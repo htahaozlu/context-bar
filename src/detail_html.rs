@@ -11,8 +11,9 @@ pub fn render(snap: &UsageSnapshot) -> String {
     let updated = snap.collected_at.as_deref().unwrap_or("-");
     let mut html = String::new();
     html.push_str(HEAD);
+    html.push_str(r#"<div class="app-shell">"#);
     html.push_str(&format!(
-        r#"<header><h1>{}</h1><div class="muted">{} {}</div></header>"#,
+        r#"<header><div class="title-block"><h1>{}</h1><div class="muted">{} {}</div></div></header>"#,
         lang.text("Agent Usage Detail", "Ajan Kullanım Detayı"),
         lang.text("Updated", "Güncellendi"),
         html_escape(updated),
@@ -36,6 +37,7 @@ pub fn render(snap: &UsageSnapshot) -> String {
     html.push_str(&panel("sessions", false, &render_sessions(snap, lang)));
     html.push_str(&panel("breakdown", false, &render_breakdown(snap, lang)));
     html.push_str(r#"</main>"#);
+    html.push_str(r#"</div>"#);
     html.push_str(FOOT);
     html
 }
@@ -472,20 +474,30 @@ const HEAD: &str = r#"<!doctype html>
 * { box-sizing: border-box; margin:0; padding:0; }
 body {
   min-height: 100vh;
-  background: var(--bg);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--panel) 72%, transparent), transparent 180px),
+    var(--bg);
   color: var(--text);
   font: 13px/1.45 -apple-system, "SF Pro Text", ui-sans-serif, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+.app-shell {
+  min-height: 100vh;
+}
 
 /* ── Header ───────────────────────────────────────────── */
 header {
-  padding: 20px 28px 14px;
+  padding: 18px 24px 12px;
   border-bottom: 1px solid var(--separator);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   background: var(--panel);
   position: sticky; top: 0; z-index: 10;
+}
+h1, h2, h3 { text-wrap: balance; }
+.title-block {
+  max-width: 1180px;
+  margin: 0 auto;
 }
 h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 .muted { color: var(--muted); font-size: 11px; margin-top: 2px; }
@@ -493,11 +505,20 @@ h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 /* ── Segmented Control (macOS NSSegmentedControl style) ── */
 nav.tabs {
   display: flex;
-  padding: 14px 28px 0;
+  justify-content: center;
+  padding: 12px 24px 0;
   border-bottom: 1px solid var(--separator);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  position: sticky;
+  top: 58px;
+  z-index: 9;
 }
 .seg-ctrl {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   background: var(--seg-bg);
   border-radius: 8px;
   padding: 2px;
@@ -523,9 +544,14 @@ nav.tabs {
   color: var(--text);
   font-weight: 590;
 }
-.tab-panel { display: none; padding: 20px 28px 32px; }
+.tab-panel {
+  display: none;
+  padding: 20px 24px 34px;
+  max-width: 1228px;
+  margin: 0 auto;
+}
 .tab-panel.active { display: block; }
-main { min-height: calc(100vh - 108px); }
+main { min-height: calc(100vh - 116px); }
 
 /* ── Layout helpers ───────────────────────────────────── */
 .stack { display: flex; flex-direction: column; gap: 14px; }
@@ -539,6 +565,9 @@ main { min-height: calc(100vh - 108px); }
   padding: 18px 20px;
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 12px 28px rgba(0,0,0,0.05);
 }
 h2 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 h3 { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; margin-bottom: 10px; }
@@ -576,6 +605,7 @@ h3 { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: upp
   border-radius: 10px;
   padding: 13px;
   min-height: 195px;
+  min-width: 0;
 }
 svg.chart { width: 100%; height: 148px; display: block; }
 svg.chart rect.bar { fill: var(--bar2); opacity: 0.85; }
@@ -585,7 +615,14 @@ svg.chart text.label-x.end { text-anchor: end; }
 
 /* ── Tables ───────────────────────────────────────────── */
 .tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 10px; margin-top: 14px; }
-.table-card { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 13px; overflow-x: auto; }
+.table-card {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 13px;
+  overflow-x: auto;
+  min-width: 0;
+}
 .table-card.wide { margin-top: 14px; }
 .other-tools { margin-top: 20px; }
 .other-tools h2 { margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; }
@@ -607,10 +644,84 @@ code { font-family: "SF Mono", ui-monospace, "Menlo", monospace; font-size: 10.5
 .bar-cell span { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); }
 .empty { color: var(--muted); font-size: 11.5px; padding: 10px 8px; }
 
+@media (max-width: 920px) {
+  .today-grid,
+  .charts,
+  .tables {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 680px) {
-  header, nav.tabs { padding-left: 16px; padding-right: 16px; }
-  .tab-panel { padding: 16px; }
-  .today-grid, .metric-grid { grid-template-columns: 1fr; }
+  header,
+  nav.tabs {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  nav.tabs {
+    justify-content: flex-start;
+    overflow-x: auto;
+    top: 54px;
+  }
+  .seg-ctrl {
+    flex-wrap: nowrap;
+    width: max-content;
+  }
+  .tab-panel {
+    padding: 14px;
+  }
+  .agent-card,
+  .agent-section,
+  .chart-card,
+  .table-card {
+    border-radius: 11px;
+  }
+  .today-grid,
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+  .agent-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .status-pill {
+    align-self: flex-start;
+  }
+  .metric .value {
+    font-size: 17px;
+  }
+  table {
+    min-width: 560px;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 14px;
+  }
+  .muted,
+  h3,
+  th,
+  td,
+  code {
+    font-size: 10.5px;
+  }
+  .tab-btn {
+    padding: 5px 11px;
+    font-size: 11.5px;
+  }
+  .agent-card,
+  .agent-section {
+    padding: 15px 16px;
+  }
+  .metric {
+    min-height: 72px;
+    padding: 10px 11px;
+  }
+  .bar-cell {
+    min-width: 96px;
+    padding-right: 40px;
+  }
 }
 </style></head><body>"#;
 
