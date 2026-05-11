@@ -87,7 +87,7 @@ fn render_today(snap: &UsageSnapshot, lang: Language) -> String {
         today_agent("Codex", &snap.codex, lang)
     );
     if !snap.accounts.is_empty() {
-        out.push_str(&render_accounts(&snap.accounts, lang));
+        out.push_str(&render_accounts(&snap.accounts, &snap.claude, lang));
     }
     if !snap.others.is_empty() {
         out.push_str(&render_other_tools(&snap.others, lang));
@@ -108,30 +108,101 @@ fn plan_label(a: &AccountInfo) -> &'static str {
     }
 }
 
-fn render_accounts(accounts: &[AccountInfo], lang: Language) -> String {
-    let mut rows = String::new();
-    for a in accounts {
-        let active_marker = if a.is_active { " ●" } else { "" };
-        let limit_5h = if a.limit_5h_messages > 0 { a.limit_5h_messages.to_string() } else { "—".to_string() };
-        let limit_7d = if a.limit_7d_messages > 0 { a.limit_7d_messages.to_string() } else { "—".to_string() };
-        let row_class = if a.is_active { r#" class="active-account-row""# } else { "" };
-        rows.push_str(&format!(
-            r#"<tr{row_class}><td><strong>{}{}</strong></td><td><span class="plan-badge plan-{}">{}</span></td><td class="num">{}</td><td class="num">{}</td></tr>"#,
+fn render_accounts(accounts: &[AccountInfo], claude: &AgentUsage, lang: Language) -> String {
+    let active = accounts.iter().find(|a| a.is_active).or_else(|| accounts.first());
+
+    let limit_bars = if let Some(a) = active {
+        let plan_name = format!(
+            "{} — <span class=\"plan-badge plan-{}\">{}</span>",
             html_escape(&a.name),
-            active_marker,
             html_escape(&a.subscription_type),
-            plan_label(a),
-            limit_5h,
-            limit_7d,
-        ));
-    }
+            plan_label(a)
+        );
+
+        let bar5h = render_limit_bar(
+            lang.text("Session (5h)", "Oturum (5s)"),
+            claude.session_5h_percent,
+            a.limit_5h_messages,
+            lang,
+        );
+        let bar7d = render_limit_bar(
+            lang.text("Week (7d)", "Hafta (7g)"),
+            claude.week_7d_percent,
+            a.limit_7d_messages,
+            lang,
+        );
+
+        format!(
+            r#"<div class="limit-account-header">{plan_name}</div><div class="limit-bars">{bar5h}{bar7d}</div>"#
+        )
+    } else {
+        String::new()
+    };
+
+    // Non-active accounts: compact table
+    let other_rows: String = accounts.iter()
+        .filter(|a| !a.is_active)
+        .map(|a| {
+            let l5h = if a.limit_5h_messages > 0 { format!("{} msgs", a.limit_5h_messages) } else { "—".to_string() };
+            let l7d = if a.limit_7d_messages > 0 { format!("{} msgs", a.limit_7d_messages) } else { "—".to_string() };
+            format!(
+                r#"<tr><td><strong>{}</strong></td><td><span class="plan-badge plan-{}">{}</span></td><td class="num">{}</td><td class="num">{}</td></tr>"#,
+                html_escape(&a.name),
+                html_escape(&a.subscription_type),
+                plan_label(a),
+                l5h,
+                l7d,
+            )
+        })
+        .collect();
+
+    let other_table = if !other_rows.is_empty() {
+        format!(
+            r#"<div class="table-card wide" style="margin-top:10px"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{other_rows}</tbody></table></div>"#,
+            lang.text("account", "hesap"),
+            lang.text("plan", "plan"),
+            lang.text("5h limit", "5s limit"),
+            lang.text("7d limit", "7g limit"),
+        )
+    } else {
+        String::new()
+    };
+
     format!(
-        r#"<section class="accounts-section"><h2>{}</h2><div class="table-card wide"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div></section>"#,
-        lang.text("Accounts & Limits", "Hesaplar ve Limitler"),
-        lang.text("account", "hesap"),
-        lang.text("plan", "plan"),
-        lang.text("5h limit (msgs)", "5s limit (mesaj)"),
-        lang.text("7d limit (msgs)", "7g limit (mesaj)"),
+        r#"<section class="accounts-section"><h2>{}</h2>{limit_bars}{other_table}</section>"#,
+        lang.text("Limits", "Limitler"),
+    )
+}
+
+fn render_limit_bar(label: &str, pct: Option<f64>, total_msgs: u32, lang: Language) -> String {
+    let (pct_val, pct_text, used_text) = if let Some(p) = pct {
+        let used = ((p / 100.0) * total_msgs as f64).round() as u32;
+        let used_label = if lang == Language::Tr {
+            format!("{} / {} mesaj", used, total_msgs)
+        } else {
+            format!("{} / {} msgs", used, total_msgs)
+        };
+        (p, format!("{p:.0}%"), used_label)
+    } else if total_msgs > 0 {
+        (0.0, "—".to_string(), format!("/ {total_msgs} msgs"))
+    } else {
+        (0.0, "—".to_string(), "—".to_string())
+    };
+
+    let color = if pct_val >= 90.0 {
+        "var(--limit-danger)"
+    } else if pct_val >= 70.0 {
+        "var(--limit-warn)"
+    } else {
+        "var(--limit-ok)"
+    };
+
+    format!(
+        r#"<div class="limit-bar-item">
+  <div class="limit-bar-header"><span class="limit-bar-label">{label}</span><span class="limit-bar-pct">{pct_text}</span></div>
+  <div class="limit-bar-track"><div class="limit-bar-fill" style="width:{pct_val:.1}%;background:{color}"></div></div>
+  <div class="limit-bar-sub">{used_text}</div>
+</div>"#
     )
 }
 
@@ -627,7 +698,17 @@ svg.chart text.label-x.end { text-anchor: end; }
 .other-tools { margin-top: 20px; }
 .other-tools h2 { margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; }
 .accounts-section { margin-top: 20px; }
-.accounts-section h2 { margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; }
+.accounts-section h2 { margin-bottom: 12px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; }
+.limit-account-header { font-size: 12px; font-weight: 500; margin-bottom: 10px; }
+.limit-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 10px; }
+.limit-bar-item { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.limit-bar-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.limit-bar-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.limit-bar-pct { font-size: 18px; font-weight: 650; letter-spacing: -0.02em; }
+.limit-bar-track { height: 6px; background: var(--seg-bg); border-radius: 999px; overflow: hidden; margin-bottom: 6px; }
+.limit-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.limit-bar-sub { font-size: 10.5px; color: var(--muted); }
+:root { --limit-ok: #34C759; --limit-warn: #FF9F0A; --limit-danger: #FF3B30; }
 .plan-badge { border-radius: 999px; padding: 2px 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; }
 .plan-badge.plan-pro { background: rgba(52,199,89,0.15); color: #34C759; }
 .plan-badge.plan-max { background: rgba(10,132,255,0.15); color: #0A84FF; }

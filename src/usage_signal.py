@@ -459,6 +459,8 @@ def collect_codex():
     per_session = {}
     session_5h_oldest = None
     week_7d_oldest = None
+    latest_rate_ts = 0.0
+    latest_rate_limits = None
 
     for path in glob.glob(
         os.path.join(home, ".codex", "sessions", "**", "*.jsonl"), recursive=True
@@ -490,6 +492,13 @@ def collect_codex():
                         continue
                     if payload.get("type") != "token_count":
                         continue
+                    # rate_limits is present alongside info (may be null info)
+                    rl = payload.get("rate_limits")
+                    if isinstance(rl, dict):
+                        ts_rl = parse_iso(obj.get("timestamp")) or mtime
+                        if ts_rl > latest_rate_ts:
+                            latest_rate_ts = ts_rl
+                            latest_rate_limits = rl
                     info = payload.get("info") or {}
                     if not isinstance(info, dict):
                         continue
@@ -543,6 +552,23 @@ def collect_codex():
                             out["last_context_pct"] = round(inp / int(window) * 100.0, 2)
         except OSError:
             continue
+
+    if latest_rate_limits:
+        primary = latest_rate_limits.get("primary") or {}
+        secondary = latest_rate_limits.get("secondary") or {}
+        # Only use primary if its reset window hasn't passed yet
+        p_resets = primary.get("resets_at")
+        if "used_percent" in primary and p_resets and p_resets > NOW:
+            out["session_5h_percent"] = parse_usage_percent(primary["used_percent"])
+            out["session_5h_resets_at"] = datetime.fromtimestamp(
+                p_resets, tz=timezone.utc
+            ).isoformat().replace("+00:00", "Z")
+        s_resets = secondary.get("resets_at")
+        if "used_percent" in secondary and s_resets and s_resets > NOW:
+            out["week_7d_percent"] = parse_usage_percent(secondary["used_percent"])
+            out["week_7d_resets_at"] = datetime.fromtimestamp(
+                s_resets, tz=timezone.utc
+            ).isoformat().replace("+00:00", "Z")
 
     if out["active_session_file"]:
         s = per_session.get(out["active_session_file"])

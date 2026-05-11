@@ -26,10 +26,10 @@ pub fn render(snapshot: &ContextSnapshot, usage: &UsageSnapshot) -> String {
     let active = usage.accounts.iter().find(|a| a.is_active)
         .or_else(|| usage.accounts.first());
     if let Some(a) = active {
-        out.push_str("## Subscription\n\n");
-        out.push_str("| Account | Plan | 5h limit | 7d limit |\n");
-        out.push_str("|---|---|---:|---:|\n");
-        out.push_str(&format_account_row(a));
+        out.push_str("## Limits\n\n");
+        out.push_str("| | 5h session | 7d week |\n");
+        out.push_str("|---|---|---|\n");
+        out.push_str(&format_limit_row(a, &usage.claude));
         out.push('\n');
     }
 
@@ -46,19 +46,38 @@ pub fn render(snapshot: &ContextSnapshot, usage: &UsageSnapshot) -> String {
     out
 }
 
-fn format_account_row(a: &AccountInfo) -> String {
+fn format_limit_row(a: &AccountInfo, claude: &AgentUsage) -> String {
     let plan = match a.subscription_type.as_str() {
-        "pro" => "Pro".to_string(),
+        "pro" => "Pro",
         "max" => {
-            if a.rate_limit_tier.contains("20x") { "Max 20×".to_string() }
-            else if a.rate_limit_tier.contains("5x") { "Max 5×".to_string() }
-            else { "Max".to_string() }
+            if a.rate_limit_tier.contains("20x") { "Max 20×" }
+            else if a.rate_limit_tier.contains("5x") { "Max 5×" }
+            else { "Max" }
         }
-        other => other.to_string(),
+        _ => &a.subscription_type,
     };
-    let l5h = if a.limit_5h_messages > 0 { a.limit_5h_messages.to_string() } else { "—".to_string() };
-    let l7d = if a.limit_7d_messages > 0 { a.limit_7d_messages.to_string() } else { "—".to_string() };
-    format!("| {} | {} | {} msgs | {} msgs |\n", a.name, plan, l5h, l7d)
+    let cell5h = format_pct_cell(claude.session_5h_percent, a.limit_5h_messages);
+    let cell7d = format_pct_cell(claude.week_7d_percent, a.limit_7d_messages);
+    format!("| {} {} | {} | {} |\n", a.name, plan, cell5h, cell7d)
+}
+
+fn format_pct_cell(pct: Option<f64>, total: u32) -> String {
+    match pct {
+        Some(p) => {
+            let bar = ascii_bar(p, 10);
+            let used = ((p / 100.0) * total as f64).round() as u32;
+            format!("{bar} **{p:.0}%** ({used}/{total})")
+        }
+        None => {
+            if total > 0 { format!("— / {total} msgs") } else { "—".to_string() }
+        }
+    }
+}
+
+fn ascii_bar(pct: f64, width: usize) -> String {
+    let filled = ((pct / 100.0) * width as f64).round() as usize;
+    let filled = filled.min(width);
+    format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
 }
 
 fn format_row(label: &str, usage: &AgentUsage) -> String {

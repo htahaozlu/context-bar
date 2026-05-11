@@ -503,24 +503,33 @@ final class SparklineView: NSView {
 /// with a horizontal progress bar showing window-elapsed fraction.
 final class LimitRowView: NSView {
     private let labelField = NSTextField(labelWithString: "")
-    private let tokenField = NSTextField(labelWithString: "")
+    private let pctField   = NSTextField(labelWithString: "")
     private let resetField = NSTextField(labelWithString: "")
-    private let bar = ProgressBarView()
+    private let bar        = ProgressBarView()
 
-    override var intrinsicContentSize: NSSize { NSSize(width: 320, height: 22) }
+    override var intrinsicContentSize: NSSize { NSSize(width: 320, height: 38) }
 
-    init(label: String, tokens: String, reset: String) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 320, height: 22))
+    init(label: String, percent: Double?, reset: String) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 320, height: 38))
+
+        let pctText = percent.map { String(format: "%.0f%%", $0) } ?? "—"
+        let barValue = (percent ?? 0) / 100.0
+        let barColor: NSColor = {
+            guard let p = percent else { return .controlAccentColor }
+            if p >= 90 { return .systemRed }
+            if p >= 70 { return .systemOrange }
+            return .systemGreen
+        }()
 
         labelField.stringValue = label
         labelField.font = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
         labelField.textColor = .secondaryLabelColor
         labelField.translatesAutoresizingMaskIntoConstraints = false
 
-        tokenField.stringValue = tokens
-        tokenField.font = NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
-        tokenField.textColor = .labelColor
-        tokenField.translatesAutoresizingMaskIntoConstraints = false
+        pctField.stringValue = pctText
+        pctField.font = NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+        pctField.textColor = barColor
+        pctField.translatesAutoresizingMaskIntoConstraints = false
 
         resetField.stringValue = "↻ \(reset)"
         resetField.font = NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize - 1, weight: .regular)
@@ -528,19 +537,28 @@ final class LimitRowView: NSView {
         resetField.alignment = .right
         resetField.translatesAutoresizingMaskIntoConstraints = false
 
-        addSubview(labelField); addSubview(tokenField); addSubview(resetField)
+        bar.value = barValue
+        bar.tint = barColor
+        bar.corner = 2
+        bar.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(labelField); addSubview(pctField); addSubview(resetField); addSubview(bar)
         NSLayoutConstraint.activate([
             labelField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
-            labelField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            labelField.widthAnchor.constraint(equalToConstant: 56),
+            labelField.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            labelField.widthAnchor.constraint(equalToConstant: 36),
 
-            tokenField.leadingAnchor.constraint(equalTo: labelField.trailingAnchor, constant: 4),
-            tokenField.firstBaselineAnchor.constraint(equalTo: labelField.firstBaselineAnchor),
+            pctField.leadingAnchor.constraint(equalTo: labelField.trailingAnchor, constant: 6),
+            pctField.firstBaselineAnchor.constraint(equalTo: labelField.firstBaselineAnchor),
 
             resetField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             resetField.firstBaselineAnchor.constraint(equalTo: labelField.firstBaselineAnchor),
+
+            bar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
+            bar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            bar.topAnchor.constraint(equalTo: labelField.bottomAnchor, constant: 5),
+            bar.heightAnchor.constraint(equalToConstant: 4),
         ])
-        _ = bar
     }
     required init?(coder: NSCoder) { fatalError() }
 }
@@ -1335,9 +1353,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
-        // Limits — rolling 5h/7d usage windows with reset countdowns, so the
-        // user can see remaining budget without opening the detail page.
-        if !all.isEmpty {
+        // Limits — rolling 5h/7d usage windows for subscription-based agents.
+        // Only shown for agents that have actual percent data (Claude Pro/Max).
+        // Codex uses OpenAI token billing with no rolling message limits.
+        let limitAgents = all.filter { $0.session5hPercent != nil || $0.week7dPercent != nil }
+        if !limitAgents.isEmpty {
             menu.addItem(NSMenuItem.separator())
             let h = NSMenuItem()
             h.isEnabled = false
@@ -1349,7 +1369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 ]
             )
             menu.addItem(h)
-            for a in all {
+            for a in limitAgents {
                 appendLimits(menu: menu, agent: a)
             }
         }
@@ -1618,18 +1638,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(nameItem)
 
-        for (label, tokens, resetsAt) in [
-            ("5h", a.session5h, a.session5hResetsAt),
-            ("7d", a.week7d, a.week7dResetsAt),
+        for (label, percent, resetsAt) in [
+            ("5h", a.session5hPercent, a.session5hResetsAt),
+            ("7d", a.week7dPercent, a.week7dResetsAt),
         ] {
             let view = LimitRowView(
                 label: label,
-                tokens: label == "5h"
-                    ? Hud.formatUsageValue(percent: a.session5hPercent, tokens: tokens)
-                    : Hud.formatUsageValue(percent: a.week7dPercent, tokens: tokens),
+                percent: percent,
                 reset: Hud.resetsIn(resetsAt)
             )
-            view.frame = NSRect(x: 0, y: 0, width: 320, height: 22)
+            view.frame = NSRect(x: 0, y: 0, width: 320, height: 38)
             let item = NSMenuItem()
             item.isEnabled = false
             item.view = view
