@@ -112,6 +112,27 @@ Arastirma sirasinda su iki urun gereksinimi icin acik, dogrudan ve resmi bir ext
 
 Bu ikisi urunun cekirdegi oldugu icin, teknik plan bunlari "dogrulanmis", "muhtemel" ve "fallback" yollar olarak ayirmali.
 
+## Gozlenen runtime bulgusu: Zed Preview + Codex ACP
+
+Elle yapilan runtime dogrulamasinda su durum gozlemlendi:
+
+1. `Zed Context Pilot` extension'i Zed Preview icinde yuklenmis gorunuyor.
+2. Extension manifest'indeki slash command'ler (`hello`, `brief`, `doctor`) extension index'inde de gorunuyor.
+3. Buna ragmen Codex ACP thread yuzeyinde slash autocomplete sadece ACP komutlarini gosteriyor:
+   - `/review`
+   - `/review-branch`
+   - `/review-commit`
+   - `/init`
+   - `/compact`
+   - `/logout`
+4. Bu yuzeyde `/doctor` denendiginde komut extension'a degil `codex-acp` provider'ina gidiyor ve "not supported by codex-acp" hatasi veriyor.
+
+Cikarim:
+
+- Zed Preview icindeki Codex ACP thread'i, Zed extension slash command registry'sini dogrudan consume etmiyor.
+- Bu nedenle slash command'ler bu proje icin ana entegrasyon yolu olarak kabul edilmemeli.
+- Urun hedefi agent mode'da varsayilan context ise, entegrasyon noktasi ACP/tool/prompt katmaninda aranmak zorunda.
+
 ## Bundan sonra neyi "high signal" sayiyoruz?
 
 Bu proje icin yuksek sinyal veri su tiptedir:

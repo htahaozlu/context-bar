@@ -6,7 +6,18 @@ license = "Apache-2.0"
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 zed_extension_api = "0.7.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+serde_json = "1.0"
+
+[[example]]
+name = "snapshot"
+path = "examples/snapshot.rs"

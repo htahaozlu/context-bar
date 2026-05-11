@@ -18,6 +18,7 @@ Current state:
 - A minimal Zed extension scaffold already exists.
 - `/hello` slash command exists only as API validation.
 - This is not a slash-command-first product.
+- In Zed Preview, Codex ACP threads do not expose the extension slash commands even when the extension is loaded.
 
 Product goal:
 
@@ -36,6 +37,7 @@ Important constraints:
 - Keep the implementation high-signal and scoped.
 - Prefer a strong context engine and state model before overcommitting to uncertain Zed UI hooks.
 - Do not invent unverified Zed APIs. If a Zed integration surface is unclear, isolate it behind a small interface and document the uncertainty.
+- Optimize for agent-mode context access, not command discoverability.
 
 Implementation priorities:
 
@@ -68,6 +70,8 @@ Implementation priorities:
 
 6. Add focused documentation updates as the code evolves.
 
+7. If ACP-specific integration is not possible yet, leave the engine outputs in a shape that another integration layer can consume later without redesign.
+
 What I want from you:
 
 - inspect the current repo
@@ -75,6 +79,7 @@ What I want from you:
 - implement the context engine foundation
 - keep the extension compiling with `cargo check`
 - explain any unverified Zed integration assumptions explicitly
+- bias decisions toward "agent can read context later" rather than "user can manually trigger a command now"
 
 Do not stop after planning. Make the code changes.
 ```

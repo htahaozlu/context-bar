@@ -53,6 +53,40 @@ Ornek:
 
 Bu urunun cekirdegi degildir.
 
+## Otomatik refresh akisi
+
+Kullanici komutu calistirmadan context'in yerine oturmasi gerekiyor. `zed_extension_api` 0.7 yuzeyinde "extension yuklendi" veya "worktree acildi" icin worktree handle'i veren bir hook dogrulanmadi. Dogrulanmis tek worktree-tasimali giris noktasi slash command callback'leri.
+
+Bu yuzden:
+
+- `src/auto_refresh.rs` icindeki `refresh(worktree)` her worktree-tasimali entry point'ten side effect olarak cagrilir.
+- Cagri idempotent: `.zed-context/state.json` 20 saniyeden taze ise erkenden donulur. Bu, completion poll'leri veya hizli ard arda slash command'lerinde tekrar yurutmeyi engeller.
+- Hata yutulur. Artefaktlar danismandir; `/doctor` explicit hata yuzeyi olarak kalir.
+
+Gercek bir load-hook ortaya cikinca sadece cagri yeri degisir. Engine seam'i (`context_engine::assemble`) ve `state_writer::write` ayni kalir.
+
+## Gelistirici dogrulamasi
+
+`examples/snapshot.rs` ayni engine'i native target'te calistirir. Sadece gelistirici amaclidir, urun akisinin parcasi degildir.
+
+## Runtime sonucu: ACP thread kisiti
+
+Su anki gozlem:
+
+- Extension Zed Preview icinde yuklenebiliyor.
+- Manifest slash command'leri extension index'ine dusuyor.
+- Ancak Codex ACP thread'i bu slash command'leri kullanmiyor.
+
+Bu nedenle urunun basari kriteri su olmamali:
+
+- "Assistant panelinde `/brief` calisti"
+
+Dogrulanmasi gereken asil kriter su:
+
+- "Agent mode, kullanici istemeden bu context'i gorebiliyor mu?"
+
+Mevcut yanit: agent `.zed-context/AGENT.md` dosyasini filesystem'den okur; Claude Code icin ayni brief `CLAUDE.md` olarak repo kokune de yazilir. Dosyalar, otomatik refresh tarafindan kullanicidan komut beklemeden uretilir ve guncellenir.
+
 ## Fazlara bolunmus yaklasim
 
 ### Faz 0: API doğrulama
@@ -154,6 +188,11 @@ Amaç:
 
 - otomatik entegrasyon olmadiginda hizli kurtarma mekanizmasi sunmak
 
+Not:
+
+- Bu faz, ACP thread entegrasyonunu cozmuyor.
+- Sadece debug ve alternatif yuzey icin degerli.
+
 Örnek çıktı şablonu:
 
 ```md
@@ -213,6 +252,7 @@ Onerilen `state.json` iskeleti:
 - kullanici beklentisi sifir ek efor
 - HUD hissi surekli gorunurluk ister
 - tek komutla inject etmek "where was I?" problemini tam cozmez
+- runtime gozlemi, ACP thread'in extension slash command'lerini zaten consume etmedigini gosteriyor
 
 ### Neden once context engine?
 
@@ -258,5 +298,5 @@ zed-context/
 3. `now/session/week` ozetleyicilerini ayri fonksiyonlar halinde yaz
 4. `process:exec` capability gereksinimini manifest ve kullanici dokumantasyonuna yaz
 5. HUD yuzeyi icin Zed entegrasyon noktasini arastir
-6. otomatik assistant context hook'u icin Zed entegrasyon noktasini arastir
+6. otomatik assistant context hook'u veya ACP entegrasyon noktasini arastir
 7. fallback slash command'leri en son tamamla

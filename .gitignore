@@ -1,2 +1,5 @@
 .tmp/
 target/
+.zed-context/
+CLAUDE.md
+extension.wasm
