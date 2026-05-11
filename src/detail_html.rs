@@ -4,7 +4,7 @@
 //! report that the menubar app opens in a WKWebView. The report is a single
 //! full-page tabbed layout with no external assets.
 
-use crate::usage_signal::{AgentUsage, NamedBucket, SessionRecord, TimeBucket, ToolSummary, UsageSnapshot};
+use crate::usage_signal::{AccountInfo, AgentUsage, NamedBucket, SessionRecord, TimeBucket, ToolSummary, UsageSnapshot};
 
 pub fn render(snap: &UsageSnapshot) -> String {
     let lang = Language::detect();
@@ -84,10 +84,53 @@ fn render_today(snap: &UsageSnapshot, lang: Language) -> String {
         today_agent("Claude", &snap.claude, lang),
         today_agent("Codex", &snap.codex, lang)
     );
+    if !snap.accounts.is_empty() {
+        out.push_str(&render_accounts(&snap.accounts, lang));
+    }
     if !snap.others.is_empty() {
         out.push_str(&render_other_tools(&snap.others, lang));
     }
     out
+}
+
+fn plan_label(a: &AccountInfo) -> &'static str {
+    match a.subscription_type.as_str() {
+        "pro" => "Pro",
+        "max" => {
+            if a.rate_limit_tier.contains("20x") { "Max 20×" }
+            else if a.rate_limit_tier.contains("5x") { "Max 5×" }
+            else { "Max" }
+        }
+        "free" => "Free",
+        _ => "Unknown",
+    }
+}
+
+fn render_accounts(accounts: &[AccountInfo], lang: Language) -> String {
+    let mut rows = String::new();
+    for a in accounts {
+        let active_marker = if a.is_active { " ●" } else { "" };
+        let limit_5h = if a.limit_5h_messages > 0 { a.limit_5h_messages.to_string() } else { "—".to_string() };
+        let limit_7d = if a.limit_7d_messages > 0 { a.limit_7d_messages.to_string() } else { "—".to_string() };
+        let row_class = if a.is_active { r#" class="active-account-row""# } else { "" };
+        rows.push_str(&format!(
+            r#"<tr{row_class}><td><strong>{}{}</strong></td><td><span class="plan-badge plan-{}">{}</span></td><td class="num">{}</td><td class="num">{}</td></tr>"#,
+            html_escape(&a.name),
+            active_marker,
+            html_escape(&a.subscription_type),
+            plan_label(a),
+            limit_5h,
+            limit_7d,
+        ));
+    }
+    format!(
+        r#"<section class="accounts-section"><h2>{}</h2><div class="table-card wide"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div></section>"#,
+        lang.text("Accounts & Limits", "Hesaplar ve Limitler"),
+        lang.text("account", "hesap"),
+        lang.text("plan", "plan"),
+        lang.text("5h limit (msgs)", "5s limit (mesaj)"),
+        lang.text("7d limit (msgs)", "7g limit (mesaj)"),
+    )
 }
 
 fn render_other_tools(tools: &[ToolSummary], lang: Language) -> String {
@@ -546,6 +589,13 @@ svg.chart text.label-x.end { text-anchor: end; }
 .table-card.wide { margin-top: 14px; }
 .other-tools { margin-top: 20px; }
 .other-tools h2 { margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; }
+.accounts-section { margin-top: 20px; }
+.accounts-section h2 { margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.055em; }
+.plan-badge { border-radius: 999px; padding: 2px 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; }
+.plan-badge.plan-pro { background: rgba(52,199,89,0.15); color: #34C759; }
+.plan-badge.plan-max { background: rgba(10,132,255,0.15); color: #0A84FF; }
+.plan-badge.plan-free { background: var(--pill-idle-bg); color: var(--muted); }
+tr.active-account-row td { background: rgba(10,132,255,0.06); }
 table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 th { text-align: left; padding: 5px 8px; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--separator); white-space: nowrap; font-size: 11px; }
 td { padding: 5px 8px; border-bottom: 1px solid var(--separator); vertical-align: top; }

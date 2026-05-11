@@ -144,6 +144,35 @@ pub struct ToolSummary {
     pub last_model: Option<String>,
 }
 
+/// Subscription account read from `~/.claude/auth-*.json`.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct AccountInfo {
+    /// Filename stem, e.g. "hasan" from auth-hasan.json.
+    pub name: String,
+    /// "pro", "max", "free", etc.
+    pub subscription_type: String,
+    /// Raw tier string from the auth file.
+    pub rate_limit_tier: String,
+    /// Rolling 5-hour message limit (0 = unknown).
+    pub limit_5h_messages: u32,
+    /// Rolling 7-day message limit (0 = unknown).
+    pub limit_7d_messages: u32,
+    /// Whether this is the currently active account (matched via keychain).
+    pub is_active: bool,
+}
+
+impl AccountInfo {
+    fn from_tier(name: String, subscription_type: String, rate_limit_tier: String) -> Self {
+        let (limit_5h_messages, limit_7d_messages) = match rate_limit_tier.as_str() {
+            t if t.contains("max_20x") => (900, 4500),
+            t if t.contains("max_5x") => (225, 1125),
+            t if t.contains("max") => (225, 1125),
+            _ => (45, 225),
+        };
+        Self { name, subscription_type, rate_limit_tier, limit_5h_messages, limit_7d_messages, is_active: false }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct UsageSnapshot {
     #[serde(default)]
@@ -152,6 +181,8 @@ pub struct UsageSnapshot {
     pub codex: AgentUsage,
     #[serde(default)]
     pub others: Vec<ToolSummary>,
+    #[serde(default)]
+    pub accounts: Vec<AccountInfo>,
     #[serde(default)]
     pub collected_at: Option<String>,
     #[serde(default)]
@@ -227,7 +258,111 @@ pub fn collect_native() -> UsageSnapshot {
     }
 
     match serde_json::from_slice::<UsageSnapshot>(&output.stdout) {
-        Ok(snapshot) => snapshot,
+        Ok(mut snapshot) => {
+            snapshot.accounts = collect_accounts();
+            snapshot
+        }
         Err(error) => UsageSnapshot::unavailable(format!("usage parse failed: {error}")),
     }
+}
+
+/// Reads all `~/.claude/auth-*.json` files and returns one `AccountInfo` per file.
+/// Marks the active account by matching the token stored in macOS Keychain under
+/// service "Claude Code-credentials".
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_accounts() -> Vec<AccountInfo> {
+    use std::fs;
+    use serde_json;
+
+    let home = match std::env::var("HOME") {
+        Ok(h) => h,
+        Err(_) => return vec![],
+    };
+    let claude_dir = std::path::PathBuf::from(&home).join(".claude");
+
+    let read_dir = match fs::read_dir(&claude_dir) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+
+    let paths: Vec<_> = read_dir
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.starts_with("auth-") && n.ends_with(".json"))
+                .unwrap_or(false)
+        })
+        .collect();
+
+    // Read the active token prefix from keychain.
+    let active_token_prefix = active_token_prefix_from_keychain();
+
+    let mut accounts = Vec::new();
+    for path in &paths {
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .trim_start_matches("auth-")
+            .to_string();
+
+        let Ok(content) = fs::read_to_string(path) else { continue };
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else { continue };
+
+        let oauth = &val["claudeAiOauth"];
+        let subscription_type = oauth["subscriptionType"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
+        let rate_limit_tier = oauth["rateLimitTier"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        let file_token = oauth["accessToken"].as_str().unwrap_or("");
+
+        let mut info = AccountInfo::from_tier(stem, subscription_type, rate_limit_tier);
+        if let Some(ref prefix) = active_token_prefix {
+            if !file_token.is_empty() && file_token.starts_with(prefix.as_str()) {
+                info.is_active = true;
+            }
+        }
+        accounts.push(info);
+    }
+
+    accounts.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // If exactly one account exists, treat it as active regardless.
+    if accounts.len() == 1 {
+        accounts[0].is_active = true;
+    }
+
+    accounts
+}
+
+/// Returns the first 40 chars of the access token stored in the macOS Keychain
+/// under service "Claude Code-credentials", or None if unavailable.
+#[cfg(not(target_arch = "wasm32"))]
+fn active_token_prefix_from_keychain() -> Option<String> {
+    let output = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    // The stored value is the full auth JSON — parse it.
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+        let token = val["claudeAiOauth"]["accessToken"].as_str()?;
+        return Some(token[..token.len().min(40)].to_string());
+    }
+    // Fallback: stored value might itself be just the token string.
+    if raw.starts_with("sk-ant") {
+        return Some(raw[..raw.len().min(40)].to_string());
+    }
+    None
 }

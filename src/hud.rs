@@ -7,7 +7,7 @@
 //! drive it directly from `state.json`.
 
 use crate::context_engine::ContextSnapshot;
-use crate::usage_signal::{AgentUsage, UsageSnapshot};
+use crate::usage_signal::{AccountInfo, AgentUsage, UsageSnapshot};
 
 pub fn render(snapshot: &ContextSnapshot, usage: &UsageSnapshot) -> String {
     let mut out = String::new();
@@ -23,6 +23,16 @@ pub fn render(snapshot: &ContextSnapshot, usage: &UsageSnapshot) -> String {
     out.push_str(&format_row("Codex", &usage.codex));
     out.push('\n');
 
+    let active = usage.accounts.iter().find(|a| a.is_active)
+        .or_else(|| usage.accounts.first());
+    if let Some(a) = active {
+        out.push_str("## Subscription\n\n");
+        out.push_str("| Account | Plan | 5h limit | 7d limit |\n");
+        out.push_str("|---|---|---:|---:|\n");
+        out.push_str(&format_account_row(a));
+        out.push('\n');
+    }
+
     if usage.source != "python3" {
         out.push_str(&format!(
             "> Usage data unavailable: {}\n> Falling back to git-only signals.\n\n",
@@ -34,6 +44,21 @@ pub fn render(snapshot: &ContextSnapshot, usage: &UsageSnapshot) -> String {
         snapshot.worktree_root, snapshot.branch));
 
     out
+}
+
+fn format_account_row(a: &AccountInfo) -> String {
+    let plan = match a.subscription_type.as_str() {
+        "pro" => "Pro".to_string(),
+        "max" => {
+            if a.rate_limit_tier.contains("20x") { "Max 20×".to_string() }
+            else if a.rate_limit_tier.contains("5x") { "Max 5×".to_string() }
+            else { "Max".to_string() }
+        }
+        other => other.to_string(),
+    };
+    let l5h = if a.limit_5h_messages > 0 { a.limit_5h_messages.to_string() } else { "—".to_string() };
+    let l7d = if a.limit_7d_messages > 0 { a.limit_7d_messages.to_string() } else { "—".to_string() };
+    format!("| {} | {} | {} msgs | {} msgs |\n", a.name, plan, l5h, l7d)
 }
 
 fn format_row(label: &str, usage: &AgentUsage) -> String {
