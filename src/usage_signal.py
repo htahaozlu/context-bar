@@ -218,13 +218,16 @@ def collect_claude():
                     usage = msg.get("usage") or {}
                     if not isinstance(usage, dict):
                         continue
-                    inp = (
-                        int(usage.get("input_tokens", 0) or 0)
-                        + int(usage.get("cache_creation_input_tokens", 0) or 0)
-                        + int(usage.get("cache_read_input_tokens", 0) or 0)
-                    )
+                    # Effective consumed tokens — fresh input + cache creation
+                    # + output. cache_read is excluded because it re-reports
+                    # the same cached context every turn and would inflate
+                    # rolling totals by 10-100x for long sessions.
+                    fresh_in = int(usage.get("input_tokens", 0) or 0)
+                    cache_create = int(usage.get("cache_creation_input_tokens", 0) or 0)
+                    cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
                     outp = int(usage.get("output_tokens", 0) or 0)
-                    total = inp + outp
+                    inp = fresh_in + cache_create + cache_read  # context-window view
+                    total = fresh_in + cache_create + outp      # consumed view
                     ts = parse_iso(obj.get("timestamp")) or mtime
                     age = NOW - ts
 
@@ -352,9 +355,15 @@ def collect_codex():
                     last_use = info.get("last_token_usage") or {}
                     if not isinstance(last_use, dict):
                         continue
-                    total = int(last_use.get("total_tokens", 0) or 0)
-                    inp = int(last_use.get("input_tokens", 0) or 0)
+                    inp_raw = int(last_use.get("input_tokens", 0) or 0)
+                    cached = int(last_use.get("cached_input_tokens", 0) or 0)
                     outp = int(last_use.get("output_tokens", 0) or 0)
+                    reasoning = int(last_use.get("reasoning_output_tokens", 0) or 0)
+                    # input_tokens includes cached_input_tokens — subtract to
+                    # avoid counting the same cached prefix every turn.
+                    fresh_in = max(0, inp_raw - cached)
+                    inp = inp_raw  # context-window view (full prompt)
+                    total = fresh_in + outp + reasoning  # consumed view
                     window = info.get("model_context_window")
                     ts = parse_iso(obj.get("timestamp")) or mtime
                     age = NOW - ts
