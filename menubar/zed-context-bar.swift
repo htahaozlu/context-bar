@@ -939,33 +939,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         header.attributedTitle = attr
         menu.addItem(header)
 
-        let last = a.lastTurn.map { Hud.relative($0) } ?? "—"
         let modelStr = a.model ?? "—"
         let duration = Hud.formatDuration(a.sessionStarted, a.lastTurn)
-        let detailSep = SeparatorStore.current.isEmpty ? "·" : SeparatorStore.current
-        let detail = "      \(modelStr)  \(detailSep)  session \(duration)  \(detailSep)  \(last)"
-        let detailItem = NSMenuItem()
-        detailItem.isEnabled = false
-        detailItem.attributedTitle = NSAttributedString(
-            string: detail,
+
+        // ── Active session row ─────────────────────────────────
+        let sessionItem = NSMenuItem()
+        sessionItem.isEnabled = false
+        let sess = NSMutableAttributedString()
+        let sessionFont = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+        let mono = NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        sess.append(NSAttributedString(string: "      ", attributes: [.font: sessionFont]))
+        // Green dot when active, dim when idle
+        let dotColor: NSColor = active ? .systemGreen : .tertiaryLabelColor
+        sess.append(NSAttributedString(string: "⏺  ", attributes: [
+            .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize - 1),
+            .foregroundColor: dotColor,
+        ]))
+        sess.append(NSAttributedString(string: modelStr, attributes: [
+            .font: mono, .foregroundColor: NSColor.labelColor,
+        ]))
+        sess.append(NSAttributedString(string: "   \(duration)", attributes: [
+            .font: sessionFont, .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        sessionItem.attributedTitle = sess
+        menu.addItem(sessionItem)
+
+        // ── Last turn row ──────────────────────────────────────
+        let last = a.lastTurn.map { Hud.relative($0) } ?? "—"
+        let lastItem = NSMenuItem()
+        lastItem.isEnabled = false
+        lastItem.attributedTitle = NSAttributedString(
+            string: "             last turn   \(last)",
             attributes: [
-                .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .font: sessionFont,
+                .foregroundColor: NSColor.tertiaryLabelColor,
             ]
         )
-        menu.addItem(detailItem)
+        menu.addItem(lastItem)
 
         // If more than one session is live concurrently for this agent, render
         // a row per session so 3-5 parallel sessions stay visible. Skip the
         // top one (already represented by the header line above).
         if a.activeSessions.count > 1 {
+            let concurrentSep = SeparatorStore.current.isEmpty ? "·" : SeparatorStore.current
             let topId = a.activeSessions.first?.id
             for sess in a.activeSessions where sess.id != topId {
                 let tok = Hud.formatTokens(sess.tokens)
                 let when = sess.lastTurn.map { Hud.relative($0) } ?? "—"
                 let proj = sess.project
                 let model = sess.model ?? "—"
-                let line = "      \(theme.inactiveDot) \(proj)  \(detailSep)  \(tok)  \(detailSep)  \(model)  \(detailSep)  \(when)"
+                let line = "      \(theme.inactiveDot) \(proj)  \(concurrentSep)  \(tok)  \(concurrentSep)  \(model)  \(concurrentSep)  \(when)"
                 let item = NSMenuItem()
                 item.isEnabled = false
                 item.attributedTitle = NSAttributedString(
@@ -1002,22 +1025,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func appendLimits(menu: NSMenu, agent a: Agent) {
-        let sep = SeparatorStore.current.isEmpty ? "·" : SeparatorStore.current
-        let fiveH = Hud.formatTokens(a.session5h)
-        let weekly = Hud.formatTokens(a.week7d)
-        let fiveReset = Hud.resetsIn(a.session5hResetsAt)
-        let weekReset = Hud.resetsIn(a.week7dResetsAt)
-        let line = "      \(a.name)   5h \(fiveH) (resets \(fiveReset))  \(sep)  7d \(weekly) (resets \(weekReset))"
-        let item = NSMenuItem()
-        item.isEnabled = false
-        item.attributedTitle = NSAttributedString(
-            string: line,
+        // Agent name row
+        let nameItem = NSMenuItem()
+        nameItem.isEnabled = false
+        nameItem.attributedTitle = NSAttributedString(
+            string: "      \(a.name)",
             attributes: [
-                .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
+                .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize - 0.5),
                 .foregroundColor: NSColor.secondaryLabelColor,
             ]
         )
-        menu.addItem(item)
+        menu.addItem(nameItem)
+
+        // 5h and 7d rows
+        for (label, tokens, resetsAt) in [
+            ("5h window", Hud.formatTokens(a.session5h), a.session5hResetsAt),
+            ("7d window", Hud.formatTokens(a.week7d),    a.week7dResetsAt),
+        ] {
+            let resetStr = Hud.resetsIn(resetsAt)
+            let row = NSMenuItem()
+            row.isEnabled = false
+            row.attributedTitle = buildLimitRow(label: label, tokens: tokens, reset: resetStr)
+            menu.addItem(row)
+        }
+    }
+
+    private func buildLimitRow(label: String, tokens: String, reset: String) -> NSAttributedString {
+        let font  = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+        let mono  = NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        let s = NSMutableAttributedString()
+        s.append(NSAttributedString(string: "         \(label)   ", attributes: [
+            .font: font, .foregroundColor: NSColor.tertiaryLabelColor,
+        ]))
+        s.append(NSAttributedString(string: tokens, attributes: [
+            .font: mono, .foregroundColor: NSColor.labelColor,
+        ]))
+        s.append(NSAttributedString(string: "   resets in  ", attributes: [
+            .font: font, .foregroundColor: NSColor.tertiaryLabelColor,
+        ]))
+        s.append(NSAttributedString(string: reset, attributes: [
+            .font: mono, .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        return s
     }
 
     private func appendTool(menu: NSMenu, tool: ToolSummary) {
