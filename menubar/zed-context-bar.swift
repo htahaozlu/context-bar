@@ -127,6 +127,22 @@ final class ThemeStore {
     }
 }
 
+final class SeparatorStore {
+    static let key = "separator"
+    static let options: [(label: String, value: String)] = [
+        ("·", "·"), ("|", "|"), ("-", "-"), ("—", "—"), ("/", "/"), ("none", ""),
+    ]
+    static var current: String {
+        UserDefaults.standard.string(forKey: key) ?? "·"
+    }
+    static var currentIndex: Int {
+        options.firstIndex(where: { $0.value == current }) ?? 0
+    }
+    static func set(_ value: String) {
+        UserDefaults.standard.set(value, forKey: key)
+    }
+}
+
 struct Agent {
     let name: String
     let session5h: UInt64
@@ -335,6 +351,7 @@ final class ThemeCardView: NSView {
 final class SettingsViewController: NSViewController {
     var onThemeChange: ((String) -> Void)?
     private var cardViews: [(ThemeCardView, Theme)] = []
+    private var sepControl: NSSegmentedControl?
 
     override func loadView() { view = NSView() }
     override func viewDidLoad() { super.viewDidLoad(); buildUI() }
@@ -379,7 +396,25 @@ final class SettingsViewController: NSViewController {
         let descLabel = NSTextField(labelWithString: "Choose a color theme for the menubar and status bar.")
         descLabel.font = NSFont.systemFont(ofSize: 11)
         descLabel.textColor = .secondaryLabelColor
-        let mainStack = NSStackView(views: [titleLabel, descLabel, themeGrid])
+
+        // Separator section
+        let sepTitle = NSTextField(labelWithString: "Separator")
+        sepTitle.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        let sepDesc = NSTextField(labelWithString: "Character shown between agent name, project, and context %.")
+        sepDesc.font = NSFont.systemFont(ofSize: 11)
+        sepDesc.textColor = .secondaryLabelColor
+
+        let seg = NSSegmentedControl(
+            labels: SeparatorStore.options.map { $0.label },
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(separatorChanged(_:))
+        )
+        seg.selectedSegment = SeparatorStore.currentIndex
+        seg.translatesAutoresizingMaskIntoConstraints = false
+        sepControl = seg
+
+        let mainStack = NSStackView(views: [titleLabel, descLabel, themeGrid, sepTitle, sepDesc, seg])
         mainStack.orientation = .vertical; mainStack.alignment = .leading; mainStack.spacing = 12
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(mainStack)
@@ -397,6 +432,12 @@ final class SettingsViewController: NSViewController {
     private func updateCardSelection() {
         let current = ThemeStore.current.id
         for (card, theme) in cardViews { card.isSelected = theme.id == current }
+    }
+
+    @objc private func separatorChanged(_ sender: NSSegmentedControl) {
+        let value = SeparatorStore.options[sender.selectedSegment].value
+        SeparatorStore.set(value)
+        onThemeChange?(ThemeStore.current.id)
     }
 }
 
@@ -584,7 +625,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .foregroundColor: theme.ctxColor(pct),
         ]
         let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
-        let sep = theme.separator.isEmpty ? " " : " \(theme.separator) "
+        let rawSep = SeparatorStore.current
+        let sep = rawSep.isEmpty ? " " : " \(rawSep) "
 
         let s = NSMutableAttributedString()
         s.append(NSAttributedString(string: " \(agent)", attributes: agentAttrs))
@@ -601,7 +643,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         header.isEnabled = false
         let pctStr = a.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
         let dot = active ? theme.activeDot : theme.inactiveDot
-        let sep = theme.separator.isEmpty ? "  " : "  \(theme.separator)  "
+        let rawSep = SeparatorStore.current
+        let sep = rawSep.isEmpty ? "  " : "  \(rawSep)  "
         let titleStr = "\(dot) \(a.name)\(sep)\(a.project)\(sep)\(pctStr)"
 
         let font = NSFont.menuFont(ofSize: 0)
@@ -629,7 +672,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let last = a.lastTurn.map { Hud.relative($0) } ?? "—"
         let modelStr = a.model ?? "—"
         let duration = Hud.formatDuration(a.sessionStarted, a.lastTurn)
-        let detail = "      \(modelStr)  \(theme.separator.isEmpty ? "·" : theme.separator)  session \(duration)  \(theme.separator.isEmpty ? "·" : theme.separator)  \(last)"
+        let detailSep = SeparatorStore.current.isEmpty ? "·" : SeparatorStore.current
+        let detail = "      \(modelStr)  \(detailSep)  session \(duration)  \(detailSep)  \(last)"
         let detailItem = NSMenuItem()
         detailItem.isEnabled = false
         detailItem.attributedTitle = NSAttributedString(
