@@ -21,3 +21,8 @@ serde_json = "1.0"
 [[example]]
 name = "snapshot"
 path = "examples/snapshot.rs"
+
+[[bin]]
+name = "zed-context"
+path = "src/bin/zed-context.rs"
+required-features = []
