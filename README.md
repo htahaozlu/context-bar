@@ -32,7 +32,51 @@ Kullanicinin ilk surum icin **manuel komut calistirmasi gerekmez**. Coding agent
 
 Bu yuzden ilk otomatik refresh, extension'a Zed icinden ilk ulasan worktree-tasimali cagriya bagli olarak tetiklenir. Pratikte coding agent'lar acilis ardindan extension yuzeyiyle etkilestiginde context dosyalari yerine oturur. Daha guclu bir load-hook ortaya cikinca `auto_refresh::refresh` cagri yeri degistirilir; fonksiyonun kendisi degismez.
 
-Slash command'ler (`/brief`, `/doctor`, `/hello`) sadece **fallback ve debug** yuzeyidir; urun yuzeyi degildir.
+Slash command'ler (`/brief`, `/hud`, `/doctor`, `/hello`) sadece **fallback ve debug** yuzeyidir; urun yuzeyi degildir.
+
+### Menubar HUD (gercek "her yerde gorunur" cozum)
+
+macOS menubar'da kalir, Zed/Claude Code/baska uygulama farketmez. Her 10sn `~/.zed-context/hud.md`'i parse eder:
+
+```bash
+swiftc -O menubar/zed-context-bar.swift -o ~/.cargo/bin/zed-context-bar
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.zedcontext.bar.plist
+```
+
+Bar formati: `C 15.9M/59% · X 29.2M/50%` (Claude session5h/ctx%, Codex session5h/ctx%). Tikla → tam detay dropdown, "Open hud.md", "Refresh now", "Quit".
+
+Durdur: `launchctl bootout gui/$UID ~/Library/LaunchAgents/com.zedcontext.bar.plist`
+
+### Standalone HUD daemon (her projede dosya bazli)
+
+Zed `extension_api` 0.7 install-time hook ve status bar primitifi sunmuyor; Zed Preview'in ACP agent thread'leri extension slash command'lerini gormuyor. Bu yuzden gercek "her projede gorunur" HUD icin `zed-context` CLI'sini kullaniyoruz:
+
+```bash
+cargo install --path .              # ~/.cargo/bin/zed-context
+zed-context global                  # ~/.zed-context/hud.md yazar
+zed-context watch-global 30         # 30sn'de bir refresh, foreground
+```
+
+Arkaplanda surekli calismasi icin macOS launchd plist:
+
+```bash
+# Plist: ~/Library/LaunchAgents/com.zedcontext.hud.plist (repo'da template)
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.zedcontext.hud.plist
+```
+
+Sonra Zed'de `~/.zed-context/hud.md` ac → tab'a sag tik → **Pin Tab**. Her projede ayni tab gorunur ve 30sn'de bir taze.
+
+### Per-repo HUD (extension yolu)
+
+`/hud` ya da herhangi bir extension etkilesimi `.zed-context/hud.md` dosyasini uretir. HUD su sinyalleri **butun projeler icin** toplar:
+
+- **Claude Code**: `~/.claude/projects/**/*.jsonl` icindeki `assistant.message.usage` alanlarini okur
+- **Codex CLI**: `~/.codex/sessions/**/*.jsonl` icindeki `event_msg.token_count` alanlarini okur
+- 5 saatlik rolling session token toplami
+- 7 gunluk rolling week token toplami
+- Son turn'un context window kullanim yuzdesi (input_tokens / model_context_window)
+
+Yerel veri toplama yok; agent CLI'larinin kendi hesap-bagli kayitlari kaynak. Toplama `python3` ile `process:exec` araciligiyla yapilir (macOS/Linux preinstalled). `python3` yoksa HUD git-only fallback'e duser.
 
 ## Yukleme
 
@@ -58,6 +102,8 @@ Context engine modulleri:
 
 - `src/context_engine.rs` — `assemble(...)` non-Zed entegrasyon seam'i
 - `src/git_signal.rs`
+- `src/usage_signal.rs` + `src/usage_signal.py` — Claude/Codex transcript aggregator
+- `src/hud.rs` — HUD markdown render
 - `src/time_windows.rs`
 - `src/state_writer.rs` — atomic write
 - `src/agent_context.rs` — `AGENT.md` ve `CLAUDE.md` render
