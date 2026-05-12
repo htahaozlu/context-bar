@@ -1,4 +1,4 @@
-//! Zed Context Pilot extension entry point.
+//! Context Pilot extension entry point.
 //!
 //! The product surface is an always-on context system, not slash commands.
 //! Slash commands are kept only as debug/fallback surfaces. Modules below are
@@ -9,7 +9,7 @@
 //! ## Verified
 //! - Extension loads in Zed Preview.
 //! - `process:exec` can shell out to `git` inside the worktree.
-//! - Engine writes `.zed-context/{state.json,brief-*.md,AGENT.md}` artifacts.
+//! - Engine writes `.context-pilot/{state.json,brief-*.md,AGENT.md}` artifacts.
 //! - `run_slash_command` receives a `Worktree` and is the strongest verified
 //!   hook to wire automatic refresh into.
 //!
@@ -22,7 +22,7 @@
 //!   keeps the surface fresh idempotently. Once a real load hook ships, the
 //!   call site moves; the function does not.
 //! - Codex ACP threads in Zed Preview do not currently invoke extension slash
-//!   commands. Agents are therefore expected to read `.zed-context/AGENT.md`
+//!   commands. Agents are therefore expected to read `.context-pilot/AGENT.md`
 //!   from the filesystem (Codex/Claude conventions) until a richer
 //!   automatic-context hook is verified.
 //! - The seam for both cases is [`context_engine::assemble`], which takes
@@ -48,9 +48,9 @@ mod extension {
     use super::{auto_refresh, slash_commands};
     use zed_extension_api::{self as zed, Result};
 
-    struct ZedContextPilot;
+    struct ContextPilot;
 
-    impl zed::Extension for ZedContextPilot {
+    impl zed::Extension for ContextPilot {
         fn new() -> Self {
             Self
         }
@@ -71,5 +71,5 @@ mod extension {
         }
     }
 
-    zed::register_extension!(ZedContextPilot);
+    zed::register_extension!(ContextPilot);
 }

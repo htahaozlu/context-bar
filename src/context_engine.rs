@@ -351,7 +351,7 @@ fn top_directories(files: &[FileObservation], limit: usize) -> Vec<String> {
 fn is_noise_area(area: &str) -> bool {
     matches!(
         area,
-        "." | ".git" | ".tmp" | ".zed-context" | "target" | "node_modules"
+        "." | ".git" | ".tmp" | ".context-pilot" | "target" | "node_modules"
     )
 }
 
@@ -437,7 +437,7 @@ fn collect_dir(
 fn should_skip_dir(path: &Path) -> bool {
     matches!(
         path.file_name().and_then(|value| value.to_str()),
-        Some(".git" | "target" | ".zed-context" | "node_modules" | ".tmp")
+        Some(".git" | "target" | ".context-pilot" | "node_modules" | ".tmp")
     )
 }
 

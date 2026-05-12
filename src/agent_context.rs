@@ -1,6 +1,6 @@
 //! Combined, agent-readable brief.
 //!
-//! Produces `.zed-context/AGENT.md` — a compact briefing any coding agent
+//! Produces `.context-pilot/AGENT.md` — a compact briefing any coding agent
 //! (Codex ACP, Claude Code, future MCP bridge) can read on demand. Format
 //! is stable so a future bridge can ship without redesigning the engine.
 //!

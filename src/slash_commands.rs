@@ -47,7 +47,7 @@ fn run_brief(worktree: Option<&zed::Worktree>) -> Result<zed::SlashCommandOutput
         Ok(paths) => format!(
             "Artifacts updated under `{}` (`{}`, `{}`, `{}`, `{}`, `{}`). \
              Agents can read `AGENT.md` directly.",
-            root.join(".zed-context").display(),
+            root.join(".context-pilot").display(),
             paths.state_path.display(),
             paths.now_brief_path.display(),
             paths.session_brief_path.display(),
@@ -157,7 +157,7 @@ fn run_doctor(worktree: Option<&zed::Worktree>) -> Result<zed::SlashCommandOutpu
     };
 
     let next_step = if snapshot_result.is_ok() {
-        "Runtime basics look healthy. Next step: run `/brief` and inspect `.zed-context/` artifacts."
+        "Runtime basics look healthy. Next step: run `/brief` and inspect `.context-pilot/` artifacts."
     } else {
         "If `process exec` failed, check Zed's `granted_extension_capabilities` for `process:exec` and review `Zed.log`."
     };

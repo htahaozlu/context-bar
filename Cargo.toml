@@ -1,5 +1,5 @@
 [package]
-name = "zed-context-pilot"
+name = "context-pilot"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
@@ -23,6 +23,6 @@ name = "snapshot"
 path = "examples/snapshot.rs"
 
 [[bin]]
-name = "zed-context"
-path = "src/bin/zed-context.rs"
+name = "context-pilot"
+path = "src/bin/context-pilot.rs"
 required-features = []

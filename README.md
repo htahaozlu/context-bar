@@ -1,133 +1,123 @@
-# Zed Context Pilot
+# Context Pilot
 
-`Zed Context Pilot`, Claude HUD benzeri "terminalde farkindalik" hissini Zed'in icine tasimayi hedefleyen bir extension prototipidir.
+Context Pilot generates persistent repository context for coding agents and exposes a lightweight usage HUD for Claude Code and Codex CLI. It started as a Zed extension experiment, but the current product surface is broader: a reusable context engine, a CLI, agent-readable artifacts, and an optional macOS menubar companion.
 
-Ana urun hedefi:
+## What it does
 
-- always-on context HUD
-- otomatik assistant context
-- zaman pencereli ozetler:
-  - `now`: son 15 dakika
-  - `session`: son 5 saat
-  - `week`: son 7 gun
+- Writes project artifacts under `.context-pilot/`
+- Produces a stable `AGENT.md` brief for local coding agents
+- Mirrors the same brief to `CLAUDE.md` for Claude Code compatibility
+- Summarizes repository activity across `now`, `session`, and `week` windows
+- Builds a usage HUD from local Claude Code and Codex CLI transcripts
+- Works through both a Zed extension surface and a standalone CLI
 
-## Kullanici akisi
+## Artifact layout
 
-1. Extension'i Zed'e yukle (asagidaki "Yukleme" bolumune bak).
-2. Zed'i bir repo uzerinde ac.
-3. Worktree extension'a ilk kez gorundugu anda `.zed-context/` artefaktlari otomatik uretilir:
-   - `.zed-context/state.json` — makine okunabilir snapshot
-   - `.zed-context/brief-now.md`
-   - `.zed-context/brief-session.md`
-   - `.zed-context/brief-week.md`
-   - `.zed-context/AGENT.md` — agent okunabilir tek dosya briefing
-   - `CLAUDE.md` — Claude Code icin ayni briefing
-4. Sonraki etkilesimlerde refresh idempotent ve ucuzdur; degisim olmadiginda dosyalar churn yapmaz.
+Each refresh writes the following files:
 
-Kullanicinin ilk surum icin **manuel komut calistirmasi gerekmez**. Coding agent (Codex ACP, Claude Code vb.) `.zed-context/AGENT.md` veya `CLAUDE.md` dosyasini filesystem uzerinden okur.
+- `.context-pilot/state.json`
+- `.context-pilot/brief-now.md`
+- `.context-pilot/brief-session.md`
+- `.context-pilot/brief-week.md`
+- `.context-pilot/AGENT.md`
+- `.context-pilot/hud.md`
+- `CLAUDE.md`
 
-## Dogrulanmis sinir
+Writes are atomic, so agents do not observe partial files mid-refresh.
 
-`zed_extension_api` 0.7 surumunde "extension yuklendi" veya "worktree acildi" icin worktree handle'i veren resmi bir hook yok. Worktree alabilen tek dogrulanmis giris noktasi slash command callback'leridir.
+## Installation
 
-Bu yuzden ilk otomatik refresh, extension'a Zed icinden ilk ulasan worktree-tasimali cagriya bagli olarak tetiklenir. Pratikte coding agent'lar acilis ardindan extension yuzeyiyle etkilestiginde context dosyalari yerine oturur. Daha guclu bir load-hook ortaya cikinca `auto_refresh::refresh` cagri yeri degistirilir; fonksiyonun kendisi degismez.
-
-Slash command'ler (`/brief`, `/hud`, `/doctor`, `/hello`) sadece **fallback ve debug** yuzeyidir; urun yuzeyi degildir.
-
-### Menubar HUD (gercek "her yerde gorunur" cozum)
-
-macOS menubar'da kalir, Zed/Claude Code/baska uygulama farketmez. Her 10sn `~/.zed-context/hud.md`'i parse eder:
+### CLI
 
 ```bash
-swiftc -O menubar/zed-context-bar.swift -o ~/.cargo/bin/zed-context-bar
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.zedcontext.bar.plist
+cargo install --path .
 ```
 
-Bar formati: `C 15.9M/59% · X 29.2M/50%` (Claude session5h/ctx%, Codex session5h/ctx%). Tikla → tam detay dropdown, "Open hud.md", "Refresh now", "Quit".
+### Zed dev extension
 
-Durdur: `launchctl bootout gui/$UID ~/Library/LaunchAgents/com.zedcontext.bar.plist`
+1. Open the Extensions view in Zed.
+2. Choose `Install Dev Extension`.
+3. Select this repository.
+4. If needed, grant `process:exec` under `granted_extension_capabilities`.
 
-### Standalone HUD daemon (her projede dosya bazli)
+## Usage
 
-Zed `extension_api` 0.7 install-time hook ve status bar primitifi sunmuyor; Zed Preview'in ACP agent thread'leri extension slash command'lerini gormuyor. Bu yuzden gercek "her projede gorunur" HUD icin `zed-context` CLI'sini kullaniyoruz:
+### Refresh the current repository
 
 ```bash
-cargo install --path .              # ~/.cargo/bin/zed-context
-zed-context global                  # ~/.zed-context/hud.md yazar
-zed-context watch-global 30         # 30sn'de bir refresh, foreground
+context-pilot hud
 ```
 
-Arkaplanda surekli calismasi icin macOS launchd plist:
+### Write all artifacts without printing the HUD
 
 ```bash
-# Plist: ~/Library/LaunchAgents/com.zedcontext.hud.plist (repo'da template)
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.zedcontext.hud.plist
+context-pilot snapshot
 ```
 
-Sonra Zed'de `~/.zed-context/hud.md` ac → tab'a sag tik → **Pin Tab**. Her projede ayni tab gorunur ve 30sn'de bir taze.
+### Keep repository artifacts fresh
 
-### Per-repo HUD (extension yolu)
-
-`/hud` ya da herhangi bir extension etkilesimi `.zed-context/hud.md` dosyasini uretir. HUD su sinyalleri **butun projeler icin** toplar:
-
-- **Claude Code**: `~/.claude/projects/**/*.jsonl` icindeki `assistant.message.usage` alanlarini okur
-- **Codex CLI**: `~/.codex/sessions/**/*.jsonl` icindeki `event_msg.token_count` alanlarini okur
-- 5 saatlik rolling session token toplami
-- 7 gunluk rolling week token toplami
-- Son turn'un context window kullanim yuzdesi (input_tokens / model_context_window)
-
-Yerel veri toplama yok; agent CLI'larinin kendi hesap-bagli kayitlari kaynak. Toplama `python3` ile `process:exec` araciligiyla yapilir (macOS/Linux preinstalled). `python3` yoksa HUD git-only fallback'e duser.
-
-## Yukleme
-
-Zed icinde dev extension olarak yuklemek icin:
-
-1. `cmd-shift-x`
-2. `Install Dev Extension`
-3. Bu dizini sec
-4. Gerekirse settings icinde `granted_extension_capabilities` altina `process:exec` izni ekle
-
-Debug icin:
-
-- `zed: open log`
-- Terminalden `zed --foreground`
-
-## Lisans ve Destek
-
-Bu repo `Apache-2.0` lisansi ile yayinlanir. GitHub Sponsors yuzeyi `.github/FUNDING.yml` ile tanimlanir; public yayina hazirlanirken buraya ek sponsor baglantilari konabilir.
-
-## Mevcut prototip
-
-Context engine modulleri:
-
-- `src/context_engine.rs` — `assemble(...)` non-Zed entegrasyon seam'i
-- `src/git_signal.rs`
-- `src/usage_signal.rs` + `src/usage_signal.py` — Claude/Codex transcript aggregator
-- `src/hud.rs` — HUD markdown render
-- `src/time_windows.rs`
-- `src/state_writer.rs` — atomic write
-- `src/agent_context.rs` — `AGENT.md` ve `CLAUDE.md` render
-- `src/auto_refresh.rs` — idempotent otomatik refresh
-- `src/slash_commands.rs` — fallback/debug
-
-Toplanan sinyaller:
-
-- aktif branch
-- son 7 gundeki commit ozetleri
-- staged / unstaged degisiklik ozetleri
-- dosya `mtime` bilgisinden `now/session/week` gorunumu
-
-## Gelistirici arac
-
-`examples/snapshot.rs` Zed'i ayaga kaldirmadan engine'i native target'te dogrulamak icindir. Sadece gelistirici amaclidir, urun akisinin parcasi degildir:
-
+```bash
+context-pilot watch 30 .
 ```
+
+### Generate the global HUD
+
+```bash
+context-pilot global
+context-pilot watch-global 30
+```
+
+The global HUD is written to `~/.context-pilot/hud.md`. Pin that file in Zed if you want a persistent cross-project tab.
+
+## macOS app and DMG
+
+The repository includes packaging scripts for the optional menubar companion:
+
+```bash
+scripts/build-menubar-app.sh
+scripts/create-macos-dmg.sh
+```
+
+This produces:
+
+- `dist/Context Pilot Bar.app`
+- `dist/Context-Pilot-Bar.dmg`
+
+The DMG includes a short install note that tells users to drag the app into `Applications`, launch it once, then eject and delete the DMG.
+
+## How the data is collected
+
+Context Pilot combines:
+
+- Git branch, recent commits, and worktree status
+- File activity inferred from repository mtimes
+- Claude Code usage from `~/.claude/projects/**/*.jsonl`
+- Codex CLI usage from `~/.codex/sessions/**/*.jsonl`
+
+No external service is required for the core repository summaries. Usage aggregation relies on locally available transcript data and `python3`.
+
+## Current constraints
+
+- Zed `extension_api` `0.7` does not expose a load-time worktree hook.
+- Zed does not yet expose a persistent HUD primitive for extensions.
+- Agent auto-injection is file-based today; agents read `.context-pilot/AGENT.md` or `CLAUDE.md`.
+
+Because of those limits, the CLI is the most reliable always-on surface today.
+
+## Repository layout
+
+- `src/` core engine, artifact rendering, Zed integration, and usage aggregation
+- `src/bin/context-pilot.rs` standalone CLI entry point
+- `menubar/context-pilot-bar.swift` optional macOS menubar companion
+- `examples/snapshot.rs` native development harness
+
+## Development
+
+```bash
+cargo check
 cargo run --example snapshot
 ```
 
-## Sinirlar
+## License
 
-1. Kalici HUD/panel API'si yok — `state.json` ileride bir HUD primitifi consume etsin diye stable tutuluyor.
-2. Assistant'a otomatik prompt-injection hook'u yok — agent `AGENT.md` dosyasini filesystem'den okur.
-3. `process:exec` izni kullanici tarafinda verilir.
-4. Load-time worktree hook'u yok — yukaridaki "Dogrulanmis sinir" bolumune bak.
+Apache-2.0

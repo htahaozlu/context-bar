@@ -1,5 +1,6 @@
 .tmp/
 target/
-.zed-context/
+.context-pilot/
+dist/
 CLAUDE.md
 extension.wasm

@@ -22,11 +22,11 @@ pub struct StateWriteResult {
 }
 
 /// Write all artifacts. Each file is staged to a sibling `*.tmp` path then
-/// renamed into place, so an agent reading `.zed-context/AGENT.md` (or any
+/// renamed into place, so an agent reading `.context-pilot/AGENT.md` (or any
 /// brief) never observes a truncated mid-write file. Renames on the same
 /// filesystem are atomic on POSIX and Windows ReplaceFileW.
 pub fn write(root: &Path, snapshot: &ContextSnapshot) -> Result<StateWriteResult, String> {
-    let state_dir = root.join(".zed-context");
+    let state_dir = root.join(".context-pilot");
     fs::create_dir_all(&state_dir)
         .map_err(|error| format!("failed to create {}: {error}", state_dir.display()))?;
 

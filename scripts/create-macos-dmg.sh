@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DIST_DIR="$ROOT/dist"
+APP_NAME="Context Pilot Bar.app"
+APP_PATH="$DIST_DIR/$APP_NAME"
+STAGE_DIR="$DIST_DIR/dmg-staging"
+DMG_PATH="$DIST_DIR/Context-Pilot-Bar.dmg"
+TXT_SRC="$ROOT/packaging/macos/Install Context Pilot Bar.txt"
+
+"$ROOT/scripts/build-menubar-app.sh"
+
+rm -rf "$STAGE_DIR" "$DMG_PATH"
+mkdir -p "$STAGE_DIR"
+
+cp -R "$APP_PATH" "$STAGE_DIR/"
+cp "$TXT_SRC" "$STAGE_DIR/"
+ln -s /Applications "$STAGE_DIR/Applications"
+
+hdiutil create \
+  -volname "Context Pilot Bar" \
+  -srcfolder "$STAGE_DIR" \
+  -ov \
+  -format UDZO \
+  "$DMG_PATH" >/dev/null
+
+rm -rf "$STAGE_DIR"
+
+echo "Built $DMG_PATH"
