@@ -1,7 +1,7 @@
 # ContextHUD
 
 <p align="center">
-  <img src="logo.png" alt="ContextHUD logosu" width="360">
+  <img src="logo.png" alt="ContextHUD logosu" width="560">
 </p>
 
 <p align="center">
