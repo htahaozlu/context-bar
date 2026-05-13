@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.1.6] - 2026-05-13
+
+### Improved
+
+- In-app update flow now downloads the DMG in the background, stages the new app bundle, and prompts the user with a native "Restart to Update" action instead of sending them to GitHub or Downloads.
+- Update UI now behaves like a first-party desktop app: progress is shown inline, release notes remain optional, and the primary path is a single update-confirm-restart flow.
+
 ## [0.1.5] - 2026-05-13
 
 ### Added
