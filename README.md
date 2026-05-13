@@ -178,10 +178,26 @@ ContextHUD combines:
 
 - Git branch, recent commits, and worktree status
 - file activity inferred from repository mtimes
+- optional Claude Code statusline snapshot from `~/.context-hud/claude-statusline.json`
 - Claude Code usage from `~/.claude/projects/**/*.jsonl`
 - Codex CLI usage from `~/.codex/sessions/**/*.jsonl`
 
-No external service is required for the core repository summaries. Usage aggregation relies on locally available transcript data and `python3`.
+No external service is required for the core repository summaries. Usage aggregation relies on locally available transcripts, optional native Claude Code statusline data, and `python3`.
+
+### Claude Code parity
+
+For Claude context percentage, the best source is Claude Code's native statusline payload. ContextHUD can persist that payload locally:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "context-hud claude-statusline"
+  }
+}
+```
+
+This writes `~/.context-hud/claude-statusline.json`, which ContextHUD reads as the primary Claude context source. If the snapshot is missing or stale, ContextHUD falls back to transcript-based estimation.
 
 ## Packaging
 

@@ -48,6 +48,7 @@ WIN_30D = 30 * 86400
 ACTIVE_WINDOW = 30 * 60
 CACHE_TTL_OK = 5 * 60
 CACHE_TTL_ERR = 15
+STATUSLINE_TTL = 12 * 3600
 
 
 def parse_iso(value):
@@ -98,6 +99,16 @@ def usage_cache_path():
     if not home:
         return None
     return os.path.join(home, ".context-hud", "usage_api_cache.json")
+
+
+def claude_statusline_path():
+    override = os.environ.get("CONTEXTHUD_CLAUDE_STATUSLINE_PATH")
+    if override:
+        return override
+    home = os.environ.get("HOME", "")
+    if not home:
+        return None
+    return os.path.join(home, ".context-hud", "claude-statusline.json")
 
 
 def load_usage_cache():
@@ -228,6 +239,27 @@ def apply_claude_usage_api(out):
     return out
 
 
+def load_claude_statusline_snapshot():
+    path = claude_statusline_path()
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except Exception:
+        return None
+    ts = parse_iso(payload.get("updated_at"))
+    if ts is None:
+        try:
+            ts = os.path.getmtime(path)
+        except OSError:
+            ts = None
+    if ts is None or NOW - ts > STATUSLINE_TTL:
+        return None
+    payload["_timestamp"] = ts
+    return payload
+
+
 def build_active_sessions(per_session):
     """Return list of session dicts where last_ts is within ACTIVE_WINDOW."""
     actives = []
@@ -253,7 +285,100 @@ def claude_context_window(model):
     m = model.lower()
     if "[1m]" in m or "-1m" in m:
         return 1_000_000
+    if any(tag in m for tag in [
+        "claude-mythos",
+        "claude-opus-4-7",
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+    ]):
+        return 1_000_000
     return 200_000
+
+
+def parse_claude_rate_limit_window(rate_limits, *keys):
+    if not isinstance(rate_limits, dict):
+        return (None, None)
+    current = rate_limits
+    for key in keys:
+        current = current.get(key) if isinstance(current, dict) else None
+    if not isinstance(current, dict):
+        return (None, None)
+    pct = parse_usage_percent(current.get("used_percentage"))
+    if pct is None:
+        pct = parse_usage_percent(current.get("utilization"))
+    if pct is None:
+        pct = parse_usage_percent(current.get("used_percent"))
+    resets = current.get("resets_at")
+    if isinstance(resets, (int, float)):
+        resets = datetime.fromtimestamp(resets, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    elif not isinstance(resets, str):
+        resets = None
+    return (pct, resets)
+
+
+def apply_claude_statusline_snapshot(out):
+    snap = load_claude_statusline_snapshot()
+    if not isinstance(snap, dict):
+        return out
+
+    snap_ts = snap.get("_timestamp") or 0
+    transcript_ts = parse_iso(out.get("last_turn_at")) or 0
+    if transcript_ts and snap_ts < transcript_ts:
+        return out
+
+    ctx = snap.get("context_window") or {}
+    current_usage = ctx.get("current_usage") or {}
+
+    input_total = ctx.get("total_input_tokens")
+    if input_total is None and isinstance(current_usage, dict):
+        input_total = (
+            int(current_usage.get("input_tokens", 0) or 0)
+            + int(current_usage.get("cache_creation_input_tokens", 0) or 0)
+            + int(current_usage.get("cache_read_input_tokens", 0) or 0)
+        )
+    output_total = ctx.get("total_output_tokens")
+    if output_total is None and isinstance(current_usage, dict):
+        output_total = int(current_usage.get("output_tokens", 0) or 0)
+
+    model = snap.get("model") or {}
+    workspace = snap.get("workspace") or {}
+    cwd = workspace.get("current_dir") or snap.get("cwd")
+    model_id = model.get("id") or model.get("display_name")
+    used_pct = parse_usage_percent(ctx.get("used_percentage"))
+    window = ctx.get("context_window_size")
+    if window is not None:
+        try:
+            window = int(window)
+        except Exception:
+            window = None
+
+    out["last_turn_at"] = snap.get("updated_at") or out.get("last_turn_at")
+    if model_id:
+        out["last_model"] = model_id
+    if cwd:
+        out["last_cwd"] = cwd
+    if input_total is not None:
+        out["last_turn_input_tokens"] = int(input_total or 0)
+    if output_total is not None:
+        out["last_turn_output_tokens"] = int(output_total or 0)
+    if window:
+        out["last_context_window"] = window
+    if used_pct is not None:
+        out["last_context_pct"] = used_pct
+
+    rate_limits = snap.get("rate_limits") or {}
+    for keyset, pct_key, reset_key in [
+        (("five_hour",), "session_5h_percent", "session_5h_resets_at"),
+        (("seven_day",), "week_7d_percent", "week_7d_resets_at"),
+        (("primary",), "session_5h_percent", "session_5h_resets_at"),
+        (("secondary",), "week_7d_percent", "week_7d_resets_at"),
+    ]:
+        pct, resets = parse_claude_rate_limit_window(rate_limits, *keyset)
+        if pct is not None:
+            out[pct_key] = pct
+        if resets:
+            out[reset_key] = resets
+    return out
 
 
 def project_name_from_cwd(cwd):
@@ -447,6 +572,7 @@ def collect_claude():
     if week_7d_oldest is not None:
         ts = week_7d_oldest + WIN_WEEK
         out["week_7d_resets_at"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    out = apply_claude_statusline_snapshot(out)
     return apply_claude_usage_api(out)
 
 

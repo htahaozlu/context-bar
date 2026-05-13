@@ -171,10 +171,26 @@ ContextHUD şu kaynakları birleştirir:
 
 - Git branch, son commit'ler ve worktree durumu
 - depo `mtime` verilerinden çıkarılan dosya etkinliği
+- `~/.context-hud/claude-statusline.json` altındaki isteğe bağlı Claude Code statusline snapshot'ı
 - `~/.claude/projects/**/*.jsonl` içinden Claude Code kullanım verisi
 - `~/.codex/sessions/**/*.jsonl` içinden Codex CLI kullanım verisi
 
-Temel depo özetleri için harici servis gerekmez. Kullanım toplama, yerel transcript verilerine ve `python3` aracına dayanır.
+Temel depo özetleri için harici servis gerekmez. Kullanım toplama, yerel transcript verilerine, isteğe bağlı yerel Claude Code statusline verisine ve `python3` aracına dayanır.
+
+### Claude Code parity
+
+Claude context yüzdesi için en iyi kaynak, Claude Code'un native statusline payload'ıdır. ContextHUD bunu yerelde saklayabilir:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "context-hud claude-statusline"
+  }
+}
+```
+
+Bu komut `~/.context-hud/claude-statusline.json` dosyasını yazar ve ContextHUD bu dosyayı Claude context için birincil kaynak olarak okur. Snapshot eksikse veya bayatsa transcript tabanlı tahmine geri düşer.
 
 ## Paketleme
 

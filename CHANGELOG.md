@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.1.5] - 2026-05-13
+
+### Added
+
+- `context-hud claude-statusline`, a Claude Code statusline sink that persists native context-window snapshots under `~/.context-hud/claude-statusline.json`.
+
+### Improved
+
+- Claude context percentage now prefers Claude Code's native `context_window.used_percentage` when available, which brings the HUD into parity with Claude Code statusline surfaces.
+- Transcript fallback now recognizes 1M-context Claude models such as Sonnet 4.6 and Opus 4.6/4.7 instead of incorrectly forcing them into a 200k window.
+- Turkish localization strings in the native macOS app now render proper characters in Settings and About surfaces.
+
 ## [0.1.4] - 2026-05-13
 
 ### Added
@@ -57,4 +69,3 @@ Initial ContextHUD release.
 
 - The macOS companion app is optional; the CLI is the most reliable always-on surface today.
 - Repository summaries are local-first and do not require a hosted backend.
-

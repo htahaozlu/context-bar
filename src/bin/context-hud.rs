@@ -23,6 +23,7 @@ use std::time::Duration;
 
 use serde_json;
 
+use context_hud::claude_statusline;
 use context_hud::context_engine::{self, ContextSnapshot};
 use context_hud::git_signal::{self, ChangeSummary, CommitSummary, GitSignals};
 use context_hud::hud;
@@ -37,6 +38,7 @@ fn main() {
         "hud" => run_hud(args.get(1).map(PathBuf::from)),
         "snapshot" => run_snapshot(args.get(1).map(PathBuf::from)),
         "global" => run_global(),
+        "claude-statusline" => run_claude_statusline(args.get(1).map(PathBuf::from)),
         "watch" => {
             let secs: u64 = args
                 .get(1)
@@ -73,6 +75,7 @@ fn print_help() {
          \x20   context-hud hud          [worktree_root]   refresh repo .context-hud/hud.md\n\
          \x20   context-hud snapshot     [worktree_root]   refresh full repo artifacts\n\
          \x20   context-hud global                         write ~/.context-hud/hud.md\n\
+         \x20   context-hud claude-statusline [path]       read Claude Code stdin and write a native snapshot\n\
          \x20   context-hud watch        [secs] [root]     loop per-repo (default 30s)\n\
          \x20   context-hud watch-global [secs]            loop ~/.context-hud/hud.md\n\n\
          Pin `~/.context-hud/hud.md` in Zed for an always-visible cross-project HUD.\n"
@@ -121,6 +124,19 @@ fn run_global() -> i32 {
     }
 }
 
+fn run_claude_statusline(path: Option<PathBuf>) -> i32 {
+    match claude_statusline::write_snapshot_from_stdin(path) {
+        Ok(line) => {
+            print!("{line}");
+            0
+        }
+        Err(error) => {
+            eprintln!("claude-statusline failed: {error}");
+            1
+        }
+    }
+}
+
 fn run_watch_global(secs: u64) -> i32 {
     eprintln!("context-hud watch-global: every {secs}s. Ctrl-C to stop.");
     loop {
@@ -148,7 +164,10 @@ fn refresh_global() -> Result<PathBuf, String> {
 
     let mut out = String::new();
     out.push_str("# Agent HUD (global)\n\n");
-    out.push_str(&format!("_Updated: `{now}` · Source: `{}`_\n\n", usage.source));
+    out.push_str(&format!(
+        "_Updated: `{now}` · Source: `{}`_\n\n",
+        usage.source
+    ));
     out.push_str("| Agent | Session (5h) | Week (7d) | Context | Model | Last turn |\n");
     out.push_str("|---|---:|---:|---:|---|---|\n");
     out.push_str(&format_usage_row("Claude", &usage.claude));
@@ -237,7 +256,12 @@ fn collect_git(root: &Path) -> Result<GitSignals, String> {
         .to_string();
     let log = run_git(
         root,
-        &["log", "--since=7 days ago", "--max-count=40", "--format=%H%x09%ct%x09%s"],
+        &[
+            "log",
+            "--since=7 days ago",
+            "--max-count=40",
+            "--format=%H%x09%ct%x09%s",
+        ],
     )
     .unwrap_or_default();
     let recent_commits: Vec<CommitSummary> = git_signal::parse_commits(&log);

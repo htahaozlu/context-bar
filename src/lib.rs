@@ -29,6 +29,7 @@
 //!   pre-collected signals and is decoupled from `zed::Worktree`.
 
 pub mod agent_context;
+pub mod claude_statusline;
 pub mod context_engine;
 pub mod detail_html;
 pub mod git_signal;

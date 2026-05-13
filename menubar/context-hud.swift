@@ -1696,7 +1696,7 @@ final class AppearanceSettingsViewController: PreferencePaneViewController {
             title: L10n.text("Theme", "Tema"),
             subtitle: L10n.text(
                 "Pick the menubar palette that matches your desktop. The preview uses the same typography and accent logic shown in the status item.",
-                "Masaustune en uygun menubar paletini secin. Onizleme, durum cubugunda kullanilan ayni tipografi ve vurgu mantigini gosterir."
+                "Masaüstüne en uygun menubar paletini seçin. Önizleme, durum çubuğunda kullanılan aynı tipografi ve vurgu mantığını gösterir."
             ),
             body: themeGrid
         )
@@ -1814,11 +1814,11 @@ final class AboutViewController: PreferencePaneViewController {
 
         let actions = NSStackView(views: [
             makeActionButton(
-                title: L10n.text("Check for Updates", "Guncellemeleri kontrol et"),
+                title: L10n.text("Check for Updates", "Güncellemeleri kontrol et"),
                 action: #selector(checkForUpdates)
             ),
             makeActionButton(
-                title: L10n.text("View Changelog", "Degisiklik kaydini ac"),
+                title: L10n.text("View Changelog", "Değişiklik kaydını aç"),
                 action: #selector(openChangelog)
             )
         ])
@@ -1826,27 +1826,27 @@ final class AboutViewController: PreferencePaneViewController {
         actions.alignment = .centerY
         actions.spacing = 10
         addSection(
-            title: L10n.text("Updates", "Guncellemeler"),
+            title: L10n.text("Updates", "Güncellemeler"),
             subtitle: L10n.text(
                 "ContextHUD releases are distributed from GitHub Releases.",
-                "ContextHUD surumleri GitHub Releases uzerinden dagitilir."
+                "ContextHUD sürümleri GitHub Releases üzerinden dağıtılır."
             ),
             body: actions
         )
 
         let context = NSStackView(views: [
-            makeInfoRow(title: L10n.text("Artifacts folder", "Artifact klasoru"), value: "\(NSHomeDirectory())/.context-hud"),
+            makeInfoRow(title: L10n.text("Artifacts folder", "Artifact klasörü"), value: "\(NSHomeDirectory())/.context-hud"),
             makeInfoRow(title: L10n.text("Repository brief", "Repo brifi"), value: ".context-hud/AGENT.md"),
-            makeInfoRow(title: L10n.text("Claude compatibility", "Claude uyumlulugu"), value: "CLAUDE.md"),
+            makeInfoRow(title: L10n.text("Claude compatibility", "Claude uyumluluğu"), value: "CLAUDE.md"),
         ])
         context.orientation = .vertical
         context.spacing = 10
         context.alignment = .leading
         addSection(
-            title: L10n.text("Repository context", "Repo baglami"),
+            title: L10n.text("Repository context", "Repo bağlamı"),
             subtitle: L10n.text(
                 "Stable local brief and machine-readable sidecars so agents re-enter a project with less drift.",
-                "Ajanlar projeye daha az kayma ile geri donebilsin diye sabit yerel brief ve makinece okunabilir yan dosyalar."
+                "Ajanlar projeye daha az kayma ile geri dönebilsin diye sabit yerel brief ve makinece okunabilir yan dosyalar."
             ),
             body: context
         )
@@ -1861,29 +1861,29 @@ final class AboutViewController: PreferencePaneViewController {
         sources.spacing = 10
         sources.alignment = .leading
         addSection(
-            title: L10n.text("Data sources", "Veri kaynaklari"),
+            title: L10n.text("Data sources", "Veri kaynakları"),
             subtitle: L10n.text(
                 "Usage is built locally from existing transcript files. No remote service required.",
-                "Kullanim ozeti mevcut transcript dosyalarindan yerelde olusturulur. Uzak servis gerekmez."
+                "Kullanım özeti mevcut transcript dosyalarından yerelde oluşturulur. Uzak servis gerekmez."
             ),
             body: sources
         )
 
         let locations = NSStackView(views: [
-            makeInfoRow(title: L10n.text("Version", "Surum"), value: AppMetadata.current.detailedVersionLabel),
+            makeInfoRow(title: L10n.text("Version", "Sürüm"), value: AppMetadata.current.detailedVersionLabel),
             makeInfoRow(title: L10n.text("App bundle", "Uygulama paketi"), value: "dist/ContextHUD.app"),
             makeInfoRow(title: L10n.text("Disk image", "DMG"), value: "dist/ContextHUD.dmg"),
-            makeInfoRow(title: L10n.text("Open window", "Pencereyi ac"), value: "⌘D"),
+            makeInfoRow(title: L10n.text("Open window", "Pencereyi aç"), value: "⌘D"),
             makeInfoRow(title: L10n.text("Refresh", "Yenile"), value: "⌘R"),
         ])
         locations.orientation = .vertical
         locations.spacing = 10
         locations.alignment = .leading
         addSection(
-            title: L10n.text("Files and shortcuts", "Dosyalar ve kisayollar"),
+            title: L10n.text("Files and shortcuts", "Dosyalar ve kısayollar"),
             subtitle: L10n.text(
                 "Build artifacts live in the repository. Runtime data stays under your home directory.",
-                "Build artefact'lari repo icinde kalir. Calisma verileri home dizini altinda tutulur."
+                "Build artefact'ları repo içinde kalır. Çalışma verileri home dizini altında tutulur."
             ),
             body: locations
         )
@@ -2003,11 +2003,11 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         tabVC.tabStyle = .toolbar
 
         let usageItem = NSTabViewItem(viewController: usageVC)
-        usageItem.label = L10n.text("Usage", "Kullanim")
+        usageItem.label = L10n.text("Usage", "Kullanım")
         usageItem.image = NSImage(systemSymbolName: "chart.bar.xaxis", accessibilityDescription: usageItem.label)
 
         let appearanceItem = NSTabViewItem(viewController: appearanceVC)
-        appearanceItem.label = L10n.text("Appearance", "Gorunum")
+        appearanceItem.label = L10n.text("Appearance", "Görünüm")
         appearanceItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: appearanceItem.label)
 
         let menubarItem = NSTabViewItem(viewController: menubarVC)
@@ -2015,7 +2015,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         menubarItem.image = NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: menubarItem.label)
 
         let aboutItem = NSTabViewItem(viewController: aboutVC)
-        aboutItem.label = L10n.text("About", "Hakkinda")
+        aboutItem.label = L10n.text("About", "Hakkında")
         aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
 
         [usageItem, appearanceItem, menubarItem, aboutItem].forEach(tabVC.addTabViewItem)
