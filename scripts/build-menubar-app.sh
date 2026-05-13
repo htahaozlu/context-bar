@@ -11,7 +11,12 @@ PLIST_SRC="$ROOT/packaging/macos/ContextHUD-Info.plist"
 ENTITLEMENTS="$ROOT/packaging/macos/ContextHUD.entitlements"
 SWIFT_SRC="$ROOT/menubar/context-hud.swift"
 EXECUTABLE="$MACOS_DIR/context-hud"
+ENGINE_DST="$MACOS_DIR/context-hud-engine"
+USAGE_PY_SRC="$ROOT/src/usage_signal.py"
+USAGE_PY_DST="$RESOURCES_DIR/usage_signal.py"
 LOGO_SRC="$ROOT/logo.png"
+APP_ICON_SRC="$ROOT/app_logo.png"
+APP_ICON_DST="$RESOURCES_DIR/AppIcon.icns"
 
 # Pick a Developer ID Application identity from the keychain unless overridden.
 SIGN_IDENTITY="${DEVELOPER_ID_IDENTITY:-}"
@@ -35,13 +40,44 @@ cp "$PLIST_SRC" "$CONTENTS_DIR/Info.plist"
 if [[ -f "$LOGO_SRC" ]]; then
   cp "$LOGO_SRC" "$RESOURCES_DIR/logo.png"
 fi
+
+# Generate AppIcon.icns from app_logo.png (2048x2048 source).
+if [[ -f "$APP_ICON_SRC" ]]; then
+  ICONSET_DIR="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$ICONSET_DIR"
+  for spec in "16 16x16" "32 16x16@2x" "32 32x32" "64 32x32@2x" \
+              "128 128x128" "256 128x128@2x" "256 256x256" "512 256x256@2x" \
+              "512 512x512" "1024 512x512@2x"; do
+    size="${spec%% *}"
+    name="${spec##* }"
+    sips -z "$size" "$size" "$APP_ICON_SRC" --out "$ICONSET_DIR/icon_${name}.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET_DIR" -o "$APP_ICON_DST"
+  rm -rf "$(dirname "$ICONSET_DIR")"
+fi
 chmod +x "$EXECUTABLE"
+
+# Build and embed the Rust engine so the menubar app can regenerate hud.json
+# on demand without any external daemon. Universal binary via two passes + lipo.
+ENGINE_ARM64="$ROOT/target/aarch64-apple-darwin/release/context-hud"
+ENGINE_X86_64="$ROOT/target/x86_64-apple-darwin/release/context-hud"
+rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
+(cd "$ROOT" && cargo build --release --bin context-hud --target aarch64-apple-darwin)
+(cd "$ROOT" && cargo build --release --bin context-hud --target x86_64-apple-darwin)
+lipo -create "$ENGINE_ARM64" "$ENGINE_X86_64" -output "$ENGINE_DST"
+chmod +x "$ENGINE_DST"
+cp "$USAGE_PY_SRC" "$USAGE_PY_DST"
 
 # Strip quarantine / provenance xattrs that browsers leak into source files.
 xattr -cr "$APP_DIR" 2>/dev/null || true
 
 if [[ -n "$SIGN_IDENTITY" ]]; then
   echo "Signing with: $SIGN_IDENTITY"
+  # Inner executables must be signed before the bundle so the bundle's
+  # signature covers a fully-signed payload.
+  codesign --force --options runtime --timestamp \
+    --sign "$SIGN_IDENTITY" \
+    "$ENGINE_DST"
   codesign --force --options runtime --timestamp \
     --entitlements "$ENTITLEMENTS" \
     --sign "$SIGN_IDENTITY" \

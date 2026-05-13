@@ -8,6 +8,8 @@
     <string>ContextHUD</string>
     <key>CFBundleExecutable</key>
     <string>context-hud</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.htahaozlu.contexthud</string>
     <key>CFBundleInfoDictionaryVersion</key>

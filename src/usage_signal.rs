@@ -241,14 +241,38 @@ pub fn collect(worktree: &zed::Worktree) -> UsageSnapshot {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn resolve_usage_script() -> std::path::PathBuf {
+    use std::path::PathBuf;
+
+    if let Ok(override_path) = std::env::var("CONTEXTHUD_USAGE_SCRIPT") {
+        let p = PathBuf::from(override_path);
+        if p.is_file() {
+            return p;
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let sibling = dir.join("usage_signal.py");
+            if sibling.is_file() {
+                return sibling;
+            }
+            let resources = dir.join("../Resources/usage_signal.py");
+            if resources.is_file() {
+                return resources;
+            }
+        }
+    }
+    PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/src/usage_signal.py"))
+}
+
 pub fn collect_native() -> UsageSnapshot {
     use std::process::Command;
 
-    let script_path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/usage_signal.py");
+    let script_path = resolve_usage_script();
 
-    let output = match Command::new("python3").arg(script_path).output() {
+    let output = match Command::new("python3").arg(&script_path).output() {
         Ok(out) => out,
-        Err(_) => match Command::new("python").arg(script_path).output() {
+        Err(_) => match Command::new("python").arg(&script_path).output() {
             Ok(out) => out,
             Err(error) => {
                 return UsageSnapshot::unavailable(format!("python spawn failed: {error}"));

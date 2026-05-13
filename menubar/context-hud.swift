@@ -1707,6 +1707,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let hud = Hud()
     var lastActive: Agent?
     var previewTheme: Theme?
+    private var fsStream: FSEventStreamRef?
+    private var fsDebounce: DispatchWorkItem?
+    private var fsRunning = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -1738,10 +1741,108 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             repeats: true
         )
         RunLoop.main.add(timer, forMode: .common)
+
+        startAgentDirWatcher()
     }
 
-    @objc func tick() { refresh() }
-    @objc func refreshNow() { refresh() }
+    /// Watches the agent transcript directories so the menubar reflects the
+    /// active project the moment the user starts typing in a different repo.
+    /// FSEvents is recursive and debounced so a burst of writes only triggers
+    /// one regenerate.
+    private func startAgentDirWatcher() {
+        let home = NSHomeDirectory()
+        let paths = [
+            "\(home)/.claude/projects",
+            "\(home)/.codex/sessions",
+        ].filter { FileManager.default.fileExists(atPath: $0) }
+        guard !paths.isEmpty else { return }
+
+        var context = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+        let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
+            guard let info = info else { return }
+            let delegate = Unmanaged<AppDelegate>.fromOpaque(info).takeUnretainedValue()
+            delegate.fsEventFired()
+        }
+        guard let stream = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            callback,
+            &context,
+            paths as CFArray,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0.3,
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
+        ) else { return }
+
+        FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
+        if FSEventStreamStart(stream) {
+            fsStream = stream
+            fsRunning = true
+        } else {
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+        }
+    }
+
+    private func fsEventFired() {
+        fsDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.regenerateThenRefresh()
+        }
+        fsDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    @objc func tick() { regenerateThenRefresh() }
+    @objc func refreshNow() { regenerateThenRefresh() }
+
+    /// Spawns the bundled engine to rewrite ~/.context-hud/hud.json, then reloads
+    /// the menu. Engine runs off the main thread so the menubar stays responsive;
+    /// UI update is dispatched back to main. If the engine binary is missing
+    /// (e.g. running the Swift app standalone in dev), we still refresh from the
+    /// existing JSON so behavior degrades gracefully to the previous mode.
+    func regenerateThenRefresh() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.runEngine()
+            DispatchQueue.main.async { self?.refresh() }
+        }
+    }
+
+    private func runEngine() {
+        let bundleExe = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/MacOS/context-hud-engine")
+        let candidates: [URL] = [
+            bundleExe,
+            URL(fileURLWithPath: "/usr/local/bin/context-hud"),
+            URL(fileURLWithPath: "\(NSHomeDirectory())/.cargo/bin/context-hud"),
+        ]
+        guard let exe = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
+            return
+        }
+        let pyURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Resources/usage_signal.py")
+        let task = Process()
+        task.executableURL = exe
+        task.arguments = ["global"]
+        var env = ProcessInfo.processInfo.environment
+        if FileManager.default.fileExists(atPath: pyURL.path) {
+            env["CONTEXTHUD_USAGE_SCRIPT"] = pyURL.path
+        }
+        task.environment = env
+        task.standardOutput = Pipe()
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            // Engine missing or failed — refresh() will fall back to existing JSON.
+        }
+    }
 
     func refresh() {
         let (active, all, others) = hud.load()
