@@ -122,7 +122,16 @@ Masaustu arayuzu yerel AppKit ile yazilmistir. `detail.html`, ana deneyim degil,
 cargo install --path .
 ```
 
-### macOS uygulamasi kurulumu
+### Homebrew ile kurulum (macOS)
+
+```bash
+brew tap htahaozlu/context-hud https://github.com/htahaozlu/context-hud.git
+brew install --cask context-hud
+```
+
+Sonraki guncellemeler: `brew upgrade --cask context-hud`.
+
+### macOS uygulamasini elle kurma
 
 1. Son surumu acin.
 2. `ContextHUD.dmg` dosyasini indirin (evrensel: Apple Silicon + Intel).

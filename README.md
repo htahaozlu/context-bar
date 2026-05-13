@@ -114,7 +114,16 @@ The desktop UI is native AppKit. `detail.html` is an export artifact, not the pr
 cargo install --path .
 ```
 
-### Install the macOS app
+### Install via Homebrew (macOS)
+
+```bash
+brew tap htahaozlu/context-hud https://github.com/htahaozlu/context-hud.git
+brew install --cask context-hud
+```
+
+Upgrade later with `brew upgrade --cask context-hud`.
+
+### Install the macOS app manually
 
 1. Open the latest release.
 2. Download `ContextHUD.dmg` (universal: Apple Silicon + Intel).

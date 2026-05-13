@@ -400,12 +400,21 @@ final class Hud {
     static func resetsIn(_ date: Date?) -> String {
         guard let date else { return "—" }
         let remaining = date.timeIntervalSinceNow
+        let tr = L10n.lang == .tr
+        let dU = tr ? "g" : "d"
+        let hU = tr ? "sa" : "h"
+        let mU = tr ? "dk" : "m"
         if remaining <= 0 { return L10n.text("ready", "hazır") }
-        if remaining < 60 { return "<1m" }
-        if remaining < 3600 { return "\(Int(remaining/60))m" }
-        let h = Int(remaining / 3600)
-        let m = (Int(remaining) % 3600) / 60
-        return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+        if remaining < 60 { return "<1\(mU)" }
+        if remaining < 3600 { return "\(Int(remaining/60))\(mU)" }
+        if remaining < 86400 {
+            let h = Int(remaining / 3600)
+            let m = (Int(remaining) % 3600) / 60
+            return m == 0 ? "\(h)\(hU)" : "\(h)\(hU) \(m)\(mU)"
+        }
+        let d = Int(remaining / 86400)
+        let h = (Int(remaining) % 86400) / 3600
+        return h == 0 ? "\(d)\(dU)" : "\(d)\(dU) \(h)\(hU)"
     }
 
     static func formatDuration(_ start: Date?, _ end: Date?) -> String {
@@ -1164,11 +1173,7 @@ final class MenuHeaderView: NSView {
         subtitle.textColor = .secondaryLabelColor
         subtitle.lineBreakMode = .byTruncatingTail
 
-        let version = NSTextField(labelWithString: metadata.detailedVersionLabel)
-        version.font = NSFont.monospacedSystemFont(ofSize: 10, weight: .medium)
-        version.textColor = .tertiaryLabelColor
-
-        let textStack = NSStackView(views: [title, subtitle, version])
+        let textStack = NSStackView(views: [title, subtitle])
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 4

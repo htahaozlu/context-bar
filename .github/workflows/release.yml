@@ -125,6 +125,32 @@ jobs:
             dist/ContextHUD.dmg
             dist/ContextHUD.dmg.sha256
 
+      - name: Update Homebrew Cask
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          SHA=$(awk '{print $1}' dist/ContextHUD.dmg.sha256)
+          CASK=Casks/context-hud.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          sed -i.bak -E "s/^  version \".*\"/  version \"${VERSION}\"/" "$CASK"
+          sed -i.bak -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" "$CASK"
+          rm -f "$CASK.bak"
+          git add "$CASK"
+          if git diff --cached --quiet; then
+            echo "Cask already up-to-date."
+          else
+            git commit -m "chore(cask): bump to v${VERSION}"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:main
+          fi
+
       - name: Clean up release keychain
         if: always() && env.KEYCHAIN_PATH != ''
         shell: bash

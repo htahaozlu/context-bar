@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.1.3] - 2026-05-13
+
+### Added
+
+- Homebrew Cask (`Casks/context-hud.rb`) and release-workflow automation that bumps version + sha256 on every tag.
+
+### Improved
+
+- Menubar dropdown header no longer shows the version line; version remains in Settings → About.
+- Reset timers render `6d 3h` (or `6g 3sa` in Turkish) instead of `149h` for spans ≥ 24h.
+
 ## [0.1.0] - 2026-05-12
 
 Initial ContextHUD release.
