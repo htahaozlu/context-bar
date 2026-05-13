@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.1.8] - 2026-05-13
+
+### Added
+
+- Menubar app now ships bundled brand assets for supported agents, including Anthropic/Claude, OpenAI/Codex, Google Gemini, GitHub Copilot, and Ollama.
+
+### Improved
+
+- Settings preview, menubar title, dropdown rows, and native usage panel now render supported agents with their actual icons instead of plain names or placeholder glyphs.
+- Menubar app packaging now copies bundled brand icon assets into `ContextHUD.app/Contents/Resources/brands` for release builds.
+
 ## [0.1.7] - 2026-05-13
 
 ### Fixed

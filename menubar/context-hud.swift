@@ -187,7 +187,7 @@ enum L10n {
 
     static func displayElementLabel(_ element: DisplayElement) -> String {
         switch element {
-        case .agent: return text("Agent name", "Ajan adı")
+        case .agent: return text("Agent icon", "Ajan ikonu")
         case .project: return text("Project (cwd)", "Proje (cwd)")
         case .pct: return text("Context %", "Bağlam %")
         }
@@ -245,6 +245,76 @@ struct ToolSummary {
     let tokens7d: UInt64
     let lastUsed: String?
     let lastModel: String?
+}
+
+struct AgentVisual {
+    let assetName: String?
+    let accessibilityLabel: String
+
+    static func forName(_ name: String) -> Self {
+        switch name.lowercased() {
+        case "claude":
+            return .init(assetName: "anthropic", accessibilityLabel: "Claude")
+        case "codex":
+            return .init(assetName: "openai-blossom", accessibilityLabel: "Codex")
+        case "gemini":
+            return .init(assetName: "googlegemini", accessibilityLabel: "Gemini")
+        case "ollama":
+            return .init(assetName: "ollama", accessibilityLabel: "Ollama")
+        case "copilot cli":
+            return .init(assetName: "githubcopilot", accessibilityLabel: "Copilot CLI")
+        default:
+            return .init(assetName: nil, accessibilityLabel: name)
+        }
+    }
+}
+
+private func agentIconURL(name: String) -> URL? {
+    guard let assetName = AgentVisual.forName(name).assetName else { return nil }
+    if let bundled = Bundle.main.url(forResource: assetName, withExtension: "png", subdirectory: "brands") {
+        return bundled
+    }
+    let repoAsset = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent("menubar/assets/brands/\(assetName).png")
+    return FileManager.default.fileExists(atPath: repoAsset.path) ? repoAsset : nil
+}
+
+private func agentInlineString(
+    name: String,
+    font: NSFont,
+    fallbackColor: NSColor,
+    iconScale: CGFloat = 1.0
+) -> NSAttributedString {
+    let visual = AgentVisual.forName(name)
+    if let url = agentIconURL(name: name), let image = NSImage(contentsOf: url) {
+        let attachment = NSTextAttachment()
+        let icon = (image.copy() as? NSImage) ?? image
+        let side = max(12, round(font.capHeight * iconScale))
+        icon.size = NSSize(width: side, height: side)
+        attachment.attachmentCell = NSTextAttachmentCell(imageCell: icon)
+        attachment.bounds = NSRect(x: 0, y: round((font.capHeight - side) / 2) - 1, width: side, height: side)
+        return NSAttributedString(attachment: attachment)
+    }
+    return NSAttributedString(
+        string: visual.accessibilityLabel,
+        attributes: [
+            .font: font,
+            .foregroundColor: fallbackColor,
+        ]
+    )
+}
+
+private func agentInlineLabel(name: String, font: NSFont, color: NSColor, iconScale: CGFloat = 1.0) -> NSTextField {
+    let label = NSTextField(
+        labelWithAttributedString: agentInlineString(
+            name: name,
+            font: font,
+            fallbackColor: color,
+            iconScale: iconScale
+        )
+    )
+    label.toolTip = AgentVisual.forName(name).accessibilityLabel
+    return label
 }
 
 struct ActiveSession {
@@ -748,8 +818,12 @@ final class UsageViewController: NSViewController {
         dot.font = NSFont.systemFont(ofSize: 10)
         dot.textColor = isActive ? .systemGreen : .tertiaryLabelColor
 
-        let nameLbl = NSTextField(labelWithString: a.name)
-        nameLbl.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
+        let nameLbl = agentInlineLabel(
+            name: a.name,
+            font: NSFont.systemFont(ofSize: 16, weight: .semibold),
+            color: .labelColor,
+            iconScale: 1.15
+        )
 
         var metaParts: [String] = []
         if let m = a.model { metaParts.append(m) }
@@ -924,8 +998,11 @@ final class UsageViewController: NSViewController {
         rows.spacing = 6
         rows.translatesAutoresizingMaskIntoConstraints = false
         for t in tools {
-            let name = NSTextField(labelWithString: t.name)
-            name.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            let name = agentInlineLabel(
+                name: t.name,
+                font: NSFont.systemFont(ofSize: 12, weight: .medium),
+                color: .labelColor
+            )
             let info = NSTextField(labelWithString: "\(Hud.formatTokens(t.tokens7d))  ·  \(t.sessions7d)×/\(L10n.text("wk", "hf"))  ·  \(t.lastModel ?? "—")")
             info.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
             info.textColor = .secondaryLabelColor
@@ -1009,10 +1086,7 @@ final class ThemeCardView: NSView {
     private static func previewString(_ theme: Theme) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 11)
         let s = NSMutableAttributedString()
-        s.append(NSAttributedString(string: "Claude", attributes: [
-            .font: font,
-            .foregroundColor: theme.agentColor,
-        ]))
+        s.append(agentInlineString(name: "Claude", font: font, fallbackColor: theme.agentColor))
         s.append(NSAttributedString(string: " · ", attributes: [
             .font: font,
             .foregroundColor: theme.separatorColor,
@@ -1926,7 +2000,6 @@ final class TitlePreviewView: NSView {
     func update(items: [DisplayItem], agent: String, project: String, pct: Double?) {
         let theme = ThemeStore.current
         let font = NSFont.menuBarFont(ofSize: 0)
-        let agentAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.agentColor]
         let projectAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.projectColor]
         let ctxAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.ctxColor(pct)]
         let dim: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.separatorColor]
@@ -1947,7 +2020,7 @@ final class TitlePreviewView: NSView {
                     s.append(NSAttributedString(string: sep, attributes: dim))
                 }
                 switch item.element {
-                case .agent: s.append(NSAttributedString(string: agent, attributes: agentAttrs))
+                case .agent: s.append(agentInlineString(name: agent, font: font, fallbackColor: theme.agentColor))
                 case .project: s.append(NSAttributedString(string: project, attributes: projectAttrs))
                 case .pct: s.append(NSAttributedString(string: pctStr, attributes: ctxAttrs))
                 }
@@ -2155,8 +2228,8 @@ final class MenubarSettingsViewController: PreferencePaneViewController {
         addSection(
             title: L10n.text("Separator", "Ayraç"),
             subtitle: L10n.text(
-                "Character shown between agent, project, and context values in the menubar title.",
-                "Menubar başlığında ajan, proje ve bağlam değerleri arasında gösterilen karakter."
+                "Character shown between the agent icon, project, and context values in the menubar title.",
+                "Menubar başlığında ajan ikonu, proje ve bağlam değerleri arasında gösterilen karakter."
             ),
             body: sepControl
         )
@@ -2179,8 +2252,8 @@ final class MenubarSettingsViewController: PreferencePaneViewController {
         addSection(
             title: L10n.text("Preview", "Önizleme"),
             subtitle: L10n.text(
-                "Live sample of how the menubar title will look. Changes apply instantly.",
-                "Menubar başlığının nasıl görüneceğine dair canlı örnek. Değişiklikler anında uygulanır."
+                "Live sample of how the menubar title will look with agent icons. Changes apply instantly.",
+                "Menubar başlığının ajan ikonlarıyla nasıl görüneceğine dair canlı örnek. Değişiklikler anında uygulanır."
             ),
             body: preview
         )
@@ -2620,7 +2693,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 project: sampleProject,
                 pct: samplePct,
                 theme: t,
-                font: NSFont.menuFont(ofSize: 0)
+                font: NSFont.menuFont(ofSize: 0),
+                renderAgentAsIcon: false
             )
             themeMenu.addItem(item)
         }
@@ -2669,7 +2743,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         project: String,
         pct: Double?,
         theme: Theme,
-        font: NSFont
+        font: NSFont,
+        renderAgentAsIcon: Bool = true
     ) -> NSAttributedString {
         let agentAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
@@ -2703,7 +2778,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             switch item.element {
             case .agent:
-                s.append(NSAttributedString(string: agent, attributes: agentAttrs))
+                if renderAgentAsIcon {
+                    s.append(agentInlineString(name: agent, font: font, fallbackColor: theme.agentColor))
+                } else {
+                    s.append(NSAttributedString(string: agent, attributes: agentAttrs))
+                }
             case .project:
                 s.append(NSAttributedString(string: project, attributes: projectAttrs))
             case .pct:
@@ -2721,27 +2800,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let dot = active ? theme.activeDot : theme.inactiveDot
         let rawSep = SeparatorStore.current
         let sep = rawSep.isEmpty ? "  " : "  \(rawSep)  "
-        let titleStr = "\(dot) \(a.name)\(sep)\(a.project)\(sep)\(pctStr)"
 
         let font = NSFont.menuFont(ofSize: 0)
-        let attr = NSMutableAttributedString(
-            string: titleStr,
+        let attr = NSMutableAttributedString()
+        attr.append(NSAttributedString(
+            string: "\(dot) ",
             attributes: [.font: font, .foregroundColor: theme.agentColor]
-        )
-        if let range = titleStr.range(of: a.project) {
-            attr.addAttribute(
-                .foregroundColor,
-                value: theme.projectColor,
-                range: NSRange(range, in: titleStr)
-            )
-        }
-        if let range = titleStr.range(of: pctStr) {
-            attr.addAttribute(
-                .foregroundColor,
-                value: theme.ctxColor(a.ctxPct),
-                range: NSRange(range, in: titleStr)
-            )
-        }
+        ))
+        attr.append(agentInlineString(name: a.name, font: font, fallbackColor: theme.agentColor))
+        attr.append(NSAttributedString(
+            string: sep,
+            attributes: [.font: font, .foregroundColor: theme.separatorColor]
+        ))
+        attr.append(NSAttributedString(
+            string: a.project,
+            attributes: [.font: font, .foregroundColor: theme.projectColor]
+        ))
+        attr.append(NSAttributedString(
+            string: sep,
+            attributes: [.font: font, .foregroundColor: theme.separatorColor]
+        ))
+        attr.append(NSAttributedString(
+            string: pctStr,
+            attributes: [.font: font, .foregroundColor: theme.ctxColor(a.ctxPct)]
+        ))
         header.attributedTitle = attr
         menu.addItem(header)
 
@@ -2834,13 +2916,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Agent name row
         let nameItem = NSMenuItem()
         nameItem.isEnabled = false
-        nameItem.attributedTitle = NSAttributedString(
-            string: "      \(a.name)",
+        let nameFont = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize - 0.5)
+        let nameAttr = NSMutableAttributedString(
+            string: "      ",
             attributes: [
-                .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize - 0.5),
+                .font: nameFont,
                 .foregroundColor: NSColor.secondaryLabelColor,
             ]
         )
+        nameAttr.append(agentInlineString(name: a.name, font: nameFont, fallbackColor: NSColor.secondaryLabelColor))
+        nameItem.attributedTitle = nameAttr
         menu.addItem(nameItem)
 
         for (label, percent, resetsAt) in [
@@ -2867,13 +2952,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let sess = tool.sessions7d > 0 ? "  \(tool.sessions7d)×/\(L10n.text("wk", "hf"))" : ""
         let model = tool.lastModel.map { "  \($0)" } ?? ""
         let line = "\(tool.name)\(tok)\(sess)\(model)"
-        item.attributedTitle = NSAttributedString(
-            string: line,
+        let font = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+        let attr = NSMutableAttributedString()
+        attr.append(agentInlineString(name: tool.name, font: font, fallbackColor: NSColor.secondaryLabelColor))
+        attr.append(NSAttributedString(
+            string: " \(line)",
             attributes: [
-                .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
+                .font: font,
                 .foregroundColor: NSColor.secondaryLabelColor,
             ]
-        )
+        ))
+        item.attributedTitle = attr
         menu.addItem(item)
     }
 

@@ -17,6 +17,8 @@ USAGE_PY_DST="$RESOURCES_DIR/usage_signal.py"
 LOGO_SRC="$ROOT/logo.png"
 APP_ICON_SRC="$ROOT/app_logo.png"
 APP_ICON_DST="$RESOURCES_DIR/AppIcon.icns"
+BRAND_ICONS_SRC="$ROOT/menubar/assets/brands"
+BRAND_ICONS_DST="$RESOURCES_DIR/brands"
 APP_PLIST_DST="$CONTENTS_DIR/Info.plist"
 
 VERSION="$(sed -n 's/^version = \"\(.*\)\"/\1/p' "$ROOT/Cargo.toml" | head -n1)"
@@ -53,6 +55,10 @@ cp "$PLIST_SRC" "$APP_PLIST_DST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PLIST_DST"
 if [[ -f "$LOGO_SRC" ]]; then
   cp "$LOGO_SRC" "$RESOURCES_DIR/logo.png"
+fi
+if [[ -d "$BRAND_ICONS_SRC" ]]; then
+  mkdir -p "$BRAND_ICONS_DST"
+  cp "$BRAND_ICONS_SRC"/*.png "$BRAND_ICONS_DST"/
 fi
 
 # Generate AppIcon.icns from app_logo.png (2048x2048 source).
