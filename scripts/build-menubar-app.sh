@@ -17,6 +17,18 @@ USAGE_PY_DST="$RESOURCES_DIR/usage_signal.py"
 LOGO_SRC="$ROOT/logo.png"
 APP_ICON_SRC="$ROOT/app_logo.png"
 APP_ICON_DST="$RESOURCES_DIR/AppIcon.icns"
+APP_PLIST_DST="$CONTENTS_DIR/Info.plist"
+
+VERSION="$(sed -n 's/^version = \"\(.*\)\"/\1/p' "$ROOT/Cargo.toml" | head -n1)"
+if [[ -z "$VERSION" ]]; then
+  echo "Failed to derive version from Cargo.toml" >&2
+  exit 1
+fi
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  BUILD_NUMBER="$(git -C "$ROOT" rev-list --count HEAD)"
+else
+  BUILD_NUMBER="1"
+fi
 
 # Pick a Developer ID Application identity from the keychain unless overridden.
 SIGN_IDENTITY="${DEVELOPER_ID_IDENTITY:-}"
@@ -36,7 +48,9 @@ xcrun --sdk macosx swiftc -O -target "x86_64-apple-macos${MIN_MACOS}" "$SWIFT_SR
 lipo -create "$EXECUTABLE_ARM64" "$EXECUTABLE_X86_64" -output "$EXECUTABLE"
 rm -f "$EXECUTABLE_ARM64" "$EXECUTABLE_X86_64"
 lipo -info "$EXECUTABLE"
-cp "$PLIST_SRC" "$CONTENTS_DIR/Info.plist"
+cp "$PLIST_SRC" "$APP_PLIST_DST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_PLIST_DST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PLIST_DST"
 if [[ -f "$LOGO_SRC" ]]; then
   cp "$LOGO_SRC" "$RESOURCES_DIR/logo.png"
 fi

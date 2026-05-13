@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.1.7] - 2026-05-13
+
+### Fixed
+
+- Local app builds under `dist/ContextHUD.app` now sync `CFBundleShortVersionString` and `CFBundleVersion` from the repository version instead of incorrectly showing the template `0.1.0 (1)`.
+
 ## [0.1.6] - 2026-05-13
 
 ### Improved
