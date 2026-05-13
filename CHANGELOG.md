@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.1.4] - 2026-05-13
+
+### Added
+
+- In-app update check via GitHub Releases API with download/release-notes/later actions.
+- Live menubar title preview in Settings → Menubar.
+- Drag-and-drop reordering for title fields with explicit ⠿ handle and per-field show checkbox.
+
+### Improved
+
+- Apple-style Preferences UI: borderless grouped sections, sentence-case titles, right-aligned info values.
+- About hero redesigned: 360×120 horizontal logo, centered app name, version, and description.
+- Usage panel header now shows agent name (Claude vs Codex), model, and project explicitly.
+- Replaced misleading "1.2M of 258.4k" context subtitle with model window size only.
+- Removed redundant ContextHUD header block at the top of the menubar dropdown.
+- README restructured: install section moved to the top; Zed extension references removed.
+
 ## [0.1.3] - 2026-05-13
 
 ### Added

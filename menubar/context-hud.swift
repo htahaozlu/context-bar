@@ -624,14 +624,14 @@ final class DualStatTileView: NSView {
          sub: String, mono: Bool = true) {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 8
-        layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.5).cgColor
-        layer?.borderWidth = 1
+        layer?.cornerRadius = 10
+        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.55).cgColor
+        layer?.borderWidth = 0
 
-        let cap = NSTextField(labelWithString: caption.uppercased())
-        cap.font = NSFont.systemFont(ofSize: 9, weight: .semibold)
-        cap.textColor = .tertiaryLabelColor
+        let cap = NSTextField(labelWithString: caption)
+        cap.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        cap.textColor = .secondaryLabelColor
         cap.translatesAutoresizingMaskIntoConstraints = false
 
         let val = NSTextField(labelWithString: value)
@@ -719,7 +719,7 @@ final class UsageViewController: NSViewController {
             return
         }
         let primary = active ?? all[0]
-        let card = buildAgentCard(agent: primary, isActive: true, showsHeader: false)
+        let card = buildAgentCard(agent: primary, isActive: true, showsHeader: true)
         container.addArrangedSubview(card)
         card.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true
 
@@ -738,9 +738,9 @@ final class UsageViewController: NSViewController {
         let card = NSView()
         card.wantsLayer = true
         card.layer?.cornerRadius = 12
-        card.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.55).cgColor
-        card.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.5).cgColor
-        card.layer?.borderWidth = 1
+        card.layer?.cornerCurve = .continuous
+        card.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.6).cgColor
+        card.layer?.borderWidth = 0
         card.translatesAutoresizingMaskIntoConstraints = false
 
         // Header: ● Name  · model · project · last turn
@@ -768,7 +768,7 @@ final class UsageViewController: NSViewController {
 
         // Stat tiles
         let ctxPctStr = a.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
-        let ctxSub = a.ctxWindow.map { "\(Hud.formatTokens(a.activeSession)) of \(Hud.formatTokens($0))" } ?? "—"
+        let ctxSub = a.ctxWindow.map { L10n.text("\(Hud.formatTokens($0)) window", "\(Hud.formatTokens($0)) pencere") } ?? "—"
         let sessDur = Hud.formatDuration(a.sessionStarted, a.lastTurn)
 
         let tiles = NSStackView(views: [
@@ -1075,38 +1075,45 @@ final class AboutHeroView: NSView {
         logoView.imageScaling = .scaleProportionallyUpOrDown
         logoView.imageAlignment = .alignCenter
         logoView.translatesAutoresizingMaskIntoConstraints = false
-        logoView.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        logoView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let version = NSTextField(labelWithString: metadata.detailedVersionLabel)
-        version.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
+        let appName = NSTextField(labelWithString: "ContextHUD")
+        appName.font = NSFont.systemFont(ofSize: 22, weight: .semibold)
+        appName.textColor = .labelColor
+        appName.alignment = .center
+
+        let version = NSTextField(labelWithString: "Version \(metadata.version) (\(metadata.build))")
+        version.font = NSFont.systemFont(ofSize: 12, weight: .regular)
         version.textColor = .secondaryLabelColor
         version.alignment = .center
 
         let note = NSTextField(wrappingLabelWithString: L10n.text(
             "Native repository context and coding-agent usage visibility for macOS.",
-            "macOS icin native repository baglami ve coding-agent kullanim gorunurlugu."
+            "macOS için yerel depo bağlamı ve kodlama ajanı kullanım görünürlüğü."
         ))
-        note.font = NSFont.systemFont(ofSize: 13)
-        note.textColor = .secondaryLabelColor
+        note.font = NSFont.systemFont(ofSize: 12)
+        note.textColor = .tertiaryLabelColor
         note.maximumNumberOfLines = 0
         note.alignment = .center
 
-        let stack = NSStackView(views: [logoView, version, note])
+        let stack = NSStackView(views: [logoView, appName, version, note])
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 10
+        stack.spacing = 6
+        stack.setCustomSpacing(12, after: logoView)
+        stack.setCustomSpacing(2, after: appName)
+        stack.setCustomSpacing(10, after: version)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
 
-            logoView.heightAnchor.constraint(equalToConstant: 132),
-            logoView.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            logoView.heightAnchor.constraint(equalToConstant: 120),
+            logoView.widthAnchor.constraint(equalToConstant: 360),
+            note.widthAnchor.constraint(lessThanOrEqualToConstant: 460),
         ])
     }
 
@@ -1119,17 +1126,19 @@ final class ResponsiveInfoRowView: NSView {
         translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = NSTextField(wrappingLabelWithString: title)
-        titleLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        titleLabel.maximumNumberOfLines = 0
+        titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        titleLabel.textColor = .labelColor
+        titleLabel.maximumNumberOfLines = 1
+        titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let valueLabel = NSTextField(wrappingLabelWithString: value)
-        valueLabel.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        valueLabel.font = NSFont.systemFont(ofSize: 12, weight: .regular)
         valueLabel.textColor = .secondaryLabelColor
-        valueLabel.maximumNumberOfLines = 0
-        valueLabel.alignment = .left
-        valueLabel.lineBreakMode = .byWordWrapping
+        valueLabel.maximumNumberOfLines = 2
+        valueLabel.alignment = .right
+        valueLabel.lineBreakMode = .byTruncatingMiddle
         valueLabel.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(titleLabel)
@@ -1138,15 +1147,12 @@ final class ResponsiveInfoRowView: NSView {
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: topAnchor),
             titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
-            titleLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 132),
-            titleLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 168),
+            titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             valueLabel.topAnchor.constraint(equalTo: topAnchor),
-            valueLabel.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 14),
+            valueLabel.leadingAnchor.constraint(greaterThanOrEqualTo: titleLabel.trailingAnchor, constant: 16),
             valueLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
             valueLabel.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor),
         ])
     }
 
@@ -1291,24 +1297,283 @@ final class DisplayTableController: NSObject, NSTableViewDataSource, NSTableView
     }
 }
 
-final class PreferenceSectionCard: NSView {
-    init(content: NSView) {
+final class ChipCardView: NSView, NSDraggingSource {
+    static let dragType = NSPasteboard.PasteboardType("com.contexthud.chip")
+    let index: Int
+    var onToggle: ((Int, Bool) -> Void)?
+    private let checkbox: NSButton
+    private let handle: NSTextField
+    private let label: NSTextField
+
+    init(item: DisplayItem, index: Int) {
+        self.index = index
+        self.handle = NSTextField(labelWithString: "⠿")
+        self.label = NSTextField(labelWithString: item.element.label)
+        self.checkbox = NSButton(checkboxWithTitle: L10n.text("Show", "Göster"),
+                                 target: nil, action: nil)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 10
         layer?.cornerCurve = .continuous
-        layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
+        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.85).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
         layer?.borderWidth = 1
+        translatesAutoresizingMaskIntoConstraints = false
+
+        handle.font = NSFont.systemFont(ofSize: 16, weight: .regular)
+        handle.textColor = .tertiaryLabelColor
+        handle.translatesAutoresizingMaskIntoConstraints = false
+
+        label.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .labelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        checkbox.state = item.enabled ? .on : .off
+        checkbox.target = self
+        checkbox.action = #selector(checkboxToggled(_:))
+        checkbox.font = NSFont.systemFont(ofSize: 12)
+        checkbox.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(handle)
+        addSubview(label)
+        addSubview(checkbox)
+        NSLayoutConstraint.activate([
+            handle.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            handle.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+
+            label.leadingAnchor.constraint(equalTo: handle.trailingAnchor, constant: 8),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
+            label.centerYAnchor.constraint(equalTo: handle.centerYAnchor),
+
+            checkbox.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            checkbox.topAnchor.constraint(equalTo: handle.bottomAnchor, constant: 8),
+            checkbox.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+
+            widthAnchor.constraint(greaterThanOrEqualToConstant: 168),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .openHand)
+    }
+
+    @objc private func checkboxToggled(_ sender: NSButton) {
+        onToggle?(index, sender.state == .on)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let pt = convert(event.locationInWindow, from: nil)
+        let cbHit = checkbox.frame.insetBy(dx: -6, dy: -6)
+        if cbHit.contains(pt) {
+            super.mouseDown(with: event)
+            return
+        }
+        NSCursor.closedHand.push()
+        let start = event.locationInWindow
+        var current: NSEvent? = event
+        while let ev = current {
+            if ev.type == .leftMouseUp {
+                NSCursor.pop()
+                return
+            }
+            if ev.type == .leftMouseDragged {
+                if hypot(ev.locationInWindow.x - start.x, ev.locationInWindow.y - start.y) > 4 {
+                    NSCursor.pop()
+                    startDrag(event: ev)
+                    return
+                }
+            }
+            current = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp])
+        }
+        NSCursor.pop()
+    }
+
+    private func startDrag(event: NSEvent) {
+        let pbItem = NSPasteboardItem()
+        pbItem.setString("\(index)", forType: Self.dragType)
+        let dragItem = NSDraggingItem(pasteboardWriter: pbItem)
+        let size = bounds.size
+        let snap = NSImage(size: size)
+        snap.lockFocus()
+        if let ctx = NSGraphicsContext.current?.cgContext {
+            ctx.setAlpha(0.9)
+            layer?.render(in: ctx)
+        }
+        snap.unlockFocus()
+        dragItem.setDraggingFrame(NSRect(origin: .zero, size: size), contents: snap)
+        beginDraggingSession(with: [dragItem], event: event, source: self)
+    }
+
+    func draggingSession(_ session: NSDraggingSession,
+                         sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        return .move
+    }
+}
+
+final class ChipContainer: NSStackView {
+    var onReorder: ((Int, Int) -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        registerForDraggedTypes([ChipCardView.dragType])
+    }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        registerForDraggedTypes([ChipCardView.dragType])
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .move }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { .move }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let pbItem = sender.draggingPasteboard.pasteboardItems?.first,
+              let s = pbItem.string(forType: ChipCardView.dragType),
+              let from = Int(s) else { return false }
+        let p = convert(sender.draggingLocation, from: nil)
+        let cards = arrangedSubviews.compactMap { $0 as? ChipCardView }
+        var target = cards.count - 1
+        for (i, v) in cards.enumerated() {
+            if p.x < v.frame.midX { target = i; break }
+        }
+        onReorder?(from, target)
+        return true
+    }
+}
+
+final class HorizontalDisplayController: NSObject {
+    private var items: [DisplayItem] = DisplayStore.items
+    var onChange: (() -> Void)?
+    let container: ChipContainer
+
+    override init() {
+        self.container = ChipContainer(frame: .zero)
+        super.init()
+        container.orientation = .horizontal
+        container.spacing = 10
+        container.alignment = .top
+        container.distribution = .fillEqually
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.onReorder = { [weak self] from, to in
+            self?.reorder(from: from, to: to)
+        }
+        rebuild()
+    }
+
+    var currentItems: [DisplayItem] { items }
+
+    private func rebuild() {
+        container.arrangedSubviews.forEach {
+            container.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        for (idx, item) in items.enumerated() {
+            let card = ChipCardView(item: item, index: idx)
+            card.onToggle = { [weak self] tag, enabled in
+                guard let self = self, tag < self.items.count else { return }
+                self.items[tag].enabled = enabled
+                self.persist()
+            }
+            container.addArrangedSubview(card)
+        }
+    }
+
+    private func reorder(from: Int, to: Int) {
+        guard from >= 0, from < items.count, to >= 0, to < items.count, from != to else { return }
+        let moved = items.remove(at: from)
+        items.insert(moved, at: to)
+        DisplayStore.save(items)
+        rebuild()
+        onChange?()
+    }
+
+    private func persist() {
+        DisplayStore.save(items)
+        onChange?()
+    }
+}
+
+final class TitlePreviewView: NSView {
+    private let label = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonInit()
+    }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        commonInit()
+    }
+
+    private func commonInit() {
+        wantsLayer = true
+        layer?.cornerRadius = 8
+        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.7).cgColor
+
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.lineBreakMode = .byTruncatingTail
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
+            label.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+        ])
+    }
+
+    func update(items: [DisplayItem], agent: String, project: String, pct: Double?) {
+        let theme = ThemeStore.current
+        let font = NSFont.menuBarFont(ofSize: 0)
+        let agentAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.agentColor]
+        let projectAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.projectColor]
+        let ctxAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.ctxColor(pct)]
+        let dim: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.separatorColor]
+        let rawSep = SeparatorStore.current
+        let sep = rawSep.isEmpty ? " " : " \(rawSep) "
+        let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
+
+        let s = NSMutableAttributedString()
+        let visible = items.filter { $0.enabled }
+        if visible.isEmpty {
+            s.append(NSAttributedString(
+                string: L10n.text("(nothing selected)", "(hiçbir alan seçili değil)"),
+                attributes: [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]
+            ))
+        } else {
+            for (i, item) in visible.enumerated() {
+                if i > 0 {
+                    s.append(NSAttributedString(string: sep, attributes: dim))
+                }
+                switch item.element {
+                case .agent: s.append(NSAttributedString(string: agent, attributes: agentAttrs))
+                case .project: s.append(NSAttributedString(string: project, attributes: projectAttrs))
+                case .pct: s.append(NSAttributedString(string: pctStr, attributes: ctxAttrs))
+                }
+            }
+        }
+        label.attributedStringValue = s
+    }
+}
+
+final class PreferenceSectionCard: NSView {
+    init(content: NSView) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.6).cgColor
+        layer?.borderWidth = 0
         translatesAutoresizingMaskIntoConstraints = false
 
         content.translatesAutoresizingMaskIntoConstraints = false
         addSubview(content)
         NSLayoutConstraint.activate([
-            content.topAnchor.constraint(equalTo: topAnchor, constant: 14),
-            content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            content.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14),
+            content.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            content.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -1362,23 +1627,23 @@ class PreferencePaneViewController: NSViewController {
         let section = NSStackView()
         section.orientation = .vertical
         section.alignment = .leading
-        section.spacing = 6
+        section.spacing = 4
         section.translatesAutoresizingMaskIntoConstraints = false
 
-        let titleLabel = NSTextField(labelWithString: title.uppercased())
-        titleLabel.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        titleLabel.textColor = .secondaryLabelColor
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.textColor = .labelColor
         section.addArrangedSubview(titleLabel)
 
         if let subtitle, !subtitle.isEmpty {
             let subtitleLabel = NSTextField(wrappingLabelWithString: subtitle)
             subtitleLabel.font = NSFont.systemFont(ofSize: 11)
-            subtitleLabel.textColor = .tertiaryLabelColor
+            subtitleLabel.textColor = .secondaryLabelColor
             subtitleLabel.maximumNumberOfLines = 0
             section.addArrangedSubview(subtitleLabel)
             section.setCustomSpacing(10, after: subtitleLabel)
         } else {
-            section.setCustomSpacing(10, after: titleLabel)
+            section.setCustomSpacing(8, after: titleLabel)
         }
 
         let card = PreferenceSectionCard(content: body)
@@ -1470,11 +1735,13 @@ final class AppearanceSettingsViewController: PreferencePaneViewController {
 
 final class MenubarSettingsViewController: PreferencePaneViewController {
     var onThemeChange: ((String) -> Void)?
-    private let displayTable = DisplayTableController()
+    private let displayChips = HorizontalDisplayController()
+    private let preview = TitlePreviewView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
+        refreshPreview()
     }
 
     private func buildUI() {
@@ -1486,31 +1753,52 @@ final class MenubarSettingsViewController: PreferencePaneViewController {
         )
         sepControl.selectedSegment = SeparatorStore.currentIndex
         addSection(
-            title: L10n.text("Separator", "Ayrac"),
+            title: L10n.text("Separator", "Ayraç"),
             subtitle: L10n.text(
                 "Character shown between agent, project, and context values in the menubar title.",
-                "Menubar basliginda ajan, proje ve baglam degerleri arasinda gosterilen karakter."
+                "Menubar başlığında ajan, proje ve bağlam değerleri arasında gösterilen karakter."
             ),
             body: sepControl
         )
 
-        displayTable.onChange = { [weak self] in
+        displayChips.onChange = { [weak self] in
+            self?.refreshPreview()
             self?.onThemeChange?(ThemeStore.current.id)
         }
-        displayTable.scrollView.heightAnchor.constraint(equalToConstant: 122).isActive = true
         addSection(
-            title: L10n.text("Title content", "Baslik icerigi"),
+            title: L10n.text("Title content", "Başlık içeriği"),
             subtitle: L10n.text(
-                "Toggle and drag to reorder which fields appear in the live menubar title.",
-                "Canli menubar basliginda gorunen alanlari acip kapatin ve surukleyerek siralayin."
+                "Toggle the checkbox to show a field. Grab the ⠿ handle and drag a card left or right to reorder.",
+                "Bir alanı göstermek için onay kutusunu işaretleyin. Sıralamak için ⠿ tutamacından kartı sağa veya sola sürükleyin."
             ),
-            body: displayTable.scrollView
+            body: displayChips.container
+        )
+
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
+        addSection(
+            title: L10n.text("Preview", "Önizleme"),
+            subtitle: L10n.text(
+                "Live sample of how the menubar title will look. Changes apply instantly.",
+                "Menubar başlığının nasıl görüneceğine dair canlı örnek. Değişiklikler anında uygulanır."
+            ),
+            body: preview
+        )
+    }
+
+    private func refreshPreview() {
+        preview.update(
+            items: displayChips.currentItems,
+            agent: "Claude",
+            project: "hususi-app",
+            pct: 27
         )
     }
 
     @objc private func separatorChanged(_ sender: NSSegmentedControl) {
         let value = SeparatorStore.options[sender.selectedSegment].value
         SeparatorStore.set(value)
+        refreshPreview()
         onThemeChange?(ThemeStore.current.id)
     }
 }
@@ -1609,7 +1897,92 @@ final class AboutViewController: PreferencePaneViewController {
     }
 
     @objc private func checkForUpdates() {
-        NSWorkspace.shared.open(latestReleaseURL)
+        let apiURL = URL(string: "https://api.github.com/repos/htahaozlu/context-hud/releases/latest")!
+        var req = URLRequest(url: apiURL)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.timeoutInterval = 8
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, err in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard err == nil,
+                      let data = data,
+                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let tag = obj["tag_name"] as? String else {
+                    self.presentUpdateError()
+                    return
+                }
+                let latest = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
+                let current = AppMetadata.current.version
+                let htmlURL = (obj["html_url"] as? String).flatMap(URL.init(string:)) ?? self.latestReleaseURL
+                let assets = (obj["assets"] as? [[String: Any]]) ?? []
+                let dmgURL = assets.compactMap { a -> URL? in
+                    guard let name = a["name"] as? String,
+                          name.hasSuffix(".dmg"),
+                          let u = a["browser_download_url"] as? String else { return nil }
+                    return URL(string: u)
+                }.first
+                if self.isNewer(latest: latest, current: current) {
+                    self.presentUpdateAvailable(latest: latest, current: current, html: htmlURL, dmg: dmgURL)
+                } else {
+                    self.presentUpToDate(current: current)
+                }
+            }
+        }.resume()
+    }
+
+    private func isNewer(latest: String, current: String) -> Bool {
+        let l = latest.split(separator: ".").compactMap { Int($0) }
+        let c = current.split(separator: ".").compactMap { Int($0) }
+        for i in 0..<max(l.count, c.count) {
+            let li = i < l.count ? l[i] : 0
+            let ci = i < c.count ? c[i] : 0
+            if li > ci { return true }
+            if li < ci { return false }
+        }
+        return false
+    }
+
+    private func presentUpdateAvailable(latest: String, current: String, html: URL, dmg: URL?) {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("Update available", "Güncelleme mevcut")
+        alert.informativeText = L10n.text(
+            "v\(current) → v\(latest)",
+            "v\(current) → v\(latest)"
+        )
+        alert.addButton(withTitle: L10n.text("Download", "İndir"))
+        alert.addButton(withTitle: L10n.text("Release notes", "Sürüm notları"))
+        alert.addButton(withTitle: L10n.text("Later", "Daha sonra"))
+        let resp = alert.runModal()
+        if resp == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(dmg ?? html)
+        } else if resp == .alertSecondButtonReturn {
+            NSWorkspace.shared.open(html)
+        }
+    }
+
+    private func presentUpToDate(current: String) {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("Up to date", "Güncel")
+        alert.informativeText = L10n.text(
+            "You are running the latest version (v\(current)).",
+            "En son sürümü kullanıyorsunuz (v\(current))."
+        )
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    private func presentUpdateError() {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("Could not check for updates", "Güncellemeler kontrol edilemedi")
+        alert.informativeText = L10n.text(
+            "Check your internet connection or open the releases page.",
+            "İnternet bağlantınızı kontrol edin veya sürümler sayfasını açın."
+        )
+        alert.addButton(withTitle: L10n.text("Open releases", "Sürümleri aç"))
+        alert.addButton(withTitle: L10n.text("Cancel", "Vazgeç"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(latestReleaseURL)
+        }
     }
 
     @objc private func openChangelog() {
@@ -1856,11 +2229,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.attributedTitle = composeTitle(active: active, theme: titleTheme)
 
         let menu = NSMenu()
-        let headerItem = NSMenuItem()
-        headerItem.isEnabled = false
-        headerItem.view = MenuHeaderView(active: active)
-        menu.addItem(headerItem)
-        menu.addItem(NSMenuItem.separator())
         if all.isEmpty {
             let empty = NSMenuItem(title: L10n.text("No agent data yet", "Henüz ajan verisi yok"), action: nil, keyEquivalent: "")
             empty.isEnabled = false

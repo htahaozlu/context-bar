@@ -5,23 +5,23 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | Turkce
+  <a href="README.md">English</a> | Türkçe
 </p>
 
 <p align="center">
-  <strong>Kodlama ajanlari icin local-first depo baglami ve yerel macOS kullanim gorunurlugu.</strong>
+  <strong>Kodlama ajanları için local-first depo bağlamı ve yerel macOS kullanım görünürlüğü.</strong>
 </p>
 
 <p align="center">
-  ContextHUD, ajanlarin calistiklari depoya bagli kalmasini saglar, ajanlarin okuyabilecegi kararlı ozetler uretir ve Claude Code ile Codex kullanimini yerel bir macOS arayuzuyle gorunur hale getirir.
+  ContextHUD, ajanların çalıştıkları depoya bağlı kalmasını sağlar, ajanların okuyabileceği kararlı özetler üretir ve Claude Code ile Codex kullanımını yerel bir macOS arayüzüyle görünür hale getirir.
 </p>
 
 <p align="center">
   <a href="https://github.com/htahaozlu/context-hud/releases/latest/download/ContextHUD.dmg">
-    <img alt="macOS icin indir" src="https://img.shields.io/badge/Download-macOS%20DMG-black?logo=apple">
+    <img alt="macOS için indir" src="https://img.shields.io/badge/Download-macOS%20DMG-black?logo=apple">
   </a>
   <a href="https://github.com/htahaozlu/context-hud/releases/latest">
-    <img alt="Guncel surum" src="https://img.shields.io/github/v/release/htahaozlu/context-hud?display_name=tag&label=release">
+    <img alt="Güncel sürüm" src="https://img.shields.io/github/v/release/htahaozlu/context-hud?display_name=tag&label=release">
   </a>
   <a href="LICENSE">
     <img alt="Lisans" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2">
@@ -29,62 +29,71 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-7DCEA0">
 </p>
 
-<table>
-  <tr>
-    <td valign="top" width="58%">
+## Kurulum
 
-### Ne ise yarar
+### Homebrew (önerilen)
 
-ContextHUD, ajan destekli gelistirmede surekli tekrar eden iki sorunu hedefler:
+```bash
+brew install --cask htahaozlu/context-hud/context-hud
+```
 
-- depo baglami, ajan ozeti guncellenmeden daha hizli degisir
-- kullanim ve oturum durumu terminal ciktisi ile yerel kayitlar arasinda kaybolur
+`brew` ilk kurulumda `htahaozlu/homebrew-context-hud` tap'ini otomatik ekler. Sonraki güncellemeler: `brew upgrade --cask context-hud`.
 
-Bu iki problemi, surekli kararlı proje ozetleri ureten yerel bir islem hattiyla ve Claude Code ile Codex etkinligini gosteren yerel bir macOS HUD arayuzuyle cozer.
+### macOS uygulaması (DMG)
 
-    </td>
-    <td valign="top" width="42%">
+1. [En son sürümden](https://github.com/htahaozlu/context-hud/releases/latest) `ContextHUD.dmg` dosyasını indirin (evrensel: Apple Silicon + Intel).
+2. `ContextHUD.app` uygulamasını `Applications` klasörüne sürükleyin.
+3. İlk açılış: `ContextHUD.app` üzerine sağ tıklayın → **Aç** → tekrar **Aç**. Uygulama ad-hoc imzalı (notarize değil).
+4. DMG'yi çıkarıp silin.
 
-### Temel yuzeyler
+macOS uygulamayı "hasarlı" olarak gösterirse quarantine işaretini kaldırın:
 
-- `.context-hud/` altinda depo snapshotlari
-- Kararlı `AGENT.md` ve `CLAUDE.md`
-- refresh, watch ve global gorunumler icin CLI
-- Yerel AppKit menubar yardimci uygulamasi
-- Araclar icin Markdown ve JSON ciktilari
+```bash
+xattr -dr com.apple.quarantine /Applications/ContextHUD.app
+```
 
-    </td>
-  </tr>
-</table>
+### CLI
 
-## Urun Onizlemesi
+```bash
+cargo install --path .
+```
+
+## Önizleme
 
 <p align="center">
-  <img src="docs/images/context-hud-screenshot.png" alt="ContextHUD yerel kullanim penceresi" width="100%">
+  <img src="docs/images/context-hud-screenshot.png" alt="ContextHUD yerel kullanım penceresi" width="100%">
 </p>
 
-Claude Code ve Codex icin surekli oturum gorunurlugune sahip yerel macOS kullanim penceresi.
+Claude Code ve Codex için sürekli oturum görünürlüğüne sahip yerel macOS kullanım penceresi.
 
 <p align="center">
   <img src="docs/images/context-hud-menubar.png" alt="ContextHUD menubar" width="400">
 </p>
 
-Aktif ajan, proje ve baglam kullarimini gosteren kompakt menubar durum ogesi.
+Aktif ajan, proje ve bağlam kullanımını gösteren kompakt menubar durum öğesi.
 
-## ContextHUD neden var
+## Ne işe yarar
 
-Modern kodlama ajanlari her calistirmada ayni iki seye ihtiyac duyar:
+ContextHUD, ajan destekli geliştirmede sürekli tekrar eden iki sorunu hedefler:
 
-1. kisa ve guncel bir depo ozeti
-2. yakin donem kullanim ve oturum davranisina dair guvenilir bir gorunum
+- depo bağlamı, ajan özeti güncellenmeden daha hızlı değişir
+- kullanım ve oturum durumu terminal çıktısı ile yerel kayıtlar arasında kaybolur
 
-Cogu is akisi bunlari tutarsiz sekilde ele alir. ContextHUD, barindirilan bir backend gerektirmeden bunlari yerel artifact uretimi ve yerel masaustu yuzeyiyle standardize eder.
+Bu iki problemi, sürekli kararlı proje özetleri üreten yerel bir işlem hattıyla ve Claude Code ile Codex etkinliğini gösteren yerel bir macOS HUD arayüzüyle çözer.
+
+### Temel yüzeyler
+
+- `.context-hud/` altında depo snapshot'ları
+- Kararlı `AGENT.md` ve `CLAUDE.md`
+- refresh, watch ve global görünümler için CLI
+- Yerel AppKit menubar yardımcı uygulaması
+- Araçlar için Markdown ve JSON çıktıları
 
 ## Temel yetenekler
 
-### Depo baglami uretimi
+### Depo bağlamı üretimi
 
-Her yenileme, ajanlarin okuyabilecegi durumu `.context-hud/` altina yazar:
+Her yenileme, ajanların okuyabileceği durumu `.context-hud/` altına yazar:
 
 - `state.json`
 - `brief-now.md`
@@ -93,65 +102,26 @@ Her yenileme, ajanlarin okuyabilecegi durumu `.context-hud/` altina yazar:
 - `AGENT.md`
 - `hud.md`
 
-Claude Code uyumlulugu icin `CLAUDE.md`, depo kokune de aynalanir.
+Claude Code uyumluluğu için `CLAUDE.md`, depo köküne de aynalanır.
 
-### CLI is akisi
+### CLI iş akışı
 
-Bugun icin en guvenilir surekli arayuz CLI'dir:
-
-- `context-hud hud` mevcut depoyu yeniler ve HUD ciktisini basar
+- `context-hud hud` mevcut depoyu yeniler ve HUD çıktısını basar
 - `context-hud snapshot` HUD basmadan artifact yazar
-- `context-hud watch 30 .` depo baglamini belirli araliklarla taze tutar
-- `context-hud global` `~/.context-hud/` altinda projeler arasi HUD olusturur
+- `context-hud watch 30 .` depo bağlamını belirli aralıklarla taze tutar
+- `context-hud global` `~/.context-hud/` altında projeler arası HUD oluşturur
 
-### Yerel macOS yardimcisi
+### Yerel macOS yardımcısı
 
-Istege bagli yardimci uygulama `~/.context-hud/hud.json` dosyasini okur ve sunlari saglar:
+Yardımcı uygulama `~/.context-hud/hud.json` dosyasını okur ve şunları sağlar:
 
-- kompakt bir menubar durum gorunumu
-- Claude Code ve Codex icin yerel kullanim penceresi
-- tema, dil ve menubar baslik birlesimi ayarlari
+- kompakt bir menubar durum görünümü
+- Claude Code ve Codex için yerel kullanım penceresi
+- tema, dil ve menubar başlık birleşimi ayarları
 
-Masaustu arayuzu yerel AppKit ile yazilmistir. `detail.html`, ana deneyim degil, bir export artifact'idir.
+Masaüstü arayüzü yerel AppKit ile yazılmıştır. `detail.html`, ana deneyim değil, bir export artifact'idir.
 
-## Kurulum
-
-### CLI kurulumu
-
-```bash
-cargo install --path .
-```
-
-### Homebrew ile kurulum (macOS)
-
-```bash
-brew install --cask htahaozlu/context-hud/context-hud
-```
-
-`brew` ilk kurulumda `htahaozlu/homebrew-context-hud` tap'ini otomatik ekler. Sonraki guncellemeler: `brew upgrade --cask context-hud`.
-
-### macOS uygulamasini elle kurma
-
-1. Son surumu acin.
-2. `ContextHUD.dmg` dosyasini indirin (evrensel: Apple Silicon + Intel).
-3. `ContextHUD.app` uygulamasini `Applications` klasorune surukleyin.
-4. Ilk acilis: `ContextHUD.app` uzerine sag tiklayin -> **Ac** -> tekrar **Ac**. Uygulama ad-hoc imzali (notarize degil), bu yuzden cift tiklamada "gelistirici dogrulanamadi" uyarisi cikar.
-5. DMG'yi cikarip silin.
-
-macOS uygulamayi "hasarli" olarak gosterirse, indirme bozulmus ya da imza dusmus demektir. DMG'yi yeniden indirin veya quarantine isaretini elle kaldirin:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/ContextHUD.app
-```
-
-### Zed gelistirme eklentisi olarak kurulum
-
-1. Zed icinde Extensions gorunumunu acin.
-2. `Install Dev Extension` secenegini secin.
-3. Bu depoyu secin.
-4. Gerekirse `granted_extension_capabilities` altinda `process:exec` iznini verin.
-
-## Kullanim
+## Kullanım
 
 ### Mevcut depoyu yenile
 
@@ -159,30 +129,30 @@ xattr -dr com.apple.quarantine /Applications/ContextHUD.app
 context-hud hud
 ```
 
-### HUD yazdirmadan artifact uret
+### HUD yazdırmadan artifact üret
 
 ```bash
 context-hud snapshot
 ```
 
-### Depo baglamini taze tut
+### Depo bağlamını taze tut
 
 ```bash
 context-hud watch 30 .
 ```
 
-### Global HUD uret
+### Global HUD üret
 
 ```bash
 context-hud global
 context-hud watch-global 30
 ```
 
-Global HUD `~/.context-hud/hud.md` konumuna yazilir.
+Global HUD `~/.context-hud/hud.md` konumuna yazılır.
 
-## Artifact duzeni
+## Artifact düzeni
 
-Her yenileme asagidaki dosyalari atomik olarak yazar:
+Her yenileme aşağıdaki dosyaları atomik olarak yazar:
 
 - `.context-hud/state.json`
 - `.context-hud/brief-now.md`
@@ -192,22 +162,22 @@ Her yenileme asagidaki dosyalari atomik olarak yazar:
 - `.context-hud/hud.md`
 - `CLAUDE.md`
 
-Atomik yazim sayesinde ajanlar yenileme sirasinda yari yazilmis durumu gormez.
+Atomik yazım sayesinde ajanlar yenileme sırasında yarı yazılmış durumu görmez.
 
-## Veri kaynaklari
+## Veri kaynakları
 
-ContextHUD su kaynaklari birlestirir:
+ContextHUD şu kaynakları birleştirir:
 
 - Git branch, son commit'ler ve worktree durumu
-- depo `mtime` verilerinden cikarilan dosya etkinligi
-- `~/.claude/projects/**/*.jsonl` icinden Claude Code kullanim verisi
-- `~/.codex/sessions/**/*.jsonl` icinden Codex CLI kullanim verisi
+- depo `mtime` verilerinden çıkarılan dosya etkinliği
+- `~/.claude/projects/**/*.jsonl` içinden Claude Code kullanım verisi
+- `~/.codex/sessions/**/*.jsonl` içinden Codex CLI kullanım verisi
 
-Temel depo ozetleri icin harici servis gerekmez. Kullanim toplama, yerel transcript verilerine ve `python3` aracina dayanir.
+Temel depo özetleri için harici servis gerekmez. Kullanım toplama, yerel transcript verilerine ve `python3` aracına dayanır.
 
 ## Paketleme
 
-Depoda, istege bagli macOS yardimci uygulamasi derlemesi icin scriptler bulunur:
+Depoda macOS yardımcı uygulaması derlemesi için scriptler bulunur:
 
 ```bash
 scripts/build-menubar-app.sh
@@ -219,24 +189,27 @@ Artifact'ler:
 - `dist/ContextHUD.app`
 - `dist/ContextHUD.dmg`
 
-## Mevcut kisitlar
+## Depo düzeni
 
-- Zed `extension_api` `0.7`, yukleme aninda calisan bir worktree hook saglamiyor
-- Zed, eklentiler icin kalici bir HUD primitive'i henuz acmiyor
-- ajan otomatik enjeksiyonu bugun `.context-hud/AGENT.md` veya `CLAUDE.md` uzerinden dosya tabanli
+- `src/` çekirdek motor, artifact render etme ve kullanım toplama
+- `src/bin/context-hud.rs` bağımsız CLI giriş noktası
+- `menubar/context-hud.swift` macOS yardımcı uygulaması
+- `examples/snapshot.rs` yerel geliştirme harness'i
 
-Bu sinirlar nedeniyle CLI halen en guvenilir surekli yuzeydir.
-
-## Depo duzeni
-
-- `src/` cekirdek motor, artifact render etme, Zed entegrasyonu ve kullanim toplama
-- `src/bin/context-hud.rs` bagimsiz CLI giris noktasi
-- `menubar/context-hud.swift` istege bagli macOS yardimci uygulamasi
-- `examples/snapshot.rs` yerel gelistirme harness'i
-
-## Gelistirme
+## Geliştirme
 
 ```bash
 cargo check
 cargo run --example snapshot
 ```
+
+## Topluluk
+
+- Sorular ve kullanım yardımı: GitHub Discussions
+- Hatalar ve özellik istekleri: GitHub Issues
+- Katkı rehberi: `CONTRIBUTING.md`
+- Güvenlik bildirimi: `SECURITY.md`
+
+## Lisans
+
+Apache-2.0

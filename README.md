@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  English | <a href="README.tr.md">Turkce</a>
+  English | <a href="README.tr.md">Türkçe</a>
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://github.com/htahaozlu/context-hud/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/badge/release-v0.1.0-2F81F7">
+    <img alt="Latest release" src="https://img.shields.io/badge/release-v0.1.3-2F81F7">
   </a>
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2">
@@ -32,7 +32,50 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-7DCEA0">
 </p>
 
-### What it does
+## Install
+
+### Homebrew (recommended)
+
+```bash
+brew install --cask htahaozlu/context-hud/context-hud
+```
+
+`brew` auto-taps `htahaozlu/homebrew-context-hud` on first install. Upgrade later with `brew upgrade --cask context-hud`.
+
+### macOS app (DMG)
+
+1. Download `ContextHUD.dmg` from the [latest release](https://github.com/htahaozlu/context-hud/releases/latest) (universal: Apple Silicon + Intel).
+2. Drag `ContextHUD.app` into `Applications`.
+3. First launch: right-click `ContextHUD.app` → **Open** → **Open** again. The app is ad-hoc signed (not notarized).
+4. Eject and delete the DMG.
+
+If macOS reports the app as "damaged", remove the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ContextHUD.app
+```
+
+### CLI
+
+```bash
+cargo install --path .
+```
+
+## Preview
+
+<p align="center">
+  <img src="docs/images/context-hud-screenshot.png" alt="ContextHUD native usage window" width="100%">
+</p>
+
+Native macOS usage window with rolling session visibility for Claude Code and Codex.
+
+<p align="center">
+  <img src="docs/images/context-hud-menubar.png" alt="ContextHUD menubar" width="400">
+</p>
+
+Compact menubar status item showing active agent, project, and context usage.
+
+## What it does
 
 ContextHUD solves two persistent problems in agent-driven development:
 
@@ -48,29 +91,6 @@ It addresses both through a local pipeline that continuously produces stable pro
 - CLI for refresh, watch, and global views
 - Native AppKit menubar companion
 - Markdown and JSON artifacts for tooling
-
-## Product Preview
-
-<p align="center">
-  <img src="docs/images/context-hud-screenshot.png" alt="ContextHUD native usage window" width="100%">
-</p>
-
-Native macOS usage window with rolling session visibility for Claude Code and Codex.
-
-<p align="center">
-  <img src="docs/images/context-hud-menubar.png" alt="ContextHUD menubar" width="400">
-</p>
-
-Compact menubar status item showing active agent, project, and context usage.
-
-## Why ContextHUD exists
-
-Modern coding agents need the same two things on every run:
-
-1. a concise, current repository brief
-2. a reliable view of recent usage and session behavior
-
-Most workflows handle these inconsistently. ContextHUD standardizes them with local artifact generation and a native desktop surface, without requiring a hosted backend for repository summaries.
 
 ## Key capabilities
 
@@ -89,8 +109,6 @@ For Claude Code compatibility, `CLAUDE.md` is mirrored at the repository root.
 
 ### CLI workflow
 
-The CLI is the most reliable always-on interface today:
-
 - `context-hud hud` refreshes the current repository and prints the HUD
 - `context-hud snapshot` writes artifacts without printing the HUD
 - `context-hud watch 30 .` keeps repository context fresh on an interval
@@ -98,50 +116,13 @@ The CLI is the most reliable always-on interface today:
 
 ### Native macOS companion
 
-The optional companion app reads `~/.context-hud/hud.json` and provides:
+The companion app reads `~/.context-hud/hud.json` and provides:
 
 - a compact menubar status view
 - a native usage window for Claude Code and Codex
 - settings for theme, language, and menubar title composition
 
 The desktop UI is native AppKit. `detail.html` is an export artifact, not the primary app experience.
-
-## Installation
-
-### Install the CLI
-
-```bash
-cargo install --path .
-```
-
-### Install via Homebrew (macOS)
-
-```bash
-brew install --cask htahaozlu/context-hud/context-hud
-```
-
-`brew` auto-taps `htahaozlu/homebrew-context-hud` on first install. Upgrade later with `brew upgrade --cask context-hud`.
-
-### Install the macOS app manually
-
-1. Open the latest release.
-2. Download `ContextHUD.dmg` (universal: Apple Silicon + Intel).
-3. Drag `ContextHUD.app` into `Applications`.
-4. First launch: right-click `ContextHUD.app` → **Open** → **Open** again. The app is ad-hoc signed (not notarized), so a standard double-click shows an "unidentified developer" warning.
-5. Eject and delete the DMG.
-
-If macOS reports the app as "damaged" instead of unidentified, the download was corrupted or stripped of its signature. Re-download the DMG, or remove quarantine manually:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/ContextHUD.app
-```
-
-### Install as a Zed dev extension
-
-1. Open the Extensions view in Zed.
-2. Choose `Install Dev Extension`.
-3. Select this repository.
-4. If needed, grant `process:exec` under `granted_extension_capabilities`.
 
 ## Usage
 
@@ -199,7 +180,7 @@ No external service is required for the core repository summaries. Usage aggrega
 
 ## Packaging
 
-The repository includes scripts for the optional macOS companion build:
+The repository includes scripts for the macOS companion build:
 
 ```bash
 scripts/build-menubar-app.sh
@@ -211,19 +192,11 @@ Artifacts:
 - `dist/ContextHUD.app`
 - `dist/ContextHUD.dmg`
 
-## Current constraints
-
-- Zed `extension_api` `0.7` does not expose a load-time worktree hook
-- Zed does not yet expose a persistent HUD primitive for extensions
-- agent auto-injection is file-based today through `.context-hud/AGENT.md` or `CLAUDE.md`
-
-Because of those limits, the CLI remains the most dependable always-on surface.
-
 ## Repository layout
 
-- `src/` core engine, artifact rendering, Zed integration, and usage aggregation
+- `src/` core engine, artifact rendering, and usage aggregation
 - `src/bin/context-hud.rs` standalone CLI entry point
-- `menubar/context-hud.swift` optional macOS companion app
+- `menubar/context-hud.swift` macOS companion app
 - `examples/snapshot.rs` native development harness
 
 ## Development
