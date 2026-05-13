@@ -23,6 +23,11 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/github/downloads/htahaozlu/context-hud/total?style=flat-square&label=downloads" alt="Total Downloads">
+  <img src="https://img.shields.io/github/stars/htahaozlu/context-hud?style=flat-square" alt="Stars">
+</p>
+
+<p align="center">
   <a href="https://github.com/htahaozlu/context-hud/releases/latest">
     <img alt="Latest release" src="https://img.shields.io/badge/release-v0.1.3-2F81F7">
   </a>

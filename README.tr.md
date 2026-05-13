@@ -27,6 +27,7 @@
     <img alt="Lisans" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2">
   </a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-7DCEA0">
+  <img src="https://img.shields.io/github/downloads/htahaozlu/context-hud/total?style=flat-square&label=indirme" alt="Toplam İndirme">
 </p>
 
 ## Kurulum
