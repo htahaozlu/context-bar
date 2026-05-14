@@ -30,6 +30,14 @@
   <img src="https://img.shields.io/github/downloads/htahaozlu/context-hud/total?style=flat-square&label=indirme" alt="Toplam İndirme">
 </p>
 
+## Canlı demo
+
+<p align="center">
+  <img src="docs/images/context-hud-demo.gif" alt="ContextHUD üzerinde Claude Code ve Codex kullanımının macOS'ta canlı güncellendiğini gösteren demo" width="100%">
+</p>
+
+ContextHUD, Claude Code ve Codex kullanımına yerel bir macOS yüzeyi verir; böylece bağlam kayması ve rolling kullanım pencereleri siz çalışırken görünür kalır.
+
 ## Kurulum
 
 ### Homebrew (önerilen)

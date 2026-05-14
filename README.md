@@ -37,6 +37,14 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-7DCEA0">
 </p>
 
+## Live demo
+
+<p align="center">
+  <img src="docs/images/context-hud-demo.gif" alt="ContextHUD demo showing Claude Code and Codex usage updating live on macOS" width="100%">
+</p>
+
+ContextHUD gives Claude Code and Codex a native macOS surface, so context drift and rolling usage stay visible while you work.
+
 ## Install
 
 ### Homebrew (recommended)
