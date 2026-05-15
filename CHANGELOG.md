@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.2.2] - 2026-05-15
+
+### Fixed
+
+- Popover stretched to full screen height. Now sizes to its content via
+  `preferredContentSize` after each rebuild, and cards hug vertically so
+  the hero section no longer absorbs the extra space.
+
 ## [0.2.1] - 2026-05-15
 
 ### Fixed

@@ -2740,6 +2740,13 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             addCard(buildOthers(tools: others))
         }
         addCard(buildFooter())
+
+        view.layoutSubtreeIfNeeded()
+        let fit = view.fittingSize
+        preferredContentSize = NSSize(
+            width: Self.contentWidth,
+            height: max(fit.height, 1)
+        )
     }
 
     /// Adds a section view to the popover stack and pins both leading and
@@ -2749,6 +2756,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// full popover width.
     private func addCard(_ v: NSView) {
         v.translatesAutoresizingMaskIntoConstraints = false
+        v.setContentHuggingPriority(.required, for: .vertical)
+        v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
         NSLayoutConstraint.activate([
             v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: 16),
