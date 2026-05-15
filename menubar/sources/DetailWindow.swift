@@ -4,6 +4,7 @@ import Foundation
 final class DetailWindowController: NSWindowController, NSWindowDelegate {
     private let tabVC = NSTabViewController()
     let usageVC = UsageViewController()
+    let statsVC = StatsViewController()
     private let appearanceVC = AppearanceSettingsViewController()
     private let menubarVC = MenubarSettingsViewController()
     private let aboutVC = AboutViewController()
@@ -17,6 +18,10 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         usageItem.label = L10n.text("Usage", "Kullanım")
         usageItem.image = NSImage(systemSymbolName: "chart.bar.xaxis", accessibilityDescription: usageItem.label)
 
+        let statsItem = NSTabViewItem(viewController: statsVC)
+        statsItem.label = L10n.text("Stats", "İstatistik")
+        statsItem.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis", accessibilityDescription: statsItem.label)
+
         let appearanceItem = NSTabViewItem(viewController: appearanceVC)
         appearanceItem.label = L10n.text("Appearance", "Görünüm")
         appearanceItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: appearanceItem.label)
@@ -29,7 +34,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         aboutItem.label = L10n.text("About", "Hakkında")
         aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
 
-        [usageItem, appearanceItem, menubarItem, aboutItem].forEach(tabVC.addTabViewItem)
+        [usageItem, statsItem, appearanceItem, menubarItem, aboutItem].forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
@@ -61,6 +66,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
 
     func load() {
         usageVC.reload()
+        statsVC.reload()
     }
 
     func selectTab(index: Int) {
