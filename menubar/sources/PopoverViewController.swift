@@ -33,7 +33,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
         contentStack.spacing = 8
-        contentStack.edgeInsets = NSEdgeInsets(top: 16, left: 0, bottom: 14, right: 0)
+        contentStack.edgeInsets = NSEdgeInsets(top: 8, left: 0, bottom: 12, right: 0)
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
 
@@ -94,8 +94,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
         NSLayoutConstraint.activate([
-            v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: 16),
-            v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -16),
+            v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: 10),
+            v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -10),
         ])
     }
 
