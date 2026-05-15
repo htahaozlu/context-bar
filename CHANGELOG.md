@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.2.1] - 2026-05-15
+
+### Fixed
+
+- Re-cut release; v0.2.0 CI run never picked up a macOS runner. No code changes.
+
 ## [0.2.0] - 2026-05-15
 
 ### Changed
