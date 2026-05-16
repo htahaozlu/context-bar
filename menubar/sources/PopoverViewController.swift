@@ -66,7 +66,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let hud = Hud()
         let (active, all, others) = hud.load()
         let primary = active ?? all.first
-        let key = snapshotKey(active: active, primary: primary, others: others)
+        let key = snapshotKey(active: active, primary: primary, all: all, others: others)
         // Bail early when nothing the popover renders has changed — this is
         // the cheapest fix for the 10s tick flicker (no teardown, no relayout).
         if key == lastSnapshotKey, !contentStack.arrangedSubviews.isEmpty {
@@ -86,6 +86,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             addCard(buildStatRow(agent: agent))
             if agent.activeSessions.count > 1 {
                 addCard(buildParallelSessions(agent: agent))
+            }
+            // Show the *other* agent's limits/usage too — users want Codex
+            // session/week numbers visible even when Claude is the foreground
+            // hero (and vice-versa).
+            for secondary in all where secondary.name != agent.name {
+                if hasSecondaryData(secondary) {
+                    addCard(buildSecondaryAgent(secondary))
+                }
             }
         } else {
             addCard(buildEmptyState())
@@ -192,14 +200,29 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let (container, stack) = sectionContainer(hero: true)
         stack.spacing = Spacing.s
 
-        // Top row: dot + project name (left) — large pct (right)
+        // Top row: brand icon + dot + project name (left) — large pct (right)
         let dot = ActivityDotView()
         dot.isActive = isActive
+
+        // Brand icon — Claude/Codex/etc. sourced from menubar/assets/brands.
+        let projectFont = Typography.display(22, weight: .semibold)
+        let brandSize: CGFloat = round(projectFont.capHeight + 8) // visually balanced w/ 22pt cap
+        let brandView = NSImageView()
+        if let url = agentIconURL(name: a.name), let img = NSImage(contentsOf: url) {
+            brandView.image = img
+        }
+        brandView.imageScaling = .scaleProportionallyUpOrDown
+        brandView.translatesAutoresizingMaskIntoConstraints = false
+        brandView.toolTip = AgentVisual.forName(a.name).accessibilityLabel
+        NSLayoutConstraint.activate([
+            brandView.widthAnchor.constraint(equalToConstant: brandSize),
+            brandView.heightAnchor.constraint(equalToConstant: brandSize),
+        ])
 
         // Project name takes the primary slot (largest, .label color)
         let projectLbl = NSTextField(labelWithString: a.project)
         projectLbl.attributedStringValue = NSAttributedString(string: a.project, attributes: [
-            .font: Typography.display(22, weight: .semibold),
+            .font: projectFont,
             .foregroundColor: NSColor.labelColor,
             .kern: -0.3,
         ])
@@ -209,10 +232,32 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         projectLbl.toolTip = a.project
         projectLbl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let leftStack = NSStackView(views: [dot, projectLbl])
-        leftStack.orientation = .horizontal
-        leftStack.alignment = .centerY
-        leftStack.spacing = Spacing.xs
+        // Manual horizontal layout — NSStackView's .centerY uses the label's
+        // frame midline (which sits below the visual midline by half the
+        // descender), making small companions like the dot and brand icon
+        // look offset. Anchor them to the cap-height midline instead.
+        let leftStack = NSView()
+        leftStack.translatesAutoresizingMaskIntoConstraints = false
+        leftStack.addSubview(brandView)
+        leftStack.addSubview(dot)
+        leftStack.addSubview(projectLbl)
+        projectLbl.translatesAutoresizingMaskIntoConstraints = false
+        dot.translatesAutoresizingMaskIntoConstraints = false
+        let capMidline = projectLbl.firstBaselineAnchor
+        NSLayoutConstraint.activate([
+            brandView.leadingAnchor.constraint(equalTo: leftStack.leadingAnchor),
+            brandView.centerYAnchor.constraint(equalTo: capMidline,
+                                               constant: -projectFont.capHeight / 2),
+            dot.leadingAnchor.constraint(equalTo: brandView.trailingAnchor, constant: Spacing.xs),
+            dot.centerYAnchor.constraint(equalTo: capMidline,
+                                          constant: -projectFont.capHeight / 2),
+            dot.widthAnchor.constraint(equalToConstant: 10),
+            dot.heightAnchor.constraint(equalToConstant: 10),
+            projectLbl.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: Spacing.xs),
+            projectLbl.trailingAnchor.constraint(equalTo: leftStack.trailingAnchor),
+            projectLbl.topAnchor.constraint(equalTo: leftStack.topAnchor),
+            projectLbl.bottomAnchor.constraint(equalTo: leftStack.bottomAnchor),
+        ])
 
         // Right: big % number
         let pct = a.ctxPct
@@ -329,6 +374,85 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         headerRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         bar.heightAnchor.constraint(equalToConstant: 5).isActive = true
         bar.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        return container
+    }
+
+    private func hasSecondaryData(_ a: Agent) -> Bool {
+        if a.session5h > 0 || a.session5hPercent != nil { return true }
+        if a.week7d > 0 || a.week7dPercent != nil { return true }
+        if a.activeSession > 0 { return true }
+        return false
+    }
+
+    /// Compact card for the non-foreground agent — header strip with brand
+    /// icon + name + last-turn, followed by the same 5h/7d/session rows the
+    /// hero uses. Lets the user see Codex limits while Claude is the active
+    /// session (and vice-versa) without flipping windows.
+    private func buildSecondaryAgent(_ a: Agent) -> NSView {
+        let (container, stack) = sectionContainer()
+        stack.spacing = Spacing.xs
+
+        let brand = NSImageView()
+        if let url = agentIconURL(name: a.name), let img = NSImage(contentsOf: url) {
+            brand.image = img
+        }
+        brand.imageScaling = .scaleProportionallyUpOrDown
+        brand.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            brand.widthAnchor.constraint(equalToConstant: 16),
+            brand.heightAnchor.constraint(equalToConstant: 16),
+        ])
+
+        let nameLbl = NSTextField(labelWithString: a.name)
+        nameLbl.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        nameLbl.textColor = .labelColor
+
+        var metaParts: [String] = []
+        if let m = a.model { metaParts.append(m) }
+        if let t = a.lastTurn { metaParts.append(Hud.relative(t)) }
+        let meta = NSTextField(labelWithString: metaParts.joined(separator: " · "))
+        meta.font = NSFont.systemFont(ofSize: 11, weight: .regular)
+        meta.textColor = .tertiaryLabelColor
+        meta.lineBreakMode = .byTruncatingTail
+
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let header = NSStackView(views: [brand, nameLbl, spacer, meta])
+        header.orientation = .horizontal
+        header.alignment = .centerY
+        header.spacing = Spacing.xs
+
+        stack.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
+        var rows: [NSView] = []
+        if a.session5hPercent != nil || a.session5h > 0 {
+            rows.append(makeLimitRow(
+                label: L10n.text("5h limit", "5sa limit"),
+                percent: a.session5hPercent,
+                fallbackValue: Hud.formatTokens(a.session5h),
+                resetsAt: a.session5hResetsAt
+            ))
+        }
+        if a.week7dPercent != nil || a.week7d > 0 {
+            rows.append(makeLimitRow(
+                label: L10n.text("7d limit", "7g limit"),
+                percent: a.week7dPercent,
+                fallbackValue: Hud.formatTokens(a.week7d),
+                resetsAt: a.week7dResetsAt
+            ))
+        }
+        if a.activeSession > 0 {
+            rows.append(makeSimpleStatRow(
+                label: L10n.text("Session total", "Oturum toplam"),
+                value: Hud.formatTokens(a.activeSession),
+                valueColor: .secondaryLabelColor
+            ))
+        }
+        for row in rows {
+            stack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
         return container
     }
 
@@ -542,7 +666,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// Fingerprint of the data the popover actually renders. Two consecutive
     /// refreshes producing the same key skip the rebuild entirely so the
     /// popover doesn't tear down + re-add its cards on every 10s tick.
-    private func snapshotKey(active: Agent?, primary: Agent?, others: [ToolSummary]) -> String {
+    private func snapshotKey(active: Agent?, primary: Agent?, all: [Agent], others: [ToolSummary]) -> String {
         var parts: [String] = []
         parts.append(active?.name ?? "-")
         if let p = primary {
@@ -561,6 +685,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             for s in p.activeSessions {
                 parts.append("S:\(s.id)|\(s.project)|\(s.model ?? "-")|\(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(s.tokens)|\(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")")
             }
+        }
+        for ag in all where ag.name != primary?.name {
+            parts.append("A:\(ag.name)|\(ag.session5h)|\(ag.session5hPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.week7d)|\(ag.week7dPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.activeSession)|\(ag.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")|\(ag.model ?? "-")")
         }
         for t in others {
             parts.append("O:\(t.name)|\(t.tokens7d)|\(t.sessions7d)|\(t.lastModel ?? "-")")

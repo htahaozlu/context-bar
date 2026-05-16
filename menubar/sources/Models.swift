@@ -55,14 +55,13 @@ func agentInlineString(
     if let url = agentIconURL(name: name), let image = NSImage(contentsOf: url) {
         let attachment = NSTextAttachment()
         let icon = (image.copy() as? NSImage) ?? image
-        let side = max(12, round(font.capHeight * iconScale))
+        // Size the icon to match cap-height so it occupies the same vertical
+        // band as capital letters — no nudge needed because the bottom of the
+        // icon sits on the baseline like the text glyphs do.
+        let side = max(10, round(font.capHeight * iconScale))
         icon.size = NSSize(width: side, height: side)
         attachment.attachmentCell = NSTextAttachmentCell(imageCell: icon)
-        // Center icon optically on the lowercase x-height with a small extra
-        // downward nudge — empirically the menubar status bar renders inline
-        // text-attachment images one row higher than the visual midpoint
-        // without this correction.
-        attachment.bounds = NSRect(x: 0, y: round((font.xHeight - side) / 2 - 1), width: side, height: side)
+        attachment.bounds = NSRect(x: 0, y: 0, width: side, height: side)
         return NSAttributedString(attachment: attachment)
     }
     return NSAttributedString(
