@@ -71,8 +71,11 @@ def empty_block():
         # live HUD
         "session_5h_tokens": 0,
         "session_5h_percent": None,
+        "cache_read_tokens_5h": 0,
         "week_7d_tokens": 0,
         "week_7d_percent": None,
+        "cache_read_tokens_7d": 0,
+        "cache_read_tokens_30d": 0,
         "active_session_tokens": 0,
         "active_session_file": None,
         "active_session_started_at": None,
@@ -416,11 +419,11 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24):
     so consumers can compute streaks by walking the array without first
     filling in missing dates themselves.
     """
-    by_day = defaultdict(lambda: {"tokens": 0, "sessions": 0})
-    by_week = defaultdict(lambda: {"tokens": 0, "sessions": 0})
-    by_month = defaultdict(lambda: {"tokens": 0, "sessions": 0})
-    by_model = defaultdict(lambda: {"tokens": 0, "sessions": 0})
-    by_project = defaultdict(lambda: {"tokens": 0, "sessions": 0})
+    by_day = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
+    by_week = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
+    by_month = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
+    by_model = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
+    by_project = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
 
     total30 = 0
     sessions30 = 0
@@ -430,6 +433,7 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24):
         ts = s["last_ts"]
         if ts is None:
             continue
+        cache_read = int(s.get("cache_read", 0) or 0)
         dt = datetime.fromtimestamp(ts).astimezone()
         day = dt.strftime("%Y-%m-%d")
         iy, iw, _ = dt.isocalendar()
@@ -438,17 +442,22 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24):
 
         by_day[day]["tokens"] += s["tokens"]
         by_day[day]["sessions"] += 1
+        by_day[day]["cache_read"] += cache_read
         by_week[week]["tokens"] += s["tokens"]
         by_week[week]["sessions"] += 1
+        by_week[week]["cache_read"] += cache_read
         by_month[month]["tokens"] += s["tokens"]
         by_month[month]["sessions"] += 1
+        by_month[month]["cache_read"] += cache_read
 
         if s["model"]:
             by_model[s["model"]]["tokens"] += s["tokens"]
             by_model[s["model"]]["sessions"] += 1
+            by_model[s["model"]]["cache_read"] += cache_read
         proj = project_name_from_cwd(s["cwd"])
         by_project[proj]["tokens"] += s["tokens"]
         by_project[proj]["sessions"] += 1
+        by_project[proj]["cache_read"] += cache_read
 
         if ts >= cutoff30:
             total30 += s["tokens"]
@@ -459,8 +468,13 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24):
     for i in range(days):
         d = today_local - timedelta(days=i)
         key = d.strftime("%Y-%m-%d")
-        rec = by_day.get(key) or {"tokens": 0, "sessions": 0}
-        padded_day.append({"date": key, "tokens": rec["tokens"], "sessions": rec["sessions"]})
+        rec = by_day.get(key) or {"tokens": 0, "sessions": 0, "cache_read": 0}
+        padded_day.append({
+            "date": key,
+            "tokens": rec["tokens"],
+            "sessions": rec["sessions"],
+            "cache_read": rec.get("cache_read", 0),
+        })
 
     def take(d, key_name, n, sort_key=None):
         items = [{key_name: k, **v} for k, v in d.items()]
@@ -497,6 +511,12 @@ def split_logical_sessions(per_session):
         events = sorted(s.get("events") or [], key=lambda e: e[0])
         if not events:
             continue
+        # Events are 3-tuples (ts, total, cache_read). Tolerate legacy 2-tuple
+        # entries by padding cache_read to 0.
+        def _ev(e):
+            if len(e) >= 3:
+                return e[0], e[1], e[2]
+            return e[0], e[1], 0
         chunks = []
         cur = [events[0]]
         session_start = events[0][0]
@@ -512,9 +532,10 @@ def split_logical_sessions(per_session):
         for i, chunk in enumerate(chunks):
             first_ts = chunk[0][0]
             last_ts = chunk[-1][0]
-            tokens = sum(t for _, t in chunk)
+            tokens = sum(_ev(e)[1] for e in chunk)
+            cache_read = sum(_ev(e)[2] for e in chunk)
             sessions.append({
-                "tokens": tokens, "last_ts": last_ts,
+                "tokens": tokens, "cache_read": cache_read, "last_ts": last_ts,
                 "model": s["model"], "cwd": s["cwd"],
             })
             recent.append({
@@ -523,6 +544,7 @@ def split_logical_sessions(per_session):
                 "ended_at": datetime.fromtimestamp(last_ts, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
                 "duration_minutes": round((last_ts - first_ts) / 60.0, 1),
                 "tokens": tokens,
+                "cache_read": cache_read,
                 "model": s["model"] or "—",
                 "project": project_name_from_cwd(s["cwd"]),
             })
@@ -571,14 +593,14 @@ def collect_claude():
                     usage = msg.get("usage") or {}
                     if not isinstance(usage, dict):
                         continue
-                    # Billed-tokens view (matches Anthropic console / `/cost`):
-                    # total = input + cache_creation + cache_read + output.
-                    # All four count toward billing — cache_read at 0.1× input
-                    # rate, cache_creation at 1.25×. Earlier versions omitted
-                    # cache_read (ccusage's "fresh work" view) which made HUD
-                    # totals systematically undercount what Anthropic shows in
-                    # its own UI, often by 10-100× on cache-heavy sessions.
-                    # `inp` (context-window view) keeps the same three input
+                    # Fresh-work view (ccusage convention) —
+                    # total = input + cache_creation + output (+ thinking).
+                    # Excludes cache_read which is billed at 0.1× but
+                    # multiplies across turns (each turn re-reads the entire
+                    # cached prefix) and would dominate human-readable totals
+                    # by orders of magnitude. `cache_read_tokens` is emitted
+                    # separately so a future cost view can multiply by 0.1×.
+                    # `inp` (context-window view) keeps all three input
                     # buckets — output isn't part of the live window.
                     fresh_in = int(usage.get("input_tokens", 0) or 0)
                     cache_create = int(usage.get("cache_creation_input_tokens", 0) or 0)
@@ -601,12 +623,13 @@ def collect_claude():
                                 or kl == "output_thinking_tokens"):
                             outp += int(v or 0)
                     inp = fresh_in + cache_create + cache_read  # context-window view
-                    total = fresh_in + cache_create + cache_read + outp  # billed view
+                    total = fresh_in + cache_create + outp  # fresh-work view (ccusage)
                     ts = parse_iso(obj.get("timestamp")) or mtime
                     age = NOW - ts
 
                     sess = per_session.setdefault(path, {
                         "first_ts": ts, "last_ts": 0, "tokens": 0,
+                        "cache_read": 0,
                         "model": msg.get("model"), "cwd": obj.get("cwd"),
                         "last_input": 0,
                         "events": [],
@@ -616,7 +639,8 @@ def collect_claude():
                         sess["last_ts"] = ts
                         sess["last_input"] = inp
                     sess["tokens"] += total
-                    sess["events"].append((ts, total))
+                    sess["cache_read"] += cache_read
+                    sess["events"].append((ts, total, cache_read))
                     if msg.get("model"):
                         sess["model"] = msg.get("model")
                     if obj.get("cwd"):
@@ -624,12 +648,16 @@ def collect_claude():
 
                     if age <= WIN_WEEK:
                         out["week_7d_tokens"] += total
+                        out["cache_read_tokens_7d"] += cache_read
                         if week_7d_oldest is None or ts < week_7d_oldest:
                             week_7d_oldest = ts
                     if age <= WIN_SESSION:
                         out["session_5h_tokens"] += total
+                        out["cache_read_tokens_5h"] += cache_read
                         if session_5h_oldest is None or ts < session_5h_oldest:
                             session_5h_oldest = ts
+                    if age <= WIN_30D:
+                        out["cache_read_tokens_30d"] += cache_read
 
                     # Subagent transcripts (Task tool) link to a parent and
                     # often carry huge cache_read totals that don't reflect
@@ -797,6 +825,7 @@ def collect_codex():
 
                     sess = per_session.setdefault(path, {
                         "first_ts": ts, "last_ts": 0, "tokens": 0,
+                        "cache_read": 0,
                         "model": current_model, "cwd": current_cwd,
                         "last_input": 0, "last_window": window,
                         "events": [],
@@ -808,7 +837,8 @@ def collect_codex():
                         if window:
                             sess["last_window"] = window
                     sess["tokens"] += total
-                    sess["events"].append((ts, total))
+                    sess["cache_read"] += cached
+                    sess["events"].append((ts, total, cached))
                     if current_model:
                         sess["model"] = current_model
                     if current_cwd:
@@ -816,12 +846,16 @@ def collect_codex():
 
                     if age <= WIN_WEEK:
                         out["week_7d_tokens"] += total
+                        out["cache_read_tokens_7d"] += cached
                         if week_7d_oldest is None or ts < week_7d_oldest:
                             week_7d_oldest = ts
                     if age <= WIN_SESSION:
                         out["session_5h_tokens"] += total
+                        out["cache_read_tokens_5h"] += cached
                         if session_5h_oldest is None or ts < session_5h_oldest:
                             session_5h_oldest = ts
+                    if age <= WIN_30D:
+                        out["cache_read_tokens_30d"] += cached
 
                     if ts > last_ts:
                         last_ts = ts
