@@ -139,6 +139,17 @@ The companion app reads `~/.context-hud/hud.json` and provides:
   theme and the menubar title repaints in that palette before you commit
 - a full Settings window with Usage, Appearance, Menubar, and About tabs
 - per-session context percentage for parallel Claude / Codex sessions
+- a Notification Center / desktop widget (small, medium, large) showing the
+  active agent, project, context ring, and 5h/7d limit bars — kept in sync
+  with the menubar via `WidgetCenter` reloads on every regeneration
+
+The widget reads the same `~/.context-hud/hud.json` snapshot, so the menubar
+title and the widget never disagree. To add it, open Notification Center →
+"Edit Widgets" → search "ContextHUD" and pick a size.
+
+If the menubar icon is hidden by overflow (Bartender, Hidden Bar, or a
+crowded menubar), launching ContextHUD again from Finder / Spotlight opens
+the Settings window directly so you can still reach preferences.
 
 The desktop UI is native AppKit (NSPopover + NSVisualEffectView, continuous
 corner curves, SF Symbol toolbar). `detail.html` is an export artifact, not

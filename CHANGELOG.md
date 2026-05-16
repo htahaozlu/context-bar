@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.6] - 2026-05-16
+
+### Added
+
+- WidgetKit extension (`ContextHUDWidget.appex`) bundled under `Contents/PlugIns`. Three sizes (small / medium / large) showing the active agent, project, context ring, and rolling 5h/7d limit bars. Reads the same `~/.context-hud/hud.json` snapshot as the menubar; the menubar app calls `WidgetCenter.shared.reloadAllTimelines()` on every regeneration so the widget never lags behind the 60s timeline floor.
+- Finder / Spotlight relaunch fallback: `applicationShouldHandleReopen` + `application(_:open:)` open the Settings window when the menubar icon is hidden by overflow / Bartender / Hidden Bar, and toggle the popover otherwise. New `--settings` / `--open` CLI args trigger the detail window on first launch.
+
+### Fixed
+
+- Menubar title now reflects the most recently active project across parallel Claude / Codex sessions even when the popover and detail window are both closed. The 10s tick used to skip regeneration when nothing was visible, leaving the title stuck on the previous project.
+- Native popover / detail capture switched from the `screencapture` CLI to `CGWindowListCreateImage`. The CLI silently failed (`could not create image from window`) on freshly-signed builds and on launches inheriting a shell without Screen Recording TCC consent; capturing own-process windows via Core Graphics requires no permission and works headlessly.
+
 ## [0.3.5] - 2026-05-16
 
 ### Fixed

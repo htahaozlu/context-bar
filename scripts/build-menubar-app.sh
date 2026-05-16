@@ -20,6 +20,12 @@ APP_ICON_DST="$RESOURCES_DIR/AppIcon.icns"
 BRAND_ICONS_SRC="$ROOT/menubar/assets/brands"
 BRAND_ICONS_DST="$RESOURCES_DIR/brands"
 APP_PLIST_DST="$CONTENTS_DIR/Info.plist"
+WIDGET_SRC_DIR="$ROOT/menubar/widget"
+WIDGET_PLIST_SRC="$ROOT/packaging/macos/widget/Info.plist"
+WIDGET_ENTITLEMENTS="$ROOT/packaging/macos/widget/Widget.entitlements"
+PLUGINS_DIR="$CONTENTS_DIR/PlugIns"
+WIDGET_APPEX="$PLUGINS_DIR/ContextHUDWidget.appex"
+WIDGET_EXEC="$WIDGET_APPEX/Contents/MacOS/ContextHUDWidget"
 
 VERSION="$(sed -n 's/^version = \"\(.*\)\"/\1/p' "$ROOT/Cargo.toml" | head -n1)"
 if [[ -z "$VERSION" ]]; then
@@ -88,6 +94,34 @@ lipo -create "$ENGINE_ARM64" "$ENGINE_X86_64" -output "$ENGINE_DST"
 chmod +x "$ENGINE_DST"
 cp "$USAGE_PY_SRC" "$USAGE_PY_DST"
 
+# Build WidgetKit extension (.appex) and embed under Contents/PlugIns. Widget
+# is a separate Mach-O linked against WidgetKit + SwiftUI. Min macOS 14 for
+# containerBackground; bundle still works on 13 via fallback view path but the
+# widget extension itself targets 14+ since WidgetKit on macOS is gated there
+# for third-party widgets.
+if [[ -d "$WIDGET_SRC_DIR" ]]; then
+  WIDGET_MIN="14.0"
+  mkdir -p "$WIDGET_APPEX/Contents/MacOS" "$WIDGET_APPEX/Contents/Resources"
+  WIDGET_ARM64="$WIDGET_EXEC.arm64"
+  WIDGET_X86_64="$WIDGET_EXEC.x86_64"
+  xcrun --sdk macosx swiftc -O \
+    -target "arm64-apple-macos${WIDGET_MIN}" \
+    -framework WidgetKit -framework SwiftUI -framework AppKit \
+    -application-extension -parse-as-library \
+    "$WIDGET_SRC_DIR"/*.swift -o "$WIDGET_ARM64"
+  xcrun --sdk macosx swiftc -O \
+    -target "x86_64-apple-macos${WIDGET_MIN}" \
+    -framework WidgetKit -framework SwiftUI -framework AppKit \
+    -application-extension -parse-as-library \
+    "$WIDGET_SRC_DIR"/*.swift -o "$WIDGET_X86_64"
+  lipo -create "$WIDGET_ARM64" "$WIDGET_X86_64" -output "$WIDGET_EXEC"
+  rm -f "$WIDGET_ARM64" "$WIDGET_X86_64"
+  chmod +x "$WIDGET_EXEC"
+  cp "$WIDGET_PLIST_SRC" "$WIDGET_APPEX/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$WIDGET_APPEX/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$WIDGET_APPEX/Contents/Info.plist"
+fi
+
 # Strip quarantine / provenance xattrs that browsers leak into source files.
 xattr -cr "$APP_DIR" 2>/dev/null || true
 
@@ -98,6 +132,12 @@ if [[ -n "$SIGN_IDENTITY" ]]; then
   codesign --force --options runtime --timestamp \
     --sign "$SIGN_IDENTITY" \
     "$ENGINE_DST"
+  if [[ -d "$WIDGET_APPEX" ]]; then
+    codesign --force --options runtime --timestamp \
+      --entitlements "$WIDGET_ENTITLEMENTS" \
+      --sign "$SIGN_IDENTITY" \
+      "$WIDGET_APPEX"
+  fi
   codesign --force --options runtime --timestamp \
     --entitlements "$ENTITLEMENTS" \
     --sign "$SIGN_IDENTITY" \

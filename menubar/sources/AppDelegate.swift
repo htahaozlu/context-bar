@@ -1,5 +1,8 @@
 import AppKit
 import Foundation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var statusItem: NSStatusItem!
@@ -24,7 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         setupPopover()
         refresh()
-        if ProcessInfo.processInfo.environment["CONTEXTHUD_OPEN_WINDOW"] == "1" {
+        let args = CommandLine.arguments.dropFirst()
+        if ProcessInfo.processInfo.environment["CONTEXTHUD_OPEN_WINDOW"] == "1"
+            || args.contains("--settings") || args.contains("--open") {
             openDetail()
         }
         if let screenshotPath = ProcessInfo.processInfo.environment["CONTEXTHUD_SCREENSHOT_PATH"] {
@@ -118,13 +123,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc func tick() {
-        // Battery: only refresh on timer ticks when something is actually
-        // visible. FSEvents still trigger a refresh below so the menubar
-        // title stays current. The menubar title itself is repainted on
-        // refresh() — but the engine respawn is skipped here.
-        let detailVisible = detailWindow?.window?.isVisible == true
-        guard popoverVisible || detailVisible else { return }
+        // Always regenerate so menubar title reflects the most recently
+        // active project/session — even when popover and detail window are
+        // both closed. Engine is fast (sub-100ms in steady state) and this
+        // closes a UX gap where switching projects in another Claude session
+        // left the menubar showing the old project until the popover opened.
         regenerateThenRefresh()
+    }
+
+    /// Finder double-click / Dock click while running. Accessory apps with
+    /// no Dock tile still receive this when the user launches the app from
+    /// Finder, Spotlight, or `open -a ContextHUD`. Used as a fallback when
+    /// the menubar icon is hidden by overflow / Bartender / Hidden Bar.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        showFromReopen()
+        return true
+    }
+
+    /// First-launch hand-off: if the app was already running and the user
+    /// double-clicked it in Finder, AppKit may send `application(_:open:)`
+    /// instead of reopen. Treat both the same.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        showFromReopen()
+    }
+
+    private func showFromReopen() {
+        // If the status item button has zero width or is off-screen the
+        // menubar entry is hidden — surface the detail window so the user
+        // can still reach settings.
+        let button = statusItem.button
+        let buttonHidden: Bool = {
+            guard let btn = button, let win = btn.window else { return true }
+            let frame = win.convertToScreen(btn.convert(btn.bounds, to: nil))
+            guard let screen = NSScreen.screens.first(where: { $0.frame.contains(frame.origin) })
+                ?? NSScreen.main else { return frame.width < 4 }
+            return frame.width < 4 || !screen.visibleFrame.intersects(frame)
+        }()
+        if buttonHidden {
+            openDetail()
+        } else {
+            togglePopover(nil)
+        }
+        NSApp.activate(ignoringOtherApps: true)
     }
     @objc func refreshNow() { regenerateThenRefresh() }
 
@@ -139,8 +179,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func regenerateThenRefresh() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.runEngine()
-            DispatchQueue.main.async { self?.refresh() }
+            DispatchQueue.main.async {
+                self?.refresh()
+                self?.reloadWidgets()
+            }
         }
+    }
+
+    private func reloadWidgets() {
+        #if canImport(WidgetKit)
+        if #available(macOS 11.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+        #endif
     }
 
     private func runEngine() {
@@ -357,12 +408,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         guard bestID != kCGNullWindowID else { NSApp.terminate(nil); return }
 
-        // screencapture CLI has system-level screen recording access.
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        task.arguments = ["-x", "-o", "-l", String(bestID), path]
-        try? task.run()
-        task.waitUntilExit()
+        let opts: CGWindowImageOption = [.boundsIgnoreFraming, .bestResolution]
+        if let cgImage = CGWindowListCreateImage(
+            .null, .optionIncludingWindow, bestID, opts
+        ) {
+            let rep = NSBitmapImageRep(cgImage: cgImage)
+            rep.size = NSSize(width: cgImage.width, height: cgImage.height)
+            if let data = rep.representation(using: .png, properties: [:]) {
+                try? data.write(to: URL(fileURLWithPath: path))
+            }
+        }
         NSApp.terminate(nil)
     }
 
@@ -390,11 +445,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             if area > bestArea { bestArea = area; bestID = CGWindowID(widInt) }
         }
         guard bestID != kCGNullWindowID else { return }
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        task.arguments = ["-x", "-o", "-l", String(bestID), path]
-        try? task.run()
-        task.waitUntilExit()
+        // CGWindowListCreateImage works on windows owned by the current
+        // process without requiring Screen Recording TCC, unlike the
+        // `screencapture` CLI which inherits the parent's permissions and
+        // silently fails in headless / freshly-signed launches.
+        let opts: CGWindowImageOption = [.boundsIgnoreFraming, .bestResolution]
+        guard let cgImage = CGWindowListCreateImage(
+            .null, .optionIncludingWindow, bestID, opts
+        ) else { return }
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        rep.size = NSSize(width: cgImage.width, height: cgImage.height)
+        if let data = rep.representation(using: .png, properties: [:]) {
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
     }
 
     @objc func quit() {
