@@ -1,6 +1,6 @@
 cask "context-hud" do
-  version "0.3.4"
-  sha256 "8970bffde4c2b8f73acaa2d6787e90224d37134e572fbf238923f0cdb028dbca"
+  version "0.3.5"
+  sha256 "6e117178f691b680e1cf66ffd12cf83251b95cee139ed396a0c07aa86bbd49f4"
 
   url "https://github.com/htahaozlu/context-hud/releases/download/v#{version}/ContextHUD.dmg",
       verified: "github.com/htahaozlu/context-hud/"
