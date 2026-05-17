@@ -1,7 +1,6 @@
 .tmp/
 target/
 .context-bar/
-.context-hud/
 dist/
 AGENT.md
 CLAUDE.md

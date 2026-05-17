@@ -46,7 +46,7 @@ ContextBar, Claude Code ve Codex kullanımına yerel bir macOS yüzeyi verir; b�
 brew install --cask htahaozlu/context-bar/context-bar
 ```
 
-`brew` ilk kurulumda `htahaozlu/homebrew-context-bar` tap'ini otomatik ekler. Sonraki güncellemeler: `brew upgrade --cask context-bar`.
+`brew` ilk kurulumda `htahaozlu/homebrew-context-bar` tap'ini otomatik ekler. Sonraki güncellemeler: `brew update && brew upgrade --cask htahaozlu/context-bar/context-bar`.
 
 ### macOS uygulaması (DMG)
 

@@ -98,7 +98,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             // Card order: hero (active session) → parallel sessions →
             // per-agent limits (primary first, then any others) → other tools.
             addCard(buildHero(agent: agent, isActive: agent.name == active?.name))
-            if agent.activeSessions.count > 1 {
+            if hasParallelSessions(agent: agent) {
                 addCard(buildParallelSessions(agent: agent))
             }
             // Primary agent's limits first, then any other agents with data.
@@ -266,7 +266,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         ]))
         title.append(NSAttributedString(string: a.project, attributes: [
             .font: projectFont,
-            .foregroundColor: NSColor.labelColor,
+            .foregroundColor: Palette.primaryText,
             .kern: -0.3,
         ]))
         let projectLbl = NSTextField(labelWithAttributedString: title)
@@ -623,7 +623,22 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// model on top, a thin context-percent bar underneath, the percent text +
     /// last-turn relative time on the right. Capped at 5 rows; a "+N more"
     /// footer appears if exceeded. Caller is responsible for only invoking
-    /// this when `agent.activeSessions.count > 1`.
+    /// this when `hasParallelSessions(agent:)` returns true.
+    private func parallelSessions(for a: Agent) -> [ActiveSession] {
+        let foregroundCwd = a.cwd
+        return a.activeSessions.filter { sess in
+            if let fg = foregroundCwd, !fg.isEmpty {
+                let proj = (fg as NSString).lastPathComponent
+                return sess.project != proj
+            }
+            return sess.id != a.activeSessions.first?.id
+        }
+    }
+
+    private func hasParallelSessions(agent a: Agent) -> Bool {
+        !parallelSessions(for: a).isEmpty
+    }
+
     private func buildParallelSessions(agent a: Agent) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
@@ -632,17 +647,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             Typography.captionAttributed(L10n.text("Parallel Sessions", "Paralel oturumlar")))
         stack.addArrangedSubview(header)
 
-        // Distinguish the foreground session by matching its cwd against the
-        // agent.cwd (last_cwd). Falls back to "first active session" if no cwd
-        // is set, so the popover still shows N-1 rows in that degenerate case.
-        let foregroundCwd = a.cwd
-        let allOthers = a.activeSessions.filter { sess in
-            if let fg = foregroundCwd, !fg.isEmpty {
-                let proj = (fg as NSString).lastPathComponent
-                return sess.project != proj
-            }
-            return sess.id != a.activeSessions.first?.id
-        }
+        let allOthers = parallelSessions(for: a)
         let cap = 5
         let shown = Array(allOthers.prefix(cap))
         let overflow = max(0, allOthers.count - cap)
@@ -895,7 +900,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         result.append(NSAttributedString(string: " ", attributes: [.font: font]))
         result.append(NSAttributedString(
             string: theme.name,
-            attributes: [.font: font, .foregroundColor: NSColor.labelColor]
+            attributes: [.font: font, .foregroundColor: Palette.primaryText]
         ))
         if !compact {
             // Trailing example token ("42%") in the theme's percent color so
@@ -937,4 +942,3 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         onPickTheme?(id)
     }
 }
-

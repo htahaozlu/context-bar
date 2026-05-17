@@ -82,6 +82,7 @@ func agentInlineLabel(name: String, font: NSFont, color: NSColor, iconScale: CGF
             iconScale: iconScale
         )
     )
+    label.textColor = color
     label.toolTip = AgentVisual.forName(name).accessibilityLabel
     return label
 }
@@ -119,4 +120,3 @@ struct Agent {
         return (cwd as NSString).lastPathComponent
     }
 }
-

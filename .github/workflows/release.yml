@@ -151,18 +151,28 @@ jobs:
             git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:main
           fi
 
-      - name: Sync tap repo (htahaozlu/homebrew-context-bar)
+      - name: Sync Homebrew tap repo
         if: github.ref_type == 'tag' && env.HOMEBREW_TAP_TOKEN != ''
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY || 'htahaozlu/homebrew-context-bar' }}
         run: |
           set -euo pipefail
+          if ! [[ "$HOMEBREW_TAP_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Refusing unsafe Homebrew tap repository: $HOMEBREW_TAP_REPOSITORY" >&2
+            exit 1
+          fi
           SHA=$(awk '{print $1}' dist/ContextBar.dmg.sha256)
           WORK=$(mktemp -d)
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/htahaozlu/homebrew-context-bar.git" "$WORK"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${HOMEBREW_TAP_REPOSITORY}.git" "$WORK"
           cd "$WORK"
+          if ! git push --dry-run origin HEAD:main >/tmp/homebrew-tap-push-check.log 2>&1; then
+            echo "::error::HOMEBREW_TAP_TOKEN cannot push to ${HOMEBREW_TAP_REPOSITORY}. Give the token Contents read/write access to that repository, or set HOMEBREW_TAP_REPOSITORY to the correct tap repo." >&2
+            sed -E 's#x-access-token:[^@]+@#x-access-token:***@#g' /tmp/homebrew-tap-push-check.log >&2
+            exit 1
+          fi
           mkdir -p Casks
           cp "$GITHUB_WORKSPACE/Casks/context-bar.rb" Casks/context-bar.rb
           sed -i.bak -E "s/^  version \".*\"/  version \"${VERSION}\"/" Casks/context-bar.rb

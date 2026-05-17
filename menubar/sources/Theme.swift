@@ -32,9 +32,9 @@ struct Theme {
         Theme(
             id: "default",
             name: "Default",
-            agentColor: .labelColor,
+            agentColor: Palette.primaryText,
             projectColor: .controlAccentColor,
-            separatorColor: .tertiaryLabelColor,
+            separatorColor: Palette.tertiaryText,
             pctLow: .systemGreen,
             pctMid: .systemOrange,
             pctHigh: .systemRed,
@@ -43,12 +43,12 @@ struct Theme {
         Theme(
             id: "mono",
             name: "Mono",
-            agentColor: .labelColor,
-            projectColor: .labelColor,
-            separatorColor: .tertiaryLabelColor,
-            pctLow: .labelColor,
-            pctMid: .labelColor,
-            pctHigh: .labelColor,
+            agentColor: Palette.primaryText,
+            projectColor: Palette.primaryText,
+            separatorColor: Palette.tertiaryText,
+            pctLow: Palette.primaryText,
+            pctMid: Palette.primaryText,
+            pctHigh: Palette.primaryText,
             activeDot: "▸", inactiveDot: "·", separator: "·"
         ),
         Theme(
@@ -87,9 +87,9 @@ struct Theme {
         Theme(
             id: "compact",
             name: "Compact",
-            agentColor: .labelColor,
-            projectColor: .secondaryLabelColor,
-            separatorColor: .tertiaryLabelColor,
+            agentColor: Palette.primaryText,
+            projectColor: Palette.secondaryText,
+            separatorColor: Palette.tertiaryText,
             pctLow: .systemTeal,
             pctMid: .systemOrange,
             pctHigh: .systemRed,

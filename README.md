@@ -53,7 +53,7 @@ ContextBar gives Claude Code and Codex a native macOS surface, so context drift 
 brew install --cask htahaozlu/context-bar/context-bar
 ```
 
-`brew` auto-taps `htahaozlu/homebrew-context-bar` on first install. Upgrade later with `brew upgrade --cask context-bar`.
+`brew` auto-taps `htahaozlu/homebrew-context-bar` on first install. Upgrade later with `brew update && brew upgrade --cask htahaozlu/context-bar/context-bar`.
 
 ### macOS app (DMG)
 

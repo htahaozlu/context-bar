@@ -47,7 +47,7 @@ enum Typography {
 
     /// Builds an UPPERCASE kerned attributed string used for section captions
     /// ("CONTEXT", "30-DAY TOKENS", etc.). Consistent across all panes.
-    static func captionAttributed(_ text: String, color: NSColor = .tertiaryLabelColor) -> NSAttributedString {
+    static func captionAttributed(_ text: String, color: NSColor = Palette.tertiaryText) -> NSAttributedString {
         NSAttributedString(string: text.uppercased(), attributes: [
             .font: caption(),
             .foregroundColor: color,
@@ -60,12 +60,33 @@ enum Typography {
     /// should always use this so the width doesn't jitter as digits change.
     static func displayNumberAttributed(_ text: String, size: CGFloat = 28,
                                         weight: NSFont.Weight = .semibold,
-                                        color: NSColor = .labelColor) -> NSAttributedString {
+                                        color: NSColor = Palette.primaryText) -> NSAttributedString {
         NSAttributedString(string: text, attributes: [
             .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight),
             .foregroundColor: color,
             .kern: -0.4,
         ])
+    }
+}
+
+enum Palette {
+    static let primaryText = dynamicColor(name: "ContextBarPrimaryText") { isDark in
+        isDark ? NSColor(calibratedWhite: 0.96, alpha: 1) : NSColor(calibratedWhite: 0.08, alpha: 1)
+    }
+
+    static let secondaryText = dynamicColor(name: "ContextBarSecondaryText") { isDark in
+        isDark ? NSColor(calibratedWhite: 0.74, alpha: 1) : NSColor(calibratedWhite: 0.38, alpha: 1)
+    }
+
+    static let tertiaryText = dynamicColor(name: "ContextBarTertiaryText") { isDark in
+        isDark ? NSColor(calibratedWhite: 0.56, alpha: 1) : NSColor(calibratedWhite: 0.55, alpha: 1)
+    }
+
+    private static func dynamicColor(name: String, provider: @escaping (Bool) -> NSColor) -> NSColor {
+        NSColor(name: NSColor.Name(name)) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return provider(isDark)
+        }
     }
 }
 

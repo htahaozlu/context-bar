@@ -2,10 +2,9 @@ cask "context-bar" do
   version "0.3.9"
   sha256 "73c6984d4a3a3d7c72d543a25eafad86d736d052fc9ceed8b2d938a8f464fac5"
 
-  url "https://github.com/htahaozlu/context-bar/releases/download/v#{version}/ContextBar.dmg",
-      verified: "github.com/htahaozlu/context-bar/"
+  url "https://github.com/htahaozlu/context-bar/releases/download/v#{version}/ContextBar.dmg"
   name "ContextBar"
-  desc "Local-first repo context generator with a native macOS menubar companion"
+  desc "Local-first repo context generator with a native menubar companion"
   homepage "https://github.com/htahaozlu/context-bar"
 
   livecheck do
@@ -14,7 +13,7 @@ cask "context-bar" do
   end
 
   auto_updates false
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "ContextBar.app"
 
