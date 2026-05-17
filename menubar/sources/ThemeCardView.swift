@@ -48,17 +48,18 @@ final class ThemeCardView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSAppearance.current = effectiveAppearance
-        let bg = isSelected
-            ? NSColor.controlAccentColor.withAlphaComponent(0.15)
-            : NSColor.controlBackgroundColor
-        let border = isSelected ? NSColor.controlAccentColor : NSColor.separatorColor
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 8, yRadius: 8)
-        bg.setFill()
-        path.fill()
-        border.setStroke()
-        path.lineWidth = isSelected ? 2.0 : 1.0
-        path.stroke()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let bg = isSelected
+                ? NSColor.controlAccentColor.withAlphaComponent(0.15)
+                : NSColor.controlBackgroundColor
+            let border = isSelected ? NSColor.controlAccentColor : NSColor.separatorColor
+            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 8, yRadius: 8)
+            bg.setFill()
+            path.fill()
+            border.setStroke()
+            path.lineWidth = isSelected ? 2.0 : 1.0
+            path.stroke()
+        }
     }
 
     override func mouseUp(with event: NSEvent) {

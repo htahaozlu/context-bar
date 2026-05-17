@@ -68,9 +68,10 @@ final class ChipCardView: NSView, NSDraggingSource {
     }
 
     private func applyAppearance() {
-        NSAppearance.current = effectiveAppearance
-        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.85).cgColor
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.85).cgColor
+            layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
+        }
     }
 
     @objc private func checkboxToggled(_ sender: NSButton) {
@@ -275,8 +276,9 @@ final class TitlePreviewView: NSView {
     }
 
     private func applyAppearance() {
-        NSAppearance.current = effectiveAppearance
-        layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.7).cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.7).cgColor
+        }
     }
 }
 
