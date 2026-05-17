@@ -1,7 +1,7 @@
-# ContextHUD
+# ContextBar
 
 <p align="center">
-  <img src="logo.png" alt="ContextHUD logosu" width="560">
+  <img src="logo.png" alt="ContextBar logosu" width="560">
 </p>
 
 <p align="center">
@@ -13,52 +13,52 @@
 </p>
 
 <p align="center">
-  ContextHUD, ajanların çalıştıkları depoya bağlı kalmasını sağlar, ajanların okuyabileceği kararlı özetler üretir ve Claude Code ile Codex kullanımını yerel bir macOS arayüzüyle görünür hale getirir.
+  ContextBar, ajanların çalıştıkları depoya bağlı kalmasını sağlar, ajanların okuyabileceği kararlı özetler üretir ve Claude Code ile Codex kullanımını yerel bir macOS arayüzüyle görünür hale getirir.
 </p>
 
 <p align="center">
-  <a href="https://github.com/htahaozlu/context-hud/releases/latest/download/ContextHUD.dmg">
+  <a href="https://github.com/htahaozlu/context-bar/releases/latest/download/ContextBar.dmg">
     <img alt="macOS için indir" src="https://img.shields.io/badge/Download-macOS%20DMG-black?logo=apple">
   </a>
-  <a href="https://github.com/htahaozlu/context-hud/releases/latest">
-    <img alt="Güncel sürüm" src="https://img.shields.io/github/v/release/htahaozlu/context-hud?display_name=tag&label=release">
+  <a href="https://github.com/htahaozlu/context-bar/releases/latest">
+    <img alt="Güncel sürüm" src="https://img.shields.io/github/v/release/htahaozlu/context-bar?display_name=tag&label=release">
   </a>
   <a href="LICENSE">
     <img alt="Lisans" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2">
   </a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-7DCEA0">
-  <img src="https://img.shields.io/github/downloads/htahaozlu/context-hud/total?style=flat-square&label=indirme" alt="Toplam İndirme">
+  <img src="https://img.shields.io/github/downloads/htahaozlu/context-bar/total?style=flat-square&label=indirme" alt="Toplam İndirme">
 </p>
 
 ## Canlı demo
 
 <p align="center">
-  <img src="docs/images/context-hud-demo.gif" alt="ContextHUD üzerinde Claude Code ve Codex kullanımının macOS'ta canlı güncellendiğini gösteren demo" width="100%">
+  <img src="docs/images/context-bar-demo.gif" alt="ContextBar üzerinde Claude Code ve Codex kullanımının macOS'ta canlı güncellendiğini gösteren demo" width="100%">
 </p>
 
-ContextHUD, Claude Code ve Codex kullanımına yerel bir macOS yüzeyi verir; böylece bağlam kayması ve rolling kullanım pencereleri siz çalışırken görünür kalır.
+ContextBar, Claude Code ve Codex kullanımına yerel bir macOS yüzeyi verir; böylece bağlam kayması ve rolling kullanım pencereleri siz çalışırken görünür kalır.
 
 ## Kurulum
 
 ### Homebrew (önerilen)
 
 ```bash
-brew install --cask htahaozlu/context-hud/context-hud
+brew install --cask htahaozlu/context-bar/context-bar
 ```
 
-`brew` ilk kurulumda `htahaozlu/homebrew-context-hud` tap'ini otomatik ekler. Sonraki güncellemeler: `brew upgrade --cask context-hud`.
+`brew` ilk kurulumda `htahaozlu/homebrew-context-bar` tap'ini otomatik ekler. Sonraki güncellemeler: `brew upgrade --cask context-bar`.
 
 ### macOS uygulaması (DMG)
 
-1. [En son sürümden](https://github.com/htahaozlu/context-hud/releases/latest) `ContextHUD.dmg` dosyasını indirin (evrensel: Apple Silicon + Intel).
-2. `ContextHUD.app` uygulamasını `Applications` klasörüne sürükleyin.
-3. İlk açılış: `ContextHUD.app` üzerine sağ tıklayın → **Aç** → tekrar **Aç**. Uygulama ad-hoc imzalı (notarize değil).
+1. [En son sürümden](https://github.com/htahaozlu/context-bar/releases/latest) `ContextBar.dmg` dosyasını indirin (evrensel: Apple Silicon + Intel).
+2. `ContextBar.app` uygulamasını `Applications` klasörüne sürükleyin.
+3. İlk açılış: `ContextBar.app` üzerine sağ tıklayın → **Aç** → tekrar **Aç**. Uygulama ad-hoc imzalı (notarize değil).
 4. DMG'yi çıkarıp silin.
 
 macOS uygulamayı "hasarlı" olarak gösterirse quarantine işaretini kaldırın:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/ContextHUD.app
+xattr -dr com.apple.quarantine /Applications/ContextBar.app
 ```
 
 ### CLI
@@ -70,20 +70,20 @@ cargo install --path .
 ## Önizleme
 
 <p align="center">
-  <img src="docs/images/context-hud-screenshot.png" alt="ContextHUD yerel kullanım penceresi" width="100%">
+  <img src="docs/images/context-bar-screenshot.png" alt="ContextBar yerel kullanım penceresi" width="100%">
 </p>
 
 Claude Code ve Codex için sürekli oturum görünürlüğüne sahip yerel macOS kullanım penceresi.
 
 <p align="center">
-  <img src="docs/images/context-hud-menubar.png" alt="ContextHUD menubar" width="400">
+  <img src="docs/images/context-bar-menubar.png" alt="ContextBar menubar" width="400">
 </p>
 
 Aktif ajan, proje ve bağlam kullanımını gösteren kompakt menubar durum öğesi. Tıklandığında aktif oturum, bağlam penceresi, 5sa/7g limitleri, paralel oturumlar ve canlı tema seçici içeren yerel bir popover açılır.
 
 ## Ne işe yarar
 
-ContextHUD, ajan destekli geliştirmede sürekli tekrar eden iki sorunu hedefler:
+ContextBar, ajan destekli geliştirmede sürekli tekrar eden iki sorunu hedefler:
 
 - depo bağlamı, ajan özeti güncellenmeden daha hızlı değişir
 - kullanım ve oturum durumu terminal çıktısı ile yerel kayıtlar arasında kaybolur
@@ -92,7 +92,7 @@ Bu iki problemi, sürekli kararlı proje özetleri üreten yerel bir işlem hatt
 
 ### Temel yüzeyler
 
-- `.context-hud/` altında depo snapshot'ları
+- `.context-bar/` altında depo snapshot'ları
 - Kararlı `AGENT.md` ve `CLAUDE.md`
 - refresh, watch ve global görünümler için CLI
 - Yerel AppKit menubar yardımcı uygulaması
@@ -102,7 +102,7 @@ Bu iki problemi, sürekli kararlı proje özetleri üreten yerel bir işlem hatt
 
 ### Depo bağlamı üretimi
 
-Her yenileme, ajanların okuyabileceği durumu `.context-hud/` altına yazar:
+Her yenileme, ajanların okuyabileceği durumu `.context-bar/` altına yazar:
 
 - `state.json`
 - `brief-now.md`
@@ -115,14 +115,14 @@ Claude Code uyumluluğu için `CLAUDE.md`, depo köküne de aynalanır.
 
 ### CLI iş akışı
 
-- `context-hud hud` mevcut depoyu yeniler ve HUD çıktısını basar
-- `context-hud snapshot` HUD basmadan artifact yazar
-- `context-hud watch 30 .` depo bağlamını belirli aralıklarla taze tutar
-- `context-hud global` `~/.context-hud/` altında projeler arası HUD oluşturur
+- `context-bar hud` mevcut depoyu yeniler ve HUD çıktısını basar
+- `context-bar snapshot` HUD basmadan artifact yazar
+- `context-bar watch 30 .` depo bağlamını belirli aralıklarla taze tutar
+- `context-bar global` `~/.context-bar/` altında projeler arası HUD oluşturur
 
 ### Yerel macOS yardımcısı
 
-Yardımcı uygulama `~/.context-hud/hud.json` dosyasını okur ve şunları sağlar:
+Yardımcı uygulama `~/.context-bar/hud.json` dosyasını okur ve şunları sağlar:
 
 - kompakt menubar durum öğesi (aktif ajan + proje + bağlam %)
 - modern AppKit popover: aktif ajan, bağlam penceresi, ilerleme barlı 5sa/7g
@@ -151,51 +151,51 @@ export artifact'idir.
 ### Mevcut depoyu yenile
 
 ```bash
-context-hud hud
+context-bar hud
 ```
 
 ### HUD yazdırmadan artifact üret
 
 ```bash
-context-hud snapshot
+context-bar snapshot
 ```
 
 ### Depo bağlamını taze tut
 
 ```bash
-context-hud watch 30 .
+context-bar watch 30 .
 ```
 
 ### Global HUD üret
 
 ```bash
-context-hud global
-context-hud watch-global 30
+context-bar global
+context-bar watch-global 30
 ```
 
-Global HUD `~/.context-hud/hud.md` konumuna yazılır.
+Global HUD `~/.context-bar/hud.md` konumuna yazılır.
 
 ## Artifact düzeni
 
 Her yenileme aşağıdaki dosyaları atomik olarak yazar:
 
-- `.context-hud/state.json`
-- `.context-hud/brief-now.md`
-- `.context-hud/brief-session.md`
-- `.context-hud/brief-week.md`
-- `.context-hud/AGENT.md`
-- `.context-hud/hud.md`
+- `.context-bar/state.json`
+- `.context-bar/brief-now.md`
+- `.context-bar/brief-session.md`
+- `.context-bar/brief-week.md`
+- `.context-bar/AGENT.md`
+- `.context-bar/hud.md`
 - `CLAUDE.md`
 
 Atomik yazım sayesinde ajanlar yenileme sırasında yarı yazılmış durumu görmez.
 
 ## Veri kaynakları
 
-ContextHUD şu kaynakları birleştirir:
+ContextBar şu kaynakları birleştirir:
 
 - Git branch, son commit'ler ve worktree durumu
 - depo `mtime` verilerinden çıkarılan dosya etkinliği
-- `~/.context-hud/claude-statusline.json` altındaki isteğe bağlı Claude Code statusline snapshot'ı
+- `~/.context-bar/claude-statusline.json` altındaki isteğe bağlı Claude Code statusline snapshot'ı
 - `~/.claude/projects/**/*.jsonl` içinden Claude Code kullanım verisi
 - `~/.codex/sessions/**/*.jsonl` içinden Codex CLI kullanım verisi
 
@@ -203,18 +203,18 @@ Temel depo özetleri için harici servis gerekmez. Kullanım toplama, yerel tran
 
 ### Claude Code parity
 
-Claude context yüzdesi için en iyi kaynak, Claude Code'un native statusline payload'ıdır. ContextHUD bunu yerelde saklayabilir:
+Claude context yüzdesi için en iyi kaynak, Claude Code'un native statusline payload'ıdır. ContextBar bunu yerelde saklayabilir:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "context-hud claude-statusline"
+    "command": "context-bar claude-statusline"
   }
 }
 ```
 
-Bu komut `~/.context-hud/claude-statusline.json` dosyasını yazar ve ContextHUD bu dosyayı Claude context için birincil kaynak olarak okur. Snapshot eksikse veya bayatsa transcript tabanlı tahmine geri düşer.
+Bu komut `~/.context-bar/claude-statusline.json` dosyasını yazar ve ContextBar bu dosyayı Claude context için birincil kaynak olarak okur. Snapshot eksikse veya bayatsa transcript tabanlı tahmine geri düşer.
 
 ## Paketleme
 
@@ -227,14 +227,14 @@ scripts/create-macos-dmg.sh
 
 Artifact'ler:
 
-- `dist/ContextHUD.app`
-- `dist/ContextHUD.dmg`
+- `dist/ContextBar.app`
+- `dist/ContextBar.dmg`
 
 ## Depo düzeni
 
 - `src/` çekirdek motor, artifact render etme ve kullanım toplama
-- `src/bin/context-hud.rs` bağımsız CLI giriş noktası
-- `menubar/context-hud.swift` macOS yardımcı uygulaması
+- `src/bin/context-bar.rs` bağımsız CLI giriş noktası
+- `menubar/context-bar.swift` macOS yardımcı uygulaması
 - `examples/snapshot.rs` yerel geliştirme harness'i
 
 ## Geliştirme

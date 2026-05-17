@@ -1,10 +1,10 @@
-id = "context-hud"
-name = "ContextHUD"
+id = "context-bar"
+name = "ContextBar"
 version = "0.1.0"
 schema_version = 1
 authors = ["OpenAI Codex"]
 description = "Local-first repository context artifacts and native macOS HUD for coding agents."
-repository = "https://github.com/htahaozlu/context-hud"
+repository = "https://github.com/htahaozlu/context-bar"
 
 [slash_commands.hello]
 description = "Inject a minimal worktree-aware greeting into the Assistant"

@@ -360,7 +360,7 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
 }
 
 final class AboutViewController: PreferencePaneViewController {
-    private let changelogURL = URL(string: "https://github.com/htahaozlu/context-hud/blob/main/CHANGELOG.md")!
+    private let changelogURL = URL(string: "https://github.com/htahaozlu/context-bar/blob/main/CHANGELOG.md")!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -383,15 +383,15 @@ final class AboutViewController: PreferencePaneViewController {
         addSection(
             title: L10n.text("Updates", "Güncellemeler"),
             subtitle: L10n.text(
-                "ContextHUD releases are distributed from GitHub Releases.",
-                "ContextHUD sürümleri GitHub Releases üzerinden dağıtılır."
+                "ContextBar releases are distributed from GitHub Releases.",
+                "ContextBar sürümleri GitHub Releases üzerinden dağıtılır."
             ),
             body: actions
         )
 
         let context = NSStackView(views: [
-            makeInfoRow(title: L10n.text("Artifacts folder", "Artifact klasörü"), value: "\(NSHomeDirectory())/.context-hud"),
-            makeInfoRow(title: L10n.text("Repository brief", "Repo brifi"), value: ".context-hud/AGENT.md"),
+            makeInfoRow(title: L10n.text("Artifacts folder", "Artifact klasörü"), value: "\(NSHomeDirectory())/.context-bar"),
+            makeInfoRow(title: L10n.text("Repository brief", "Repo brifi"), value: ".context-bar/AGENT.md"),
             makeInfoRow(title: L10n.text("Claude compatibility", "Claude uyumluluğu"), value: "CLAUDE.md"),
         ])
         context.orientation = .vertical
@@ -410,7 +410,7 @@ final class AboutViewController: PreferencePaneViewController {
             makeInfoRow(title: "Git", value: L10n.text("branch, commits, worktree", "branch, commit, worktree")),
             makeInfoRow(title: "Claude Code", value: "~/.claude/projects/**/*.jsonl"),
             makeInfoRow(title: "Codex CLI", value: "~/.codex/sessions/**/*.jsonl"),
-            makeInfoRow(title: "Output", value: "~/.context-hud/hud.json"),
+            makeInfoRow(title: "Output", value: "~/.context-bar/hud.json"),
         ])
         sources.orientation = .vertical
         sources.spacing = 10
@@ -426,8 +426,8 @@ final class AboutViewController: PreferencePaneViewController {
 
         let locations = NSStackView(views: [
             makeInfoRow(title: L10n.text("Version", "Sürüm"), value: AppMetadata.current.detailedVersionLabel),
-            makeInfoRow(title: L10n.text("App bundle", "Uygulama paketi"), value: "dist/ContextHUD.app"),
-            makeInfoRow(title: L10n.text("Disk image", "DMG"), value: "dist/ContextHUD.dmg"),
+            makeInfoRow(title: L10n.text("App bundle", "Uygulama paketi"), value: "dist/ContextBar.app"),
+            makeInfoRow(title: L10n.text("Disk image", "DMG"), value: "dist/ContextBar.dmg"),
             makeInfoRow(title: L10n.text("Open window", "Pencereyi aç"), value: "⌘D"),
             makeInfoRow(title: L10n.text("Refresh", "Yenile"), value: "⌘R"),
         ])

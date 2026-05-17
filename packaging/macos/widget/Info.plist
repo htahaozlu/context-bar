@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>ContextHUD</string>
+    <string>ContextBar</string>
     <key>CFBundleExecutable</key>
-    <string>ContextHUDWidget</string>
+    <string>ContextBarWidget</string>
     <key>CFBundleIdentifier</key>
-    <string>com.htahaozlu.contexthud.widget</string>
+    <string>com.htahaozlu.contextbar.widget</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>ContextHUDWidget</string>
+    <string>ContextBarWidget</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>

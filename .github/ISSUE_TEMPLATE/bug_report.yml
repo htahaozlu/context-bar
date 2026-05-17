@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in ContextHUD
+description: Report a reproducible problem in ContextBar
 title: "[Bug]: "
 labels:
   - bug
@@ -26,7 +26,7 @@ body:
     attributes:
       label: Summary
       description: Describe the bug in one or two precise sentences.
-      placeholder: Running `context-hud hud` exits without writing `.context-hud/hud.md`.
+      placeholder: Running `context-bar hud` exits without writing `.context-bar/hud.md`.
     validations:
       required: true
   - type: textarea
@@ -36,7 +36,7 @@ body:
       description: List exact steps that reproduce the issue.
       placeholder: |
         1. Install the CLI with `cargo install --path .`
-        2. Run `context-hud hud`
+        2. Run `context-bar hud`
         3. Observe...
     validations:
       required: true
@@ -59,7 +59,7 @@ body:
       description: Include OS version, installation method, and relevant tool versions.
       placeholder: |
         - macOS:
-        - ContextHUD version:
+        - ContextBar version:
         - Rust version:
         - Zed version:
         - Claude Code / Codex context:

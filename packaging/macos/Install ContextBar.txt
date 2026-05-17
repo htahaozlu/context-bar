@@ -1,0 +1,10 @@
+ContextBar
+
+Install
+1. Drag "ContextBar.app" into Applications.
+2. Open the app from Applications.
+3. If macOS warns about the app, allow it from System Settings if you trust the source.
+
+After install
+- Eject this disk image.
+- Delete this DMG file. You do not need it after the app is installed.

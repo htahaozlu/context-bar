@@ -57,7 +57,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "ContextHUD"
+        window.title = "ContextBar"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .preference
@@ -105,7 +105,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
 
     func capture(to path: String) {
         load()
-        if let rawIndex = ProcessInfo.processInfo.environment["CONTEXTHUD_SELECT_TAB"],
+        if let rawIndex = ProcessInfo.processInfo.environment["CONTEXTBAR_SELECT_TAB"],
            let index = Int(rawIndex) {
             selectTab(index: index)
         }

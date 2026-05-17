@@ -11,11 +11,11 @@
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
-use context_hud::context_engine;
-use context_hud::git_signal::{
+use context_bar::context_engine;
+use context_bar::git_signal::{
     self, ChangeSummary, CommitSummary, GitSignals,
 };
-use context_hud::state_writer;
+use context_bar::state_writer;
 
 fn main() {
     if let Err(error) = run() {

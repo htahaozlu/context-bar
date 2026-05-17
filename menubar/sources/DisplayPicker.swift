@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 final class ChipCardView: NSView, NSDraggingSource {
-    static let dragType = NSPasteboard.PasteboardType("com.contexthud.chip")
+    static let dragType = NSPasteboard.PasteboardType("com.contextbar.chip")
     let index: Int
     var onToggle: ((Int, Bool) -> Void)?
     private let checkbox: NSButton

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::PathBuf;
 
-const DEFAULT_RELATIVE_PATH: &str = ".context-hud/claude-statusline.json";
+const DEFAULT_RELATIVE_PATH: &str = ".context-bar/claude-statusline.json";
 
 #[derive(Debug, Deserialize)]
 struct StatuslineInput {
@@ -94,7 +94,7 @@ struct SnapshotContextWindow {
 }
 
 pub fn default_snapshot_path() -> PathBuf {
-    if let Ok(override_path) = std::env::var("CONTEXTHUD_CLAUDE_STATUSLINE_PATH") {
+    if let Ok(override_path) = std::env::var("CONTEXTBAR_CLAUDE_STATUSLINE_PATH") {
         return PathBuf::from(override_path);
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
@@ -186,6 +186,6 @@ mod tests {
     #[test]
     fn default_path_uses_home() {
         let path = default_snapshot_path();
-        assert!(path.ends_with(".context-hud/claude-statusline.json"));
+        assert!(path.ends_with(".context-bar/claude-statusline.json"));
     }
 }

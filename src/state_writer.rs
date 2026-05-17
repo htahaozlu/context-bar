@@ -25,11 +25,11 @@ pub struct StateWriteResult {
 
 /// Write all artifacts. Each file is staged to a sibling `*.tmp.<pid>.<nanos>`
 /// path, fsynced, then renamed into place, so an agent reading
-/// `.context-hud/AGENT.md` (or any brief) never observes a truncated mid-write
+/// `.context-bar/AGENT.md` (or any brief) never observes a truncated mid-write
 /// file and the renamed bytes are durable on disk. Renames on the same
 /// filesystem are atomic on POSIX and Windows ReplaceFileW.
 pub fn write(root: &Path, snapshot: &ContextSnapshot) -> Result<StateWriteResult, String> {
-    let state_dir = root.join(".context-hud");
+    let state_dir = root.join(".context-bar");
     fs::create_dir_all(&state_dir)
         .map_err(|error| format!("failed to create {}: {error}", state_dir.display()))?;
 

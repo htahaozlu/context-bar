@@ -44,8 +44,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" packaging/macos/ContextHUD-Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" packaging/macos/ContextHUD-Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" packaging/macos/ContextBar-Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" packaging/macos/ContextBar-Info.plist
 
       - name: Import signing certificate
         if: env.MACOS_CERTIFICATE_P12_BASE64 != ''
@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           P8_PATH="$RUNNER_TEMP/AuthKey.p8"
           printf '%s' "$MACOS_NOTARY_API_KEY_BASE64" | base64 --decode > "$P8_PATH"
-          xcrun notarytool store-credentials contexthud-notary \
+          xcrun notarytool store-credentials contextbar-notary \
             --key "$P8_PATH" \
             --key-id "$MACOS_NOTARY_API_KEY_ID" \
             --issuer "$MACOS_NOTARY_API_ISSUER"
@@ -98,7 +98,7 @@ jobs:
 
       - name: Generate checksums
         shell: bash
-        run: shasum -a 256 dist/ContextHUD.dmg > dist/ContextHUD.dmg.sha256
+        run: shasum -a 256 dist/ContextBar.dmg > dist/ContextBar.dmg.sha256
 
       - name: Prepare release notes
         id: notes
@@ -122,8 +122,8 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            dist/ContextHUD.dmg
-            dist/ContextHUD.dmg.sha256
+            dist/ContextBar.dmg
+            dist/ContextBar.dmg.sha256
 
       - name: Update Homebrew Cask (in-repo)
         if: github.ref_type == 'tag'
@@ -134,8 +134,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          SHA=$(awk '{print $1}' dist/ContextHUD.dmg.sha256)
-          CASK=Casks/context-hud.rb
+          SHA=$(awk '{print $1}' dist/ContextBar.dmg.sha256)
+          CASK=Casks/context-bar.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
@@ -151,7 +151,7 @@ jobs:
             git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:main
           fi
 
-      - name: Sync tap repo (htahaozlu/homebrew-context-hud)
+      - name: Sync tap repo (htahaozlu/homebrew-context-bar)
         if: github.ref_type == 'tag' && env.HOMEBREW_TAP_TOKEN != ''
         shell: bash
         env:
@@ -159,22 +159,22 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           set -euo pipefail
-          SHA=$(awk '{print $1}' dist/ContextHUD.dmg.sha256)
+          SHA=$(awk '{print $1}' dist/ContextBar.dmg.sha256)
           WORK=$(mktemp -d)
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/htahaozlu/homebrew-context-hud.git" "$WORK"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/htahaozlu/homebrew-context-bar.git" "$WORK"
           cd "$WORK"
           mkdir -p Casks
-          cp "$GITHUB_WORKSPACE/Casks/context-hud.rb" Casks/context-hud.rb
-          sed -i.bak -E "s/^  version \".*\"/  version \"${VERSION}\"/" Casks/context-hud.rb
-          sed -i.bak -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" Casks/context-hud.rb
-          rm -f Casks/context-hud.rb.bak
+          cp "$GITHUB_WORKSPACE/Casks/context-bar.rb" Casks/context-bar.rb
+          sed -i.bak -E "s/^  version \".*\"/  version \"${VERSION}\"/" Casks/context-bar.rb
+          sed -i.bak -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" Casks/context-bar.rb
+          rm -f Casks/context-bar.rb.bak
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Casks/context-hud.rb
+          git add Casks/context-bar.rb
           if git diff --cached --quiet; then
             echo "Tap cask already up-to-date."
           else
-            git commit -m "chore: bump context-hud to v${VERSION}"
+            git commit -m "chore: bump context-bar to v${VERSION}"
             git push origin HEAD:main
           fi
 

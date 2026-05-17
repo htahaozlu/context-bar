@@ -37,25 +37,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         setupPopover()
         refresh()
         let args = CommandLine.arguments.dropFirst()
-        if ProcessInfo.processInfo.environment["CONTEXTHUD_OPEN_WINDOW"] == "1"
+        if ProcessInfo.processInfo.environment["CONTEXTBAR_OPEN_WINDOW"] == "1"
             || args.contains("--settings") || args.contains("--open") {
             openDetail()
         }
-        if let screenshotPath = ProcessInfo.processInfo.environment["CONTEXTHUD_SCREENSHOT_PATH"] {
+        if let screenshotPath = ProcessInfo.processInfo.environment["CONTEXTBAR_SCREENSHOT_PATH"] {
             openDetail()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 self?.detailWindow?.capture(to: screenshotPath)
                 NSApp.terminate(nil)
             }
         }
-        if ProcessInfo.processInfo.environment["CONTEXTHUD_MENU_SCREENSHOT_PATH"] != nil {
+        if ProcessInfo.processInfo.environment["CONTEXTBAR_MENU_SCREENSHOT_PATH"] != nil {
             // External script (marketing-screenshot.sh) handles the actual capture.
             // This env var just prevents the timer so the app stays responsive.
         }
-        if let popoverPath = ProcessInfo.processInfo.environment["CONTEXTHUD_POPOVER_SCREENSHOT_PATH"] {
+        if let popoverPath = ProcessInfo.processInfo.environment["CONTEXTBAR_POPOVER_SCREENSHOT_PATH"] {
             // Auto-open the menubar popover, give it a moment to lay out, then
             // shell out to `screencapture -l` on the popover's window number so
-            // marketing can rebuild docs/images/context-hud-menubar.png without
+            // marketing can rebuild docs/images/context-bar-menubar.png without
             // manual click-and-frame work.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
                 self?.togglePopover(nil)
@@ -229,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// Finder double-click / Dock click while running. Accessory apps with
     /// no Dock tile still receive this when the user launches the app from
-    /// Finder, Spotlight, or `open -a ContextHUD`. Used as a fallback when
+    /// Finder, Spotlight, or `open -a ContextBar`. Used as a fallback when
     /// the menubar icon is hidden by overflow / Bartender / Hidden Bar.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         showFromReopen()
@@ -267,7 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func popoverWillShow(_ notification: Notification) { popoverVisible = true }
     func popoverDidClose(_ notification: Notification) { popoverVisible = false }
 
-    /// Spawns the bundled engine to rewrite ~/.context-hud/hud.json, then reloads
+    /// Spawns the bundled engine to rewrite ~/.context-bar/hud.json, then reloads
     /// the menu. Engine runs off the main thread so the menubar stays responsive;
     /// UI update is dispatched back to main. If the engine binary is missing
     /// (e.g. running the Swift app standalone in dev), we still refresh from the
@@ -307,11 +307,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func runEngine() {
         let bundleExe = Bundle.main.bundleURL
-            .appendingPathComponent("Contents/MacOS/context-hud-engine")
+            .appendingPathComponent("Contents/MacOS/context-bar-engine")
         let candidates: [URL] = [
             bundleExe,
-            URL(fileURLWithPath: "/usr/local/bin/context-hud"),
-            URL(fileURLWithPath: "\(NSHomeDirectory())/.cargo/bin/context-hud"),
+            URL(fileURLWithPath: "/usr/local/bin/context-bar"),
+            URL(fileURLWithPath: "\(NSHomeDirectory())/.cargo/bin/context-bar"),
         ]
         guard let exe = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
             return
@@ -323,7 +323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         task.arguments = ["global"]
         var env = ProcessInfo.processInfo.environment
         if FileManager.default.fileExists(atPath: pyURL.path) {
-            env["CONTEXTHUD_USAGE_SCRIPT"] = pyURL.path
+            env["CONTEXTBAR_USAGE_SCRIPT"] = pyURL.path
         }
         task.environment = env
         task.standardOutput = Pipe()
@@ -644,7 +644,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
         let quitItem = NSMenuItem(
-            title: L10n.text("Quit ContextHUD", "ContextHUD'dan Çık"),
+            title: L10n.text("Quit ContextBar", "ContextBar'dan Çık"),
             action: #selector(quit),
             keyEquivalent: "q"
         )

@@ -2,16 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="ContextHUD.app"
+APP_NAME="ContextBar.app"
 APP_DIR="$ROOT/dist/$APP_NAME"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-PLIST_SRC="$ROOT/packaging/macos/ContextHUD-Info.plist"
-ENTITLEMENTS="$ROOT/packaging/macos/ContextHUD.entitlements"
+PLIST_SRC="$ROOT/packaging/macos/ContextBar-Info.plist"
+ENTITLEMENTS="$ROOT/packaging/macos/ContextBar.entitlements"
 SWIFT_SRC_DIR="$ROOT/menubar/sources"
-EXECUTABLE="$MACOS_DIR/context-hud"
-ENGINE_DST="$MACOS_DIR/context-hud-engine"
+EXECUTABLE="$MACOS_DIR/context-bar"
+ENGINE_DST="$MACOS_DIR/context-bar-engine"
 USAGE_PY_SRC="$ROOT/src/usage_signal.py"
 USAGE_PY_DST="$RESOURCES_DIR/usage_signal.py"
 LOGO_SRC="$ROOT/logo.png"
@@ -24,8 +24,8 @@ WIDGET_SRC_DIR="$ROOT/menubar/widget"
 WIDGET_PLIST_SRC="$ROOT/packaging/macos/widget/Info.plist"
 WIDGET_ENTITLEMENTS="$ROOT/packaging/macos/widget/Widget.entitlements"
 PLUGINS_DIR="$CONTENTS_DIR/PlugIns"
-WIDGET_APPEX="$PLUGINS_DIR/ContextHUDWidget.appex"
-WIDGET_EXEC="$WIDGET_APPEX/Contents/MacOS/ContextHUDWidget"
+WIDGET_APPEX="$PLUGINS_DIR/ContextBarWidget.appex"
+WIDGET_EXEC="$WIDGET_APPEX/Contents/MacOS/ContextBarWidget"
 
 VERSION="$(sed -n 's/^version = \"\(.*\)\"/\1/p' "$ROOT/Cargo.toml" | head -n1)"
 if [[ -z "$VERSION" ]]; then
@@ -85,11 +85,11 @@ chmod +x "$EXECUTABLE"
 
 # Build and embed the Rust engine so the menubar app can regenerate hud.json
 # on demand without any external daemon. Universal binary via two passes + lipo.
-ENGINE_ARM64="$ROOT/target/aarch64-apple-darwin/release/context-hud"
-ENGINE_X86_64="$ROOT/target/x86_64-apple-darwin/release/context-hud"
+ENGINE_ARM64="$ROOT/target/aarch64-apple-darwin/release/context-bar"
+ENGINE_X86_64="$ROOT/target/x86_64-apple-darwin/release/context-bar"
 rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
-(cd "$ROOT" && cargo build --release --bin context-hud --target aarch64-apple-darwin)
-(cd "$ROOT" && cargo build --release --bin context-hud --target x86_64-apple-darwin)
+(cd "$ROOT" && cargo build --release --bin context-bar --target aarch64-apple-darwin)
+(cd "$ROOT" && cargo build --release --bin context-bar --target x86_64-apple-darwin)
 lipo -create "$ENGINE_ARM64" "$ENGINE_X86_64" -output "$ENGINE_DST"
 chmod +x "$ENGINE_DST"
 cp "$USAGE_PY_SRC" "$USAGE_PY_DST"

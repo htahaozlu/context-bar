@@ -6,8 +6,8 @@ final class Hud {
     let usageCachePath: String
     init() {
         let env = ProcessInfo.processInfo.environment
-        self.path = env["CONTEXTHUD_HUD_PATH"] ?? "\(NSHomeDirectory())/.context-hud/hud.json"
-        self.usageCachePath = env["CONTEXTHUD_USAGE_CACHE_PATH"] ?? "\(NSHomeDirectory())/.context-hud/usage_api_cache.json"
+        self.path = env["CONTEXTBAR_HUD_PATH"] ?? "\(NSHomeDirectory())/.context-bar/hud.json"
+        self.usageCachePath = env["CONTEXTBAR_USAGE_CACHE_PATH"] ?? "\(NSHomeDirectory())/.context-bar/usage_api_cache.json"
     }
 
     func load() -> (active: Agent?, all: [Agent], others: [ToolSummary]) {

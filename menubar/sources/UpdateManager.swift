@@ -46,7 +46,7 @@ final class UpdateProgressWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = L10n.text("Updating ContextHUD", "ContextHUD güncelleniyor")
+        window.title = L10n.text("Updating ContextBar", "ContextBar güncelleniyor")
         window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
@@ -123,7 +123,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     private var activeRelease: ReleaseInfo?
 
     func checkForUpdates(presenter: NSWindow?) {
-        let apiURL = URL(string: "https://api.github.com/repos/htahaozlu/context-hud/releases/latest")!
+        let apiURL = URL(string: "https://api.github.com/repos/htahaozlu/context-bar/releases/latest")!
         var req = URLRequest(url: apiURL)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.timeoutInterval = 8
@@ -139,7 +139,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                 let latest = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
                 let current = AppMetadata.current.version
                 let htmlURL = (obj["html_url"] as? String).flatMap(URL.init(string:))
-                    ?? URL(string: "https://github.com/htahaozlu/context-hud/releases/latest")!
+                    ?? URL(string: "https://github.com/htahaozlu/context-bar/releases/latest")!
                 let assets = (obj["assets"] as? [[String: Any]]) ?? []
                 let dmgURL = assets.compactMap { asset -> URL? in
                     guard let name = asset["name"] as? String,
@@ -184,8 +184,8 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let alert = NSAlert()
         alert.messageText = L10n.text("Update available", "Güncelleme hazır")
         alert.informativeText = L10n.text(
-            "ContextHUD v\(release.latest) is available. Download it now and restart when it's ready.",
-            "ContextHUD v\(release.latest) hazır. Şimdi indirilsin, hazır olunca yeniden başlatıp güncelleyin."
+            "ContextBar v\(release.latest) is available. Download it now and restart when it's ready.",
+            "ContextBar v\(release.latest) hazır. Şimdi indirilsin, hazır olunca yeniden başlatıp güncelleyin."
         )
         alert.addButton(withTitle: L10n.text("Update Now", "Şimdi Güncelle"))
         alert.addButton(withTitle: L10n.text("Release Notes", "Sürüm Notları"))
@@ -209,7 +209,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         progressWindow.present()
         progressWindow.update(
             message: L10n.text("Downloading update…", "Güncelleme indiriliyor…"),
-            detail: L10n.text("ContextHUD v\(release.latest) is being prepared.", "ContextHUD v\(release.latest) hazırlanıyor."),
+            detail: L10n.text("ContextBar v\(release.latest) is being prepared.", "ContextBar v\(release.latest) hazırlanıyor."),
             fraction: 0
         )
         self.progressWindow = progressWindow
@@ -230,7 +230,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         if fraction >= 1 {
             progressWindow?.update(
                 message: L10n.text("Preparing update…", "Güncelleme hazırlanıyor…"),
-                detail: L10n.text("Verifying and staging ContextHUD v\(release.latest).", "ContextHUD v\(release.latest) doğrulanıyor ve hazırlanıyor."),
+                detail: L10n.text("Verifying and staging ContextBar v\(release.latest).", "ContextBar v\(release.latest) doğrulanıyor ve hazırlanıyor."),
                 fraction: nil
             )
         }
@@ -240,7 +240,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         guard let release = activeRelease else { return }
         // The system removes `location` once this delegate returns, so copy first.
         let stagedDMG = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ContextHUD-\(UUID().uuidString).dmg")
+            .appendingPathComponent("ContextBar-\(UUID().uuidString).dmg")
         do {
             if FileManager.default.fileExists(atPath: stagedDMG.path) {
                 try? FileManager.default.removeItem(at: stagedDMG)
@@ -256,7 +256,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
 
         progressWindow?.update(
             message: L10n.text("Verifying update…", "Güncelleme doğrulanıyor…"),
-            detail: L10n.text("Checking integrity of ContextHUD v\(release.latest).", "ContextHUD v\(release.latest) bütünlüğü denetleniyor."),
+            detail: L10n.text("Checking integrity of ContextBar v\(release.latest).", "ContextBar v\(release.latest) bütünlüğü denetleniyor."),
             fraction: nil
         )
 
@@ -274,7 +274,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                     self.progressWindow = nil
                     self.cleanupSession()
                     self.presentInstallError(NSError(
-                        domain: "ContextHUD.Update",
+                        domain: "ContextBar.Update",
                         code: 5,
                         userInfo: [NSLocalizedDescriptionKey: L10n.text(
                             "Verification asset unavailable.",
@@ -301,7 +301,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                     self.progressWindow = nil
                     self.cleanupSession()
                     self.presentInstallError(NSError(
-                        domain: "ContextHUD.Update",
+                        domain: "ContextBar.Update",
                         code: 6,
                         userInfo: [NSLocalizedDescriptionKey: L10n.text(
                             "Integrity check failed.",
@@ -318,9 +318,9 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     private func installVerifiedDMG(at dmgPath: URL, release: ReleaseInfo) {
         do {
             let mountURL = try mountDMG(at: dmgPath)
-            let stagedApp = mountURL.appendingPathComponent("ContextHUD.app")
+            let stagedApp = mountURL.appendingPathComponent("ContextBar.app")
             guard FileManager.default.fileExists(atPath: stagedApp.path) else {
-                throw NSError(domain: "ContextHUD.Update", code: 2, userInfo: [NSLocalizedDescriptionKey: "Mounted DMG did not contain ContextHUD.app"])
+                throw NSError(domain: "ContextBar.Update", code: 2, userInfo: [NSLocalizedDescriptionKey: "Mounted DMG did not contain ContextBar.app"])
             }
             try stageInstaller(sourceApp: stagedApp, mountedVolume: mountURL)
             progressWindow?.close()
@@ -372,8 +372,8 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let alert = NSAlert()
         alert.messageText = L10n.text("Restart to Update", "Güncellemek İçin Yeniden Başlat")
         alert.informativeText = L10n.text(
-            "ContextHUD v\(release.latest) is ready to install. Restart now to finish the update.",
-            "ContextHUD v\(release.latest) kuruluma hazır. Güncellemeyi tamamlamak için şimdi yeniden başlatın."
+            "ContextBar v\(release.latest) is ready to install. Restart now to finish the update.",
+            "ContextBar v\(release.latest) kuruluma hazır. Güncellemeyi tamamlamak için şimdi yeniden başlatın."
         )
         alert.addButton(withTitle: L10n.text("Restart to Update", "Güncellemek İçin Yeniden Başlat"))
         alert.addButton(withTitle: L10n.text("Later", "Daha Sonra"))
@@ -408,8 +408,8 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let alert = NSAlert()
         alert.messageText = L10n.text("Update could not be completed", "Güncelleme tamamlanamadı")
         alert.informativeText = L10n.text(
-            "ContextHUD could not finish installing the update.\n\n\(error.localizedDescription)",
-            "ContextHUD güncellemeyi tamamlayamadı.\n\n\(error.localizedDescription)"
+            "ContextBar could not finish installing the update.\n\n\(error.localizedDescription)",
+            "ContextBar güncellemeyi tamamlayamadı.\n\n\(error.localizedDescription)"
         )
         alert.addButton(withTitle: "OK")
         alert.runModal()
@@ -423,7 +423,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
 
     private func mountDMG(at location: URL) throws -> URL {
         let tempDMG = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ContextHUD-\(UUID().uuidString).dmg")
+            .appendingPathComponent("ContextBar-\(UUID().uuidString).dmg")
         if FileManager.default.fileExists(atPath: tempDMG.path) {
             try? FileManager.default.removeItem(at: tempDMG)
         }
@@ -438,7 +438,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         try task.run()
         task.waitUntilExit()
         guard task.terminationStatus == 0 else {
-            throw NSError(domain: "ContextHUD.Update", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to mount the downloaded disk image."])
+            throw NSError(domain: "ContextBar.Update", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to mount the downloaded disk image."])
         }
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
@@ -446,7 +446,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         guard let root = plist as? [String: Any],
               let entities = root["system-entities"] as? [[String: Any]],
               let mountPath = entities.compactMap({ $0["mount-point"] as? String }).first else {
-            throw NSError(domain: "ContextHUD.Update", code: 4, userInfo: [NSLocalizedDescriptionKey: "Could not locate the mounted update volume."])
+            throw NSError(domain: "ContextBar.Update", code: 4, userInfo: [NSLocalizedDescriptionKey: "Could not locate the mounted update volume."])
         }
         return URL(fileURLWithPath: mountPath)
     }
@@ -457,7 +457,7 @@ final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let parent = destination.deletingLastPathComponent()
         let pid = ProcessInfo.processInfo.processIdentifier
         let helper = FileManager.default.temporaryDirectory
-            .appendingPathComponent("contexthud-update-\(UUID().uuidString).sh")
+            .appendingPathComponent("contextbar-update-\(UUID().uuidString).sh")
 
         let source = shellEscape(sourceApp.path)
         let dest = shellEscape(destination.path)

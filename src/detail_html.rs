@@ -1,6 +1,6 @@
 //! Detail page renderer.
 //!
-//! Produces `~/.context-hud/detail.html`, a self-contained dark-themed HTML
+//! Produces `~/.context-bar/detail.html`, a self-contained dark-themed HTML
 //! export. The macOS menubar app uses a native AppKit window; this file exists
 //! as a standalone artifact for direct local viewing or sharing.
 
@@ -502,7 +502,7 @@ fn html_escape(s: &str) -> String {
 }
 
 const HEAD: &str = r#"<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>context-hud · usage</title>
+<html lang="en"><head><meta charset="utf-8"><title>context-bar · usage</title>
 <style>
 :root {
   color-scheme: light dark;

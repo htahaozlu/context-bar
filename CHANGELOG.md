@@ -45,7 +45,7 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 
 ### Added
 
-- WidgetKit extension (`ContextHUDWidget.appex`) bundled under `Contents/PlugIns`. Three sizes (small / medium / large) showing the active agent, project, context ring, and rolling 5h/7d limit bars. Reads the same `~/.context-hud/hud.json` snapshot as the menubar; the menubar app calls `WidgetCenter.shared.reloadAllTimelines()` on every regeneration so the widget never lags behind the 60s timeline floor.
+- WidgetKit extension (`ContextBarWidget.appex`) bundled under `Contents/PlugIns`. Three sizes (small / medium / large) showing the active agent, project, context ring, and rolling 5h/7d limit bars. Reads the same `~/.context-bar/hud.json` snapshot as the menubar; the menubar app calls `WidgetCenter.shared.reloadAllTimelines()` on every regeneration so the widget never lags behind the 60s timeline floor.
 - Finder / Spotlight relaunch fallback: `applicationShouldHandleReopen` + `application(_:open:)` open the Settings window when the menubar icon is hidden by overflow / Bartender / Hidden Bar, and toggle the popover otherwise. New `--settings` / `--open` CLI args trigger the detail window on first launch.
 
 ### Fixed
@@ -94,7 +94,7 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 
 ### Fixed
 
-- Claude context-window detection: Claude Code ships Opus 4.6/4.7, Sonnet 4.5/4.6/4.7 and Mythos as the 1M-context variant by default, but the transcript JSONL records the model id without the `[1m]` suffix. v0.3.0 had stripped these defaults, so users on the 1M variant saw their context percentage jump 5× (e.g. 12% → 60%). Restored the family-level defaults; Haiku stays at 200K; the `[1m]`/`-1m` tag and the recorded `context-1m-*` beta header still force 1M; observed turn-token max above 200K snaps to 1M adaptively. Env override `CONTEXTHUD_CONTEXT_WINDOW` honored.
+- Claude context-window detection: Claude Code ships Opus 4.6/4.7, Sonnet 4.5/4.6/4.7 and Mythos as the 1M-context variant by default, but the transcript JSONL records the model id without the `[1m]` suffix. v0.3.0 had stripped these defaults, so users on the 1M variant saw their context percentage jump 5× (e.g. 12% → 60%). Restored the family-level defaults; Haiku stays at 200K; the `[1m]`/`-1m` tag and the recorded `context-1m-*` beta header still force 1M; observed turn-token max above 200K snaps to 1M adaptively. Env override `CONTEXTBAR_CONTEXT_WINDOW` honored.
 
 ## [0.3.1] - 2026-05-16
 
@@ -143,7 +143,7 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 
 ### Changed
 
-- Daemon perf: `usage_signal.rs` now reuses `~/.context-hud/usage.cache.json` for up to 300s instead of spawning `python3 src/usage_signal.py` on every 30s watch tick.
+- Daemon perf: `usage_signal.rs` now reuses `~/.context-bar/usage.cache.json` for up to 300s instead of spawning `python3 src/usage_signal.py` on every 30s watch tick.
 - Release profile: `lto = "thin"`, `strip = "symbols"`, `codegen-units = 1` — smaller, faster engine binary.
 - Logos compressed (`app_logo.png` 4.8M → 2.4M; `logo.png` 1.6M → 1.4M) via `oxipng -o max`.
 
@@ -222,13 +222,13 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 ### Improved
 
 - Settings preview, menubar title, dropdown rows, and native usage panel now render supported agents with their actual icons instead of plain names or placeholder glyphs.
-- Menubar app packaging now copies bundled brand icon assets into `ContextHUD.app/Contents/Resources/brands` for release builds.
+- Menubar app packaging now copies bundled brand icon assets into `ContextBar.app/Contents/Resources/brands` for release builds.
 
 ## [0.1.7] - 2026-05-13
 
 ### Fixed
 
-- Local app builds under `dist/ContextHUD.app` now sync `CFBundleShortVersionString` and `CFBundleVersion` from the repository version instead of incorrectly showing the template `0.1.0 (1)`.
+- Local app builds under `dist/ContextBar.app` now sync `CFBundleShortVersionString` and `CFBundleVersion` from the repository version instead of incorrectly showing the template `0.1.0 (1)`.
 
 ## [0.1.6] - 2026-05-13
 
@@ -241,7 +241,7 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 
 ### Added
 
-- `context-hud claude-statusline`, a Claude Code statusline sink that persists native context-window snapshots under `~/.context-hud/claude-statusline.json`.
+- `context-bar claude-statusline`, a Claude Code statusline sink that persists native context-window snapshots under `~/.context-bar/claude-statusline.json`.
 
 ### Improved
 
@@ -263,14 +263,14 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 - About hero redesigned: 360×120 horizontal logo, centered app name, version, and description.
 - Usage panel header now shows agent name (Claude vs Codex), model, and project explicitly.
 - Replaced misleading "1.2M of 258.4k" context subtitle with model window size only.
-- Removed redundant ContextHUD header block at the top of the menubar dropdown.
+- Removed redundant ContextBar header block at the top of the menubar dropdown.
 - README restructured: install section moved to the top; Zed extension references removed.
 
 ## [0.1.3] - 2026-05-13
 
 ### Added
 
-- Homebrew Cask (`Casks/context-hud.rb`) and release-workflow automation that bumps version + sha256 on every tag.
+- Homebrew Cask (`Casks/context-bar.rb`) and release-workflow automation that bumps version + sha256 on every tag.
 
 ### Improved
 
@@ -279,11 +279,11 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 
 ## [0.1.0] - 2026-05-12
 
-Initial ContextHUD release.
+Initial ContextBar release.
 
 ### Added
 
-- Local-first repository context generation under `.context-hud/`
+- Local-first repository context generation under `.context-bar/`
 - Stable agent-facing outputs including `AGENT.md`, `CLAUDE.md`, and rolling markdown briefs
 - CLI commands for `hud`, `snapshot`, `watch`, `global`, and `watch-global`
 - Native macOS menubar companion app built with AppKit
@@ -294,7 +294,7 @@ Initial ContextHUD release.
 
 ### Improved
 
-- Product naming and repository presentation aligned under `ContextHUD`
+- Product naming and repository presentation aligned under `ContextBar`
 - README upgraded to a more product-oriented structure
 - GitHub repository metadata updated for release distribution
 

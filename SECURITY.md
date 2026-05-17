@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-ContextHUD is early-stage software. Security fixes will be prioritized on the latest release line.
+ContextBar is early-stage software. Security fixes will be prioritized on the latest release line.
 
 ## Reporting a vulnerability
 

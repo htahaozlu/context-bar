@@ -1,7 +1,7 @@
-# ContextHUD
+# ContextBar
 
 <p align="center">
-  <img src="logo.png" alt="ContextHUD logo" width="560">
+  <img src="logo.png" alt="ContextBar logo" width="560">
 </p>
 
 <p align="center">
@@ -13,23 +13,23 @@
 </p>
 
 <p align="center">
-  ContextHUD keeps agents grounded in the repository they are working on, writes stable agent-readable briefs, and gives Claude Code and Codex usage a native macOS surface.
+  ContextBar keeps agents grounded in the repository they are working on, writes stable agent-readable briefs, and gives Claude Code and Codex usage a native macOS surface.
 </p>
 
 <p align="center">
-  <a href="https://github.com/htahaozlu/context-hud/releases/latest/download/ContextHUD.dmg">
+  <a href="https://github.com/htahaozlu/context-bar/releases/latest/download/ContextBar.dmg">
     <img src="docs/images/download-macos-cta.svg" alt="Download app for macOS" width="300">
   </a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/downloads/htahaozlu/context-hud/total?style=flat-square&label=downloads" alt="Total Downloads">
-  <img src="https://img.shields.io/github/stars/htahaozlu/context-hud?style=flat-square" alt="Stars">
+  <img src="https://img.shields.io/github/downloads/htahaozlu/context-bar/total?style=flat-square&label=downloads" alt="Total Downloads">
+  <img src="https://img.shields.io/github/stars/htahaozlu/context-bar?style=flat-square" alt="Stars">
 </p>
 
 <p align="center">
-  <a href="https://github.com/htahaozlu/context-hud/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/htahaozlu/context-hud?style=flat-square&label=release&color=2F81F7">
+  <a href="https://github.com/htahaozlu/context-bar/releases/latest">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/htahaozlu/context-bar?style=flat-square&label=release&color=2F81F7">
   </a>
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2">
@@ -40,32 +40,32 @@
 ## Live demo
 
 <p align="center">
-  <img src="docs/images/context-hud-demo.gif" alt="ContextHUD demo showing Claude Code and Codex usage updating live on macOS" width="100%">
+  <img src="docs/images/context-bar-demo.gif" alt="ContextBar demo showing Claude Code and Codex usage updating live on macOS" width="100%">
 </p>
 
-ContextHUD gives Claude Code and Codex a native macOS surface, so context drift and rolling usage stay visible while you work.
+ContextBar gives Claude Code and Codex a native macOS surface, so context drift and rolling usage stay visible while you work.
 
 ## Install
 
 ### Homebrew (recommended)
 
 ```bash
-brew install --cask htahaozlu/context-hud/context-hud
+brew install --cask htahaozlu/context-bar/context-bar
 ```
 
-`brew` auto-taps `htahaozlu/homebrew-context-hud` on first install. Upgrade later with `brew upgrade --cask context-hud`.
+`brew` auto-taps `htahaozlu/homebrew-context-bar` on first install. Upgrade later with `brew upgrade --cask context-bar`.
 
 ### macOS app (DMG)
 
-1. Download `ContextHUD.dmg` from the [latest release](https://github.com/htahaozlu/context-hud/releases/latest) (universal: Apple Silicon + Intel).
-2. Drag `ContextHUD.app` into `Applications`.
-3. First launch: right-click `ContextHUD.app` → **Open** → **Open** again. The app is ad-hoc signed (not notarized).
+1. Download `ContextBar.dmg` from the [latest release](https://github.com/htahaozlu/context-bar/releases/latest) (universal: Apple Silicon + Intel).
+2. Drag `ContextBar.app` into `Applications`.
+3. First launch: right-click `ContextBar.app` → **Open** → **Open** again. The app is ad-hoc signed (not notarized).
 4. Eject and delete the DMG.
 
 If macOS reports the app as "damaged", remove the quarantine flag:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/ContextHUD.app
+xattr -dr com.apple.quarantine /Applications/ContextBar.app
 ```
 
 ### CLI
@@ -77,20 +77,20 @@ cargo install --path .
 ## Preview
 
 <p align="center">
-  <img src="docs/images/context-hud-screenshot.png" alt="ContextHUD native usage window" width="100%">
+  <img src="docs/images/context-bar-screenshot.png" alt="ContextBar native usage window" width="100%">
 </p>
 
 Native macOS usage window with rolling session visibility for Claude Code and Codex.
 
 <p align="center">
-  <img src="docs/images/context-hud-menubar.png" alt="ContextHUD menubar" width="400">
+  <img src="docs/images/context-bar-menubar.png" alt="ContextBar menubar" width="400">
 </p>
 
 Compact menubar status item showing active agent, project, and context usage. Clicking it opens a native popover with the active session, context window, rolling 5h/7d limits, parallel sessions, and a live theme picker.
 
 ## What it does
 
-ContextHUD solves two persistent problems in agent-driven development:
+ContextBar solves two persistent problems in agent-driven development:
 
 - repository context drifts faster than an agent brief can keep up
 - usage and session state stay buried in terminal output and local transcripts
@@ -99,7 +99,7 @@ It addresses both through a local pipeline that continuously produces stable pro
 
 ### Core surfaces
 
-- Repository snapshots under `.context-hud/`
+- Repository snapshots under `.context-bar/`
 - Stable `AGENT.md` and `CLAUDE.md`
 - CLI for refresh, watch, and global views
 - Native AppKit menubar companion
@@ -109,7 +109,7 @@ It addresses both through a local pipeline that continuously produces stable pro
 
 ### Repository context generation
 
-Each refresh writes agent-readable state into `.context-hud/`:
+Each refresh writes agent-readable state into `.context-bar/`:
 
 - `state.json`
 - `brief-now.md`
@@ -122,14 +122,14 @@ For Claude Code compatibility, `CLAUDE.md` is mirrored at the repository root.
 
 ### CLI workflow
 
-- `context-hud hud` refreshes the current repository and prints the HUD
-- `context-hud snapshot` writes artifacts without printing the HUD
-- `context-hud watch 30 .` keeps repository context fresh on an interval
-- `context-hud global` builds a cross-project HUD under `~/.context-hud/`
+- `context-bar hud` refreshes the current repository and prints the HUD
+- `context-bar snapshot` writes artifacts without printing the HUD
+- `context-bar watch 30 .` keeps repository context fresh on an interval
+- `context-bar global` builds a cross-project HUD under `~/.context-bar/`
 
 ### Native macOS companion
 
-The companion app reads `~/.context-hud/hud.json` and provides:
+The companion app reads `~/.context-bar/hud.json` and provides:
 
 - a compact menubar status item (active agent + project + context %)
 - a modern AppKit popover with cards for the active agent, context window,
@@ -148,7 +148,7 @@ Xcode subproject — building widget extensions with raw `swiftc` produces an
 hand-off is tracked as the next milestone for the macOS companion.
 
 If the menubar icon is hidden by overflow (Bartender, Hidden Bar, or a
-crowded menubar), launching ContextHUD again from Finder / Spotlight opens
+crowded menubar), launching ContextBar again from Finder / Spotlight opens
 the Settings window directly so you can still reach preferences.
 
 The desktop UI is native AppKit (NSPopover + NSVisualEffectView, continuous
@@ -160,51 +160,51 @@ the primary app experience.
 ### Refresh the current repository
 
 ```bash
-context-hud hud
+context-bar hud
 ```
 
 ### Write artifacts without printing the HUD
 
 ```bash
-context-hud snapshot
+context-bar snapshot
 ```
 
 ### Keep repository context fresh
 
 ```bash
-context-hud watch 30 .
+context-bar watch 30 .
 ```
 
 ### Generate the global HUD
 
 ```bash
-context-hud global
-context-hud watch-global 30
+context-bar global
+context-bar watch-global 30
 ```
 
-The global HUD is written to `~/.context-hud/hud.md`.
+The global HUD is written to `~/.context-bar/hud.md`.
 
 ## Artifact layout
 
 Each refresh writes the following files atomically:
 
-- `.context-hud/state.json`
-- `.context-hud/brief-now.md`
-- `.context-hud/brief-session.md`
-- `.context-hud/brief-week.md`
-- `.context-hud/AGENT.md`
-- `.context-hud/hud.md`
+- `.context-bar/state.json`
+- `.context-bar/brief-now.md`
+- `.context-bar/brief-session.md`
+- `.context-bar/brief-week.md`
+- `.context-bar/AGENT.md`
+- `.context-bar/hud.md`
 - `CLAUDE.md`
 
 Atomic writes ensure agents do not observe partial state during refresh.
 
 ## Data sources
 
-ContextHUD combines:
+ContextBar combines:
 
 - Git branch, recent commits, and worktree status
 - file activity inferred from repository mtimes
-- optional Claude Code statusline snapshot from `~/.context-hud/claude-statusline.json`
+- optional Claude Code statusline snapshot from `~/.context-bar/claude-statusline.json`
 - Claude Code usage from `~/.claude/projects/**/*.jsonl`
 - Codex CLI usage from `~/.codex/sessions/**/*.jsonl`
 
@@ -212,18 +212,18 @@ No external service is required for the core repository summaries. Usage aggrega
 
 ### Claude Code parity
 
-For Claude context percentage, the best source is Claude Code's native statusline payload. ContextHUD can persist that payload locally:
+For Claude context percentage, the best source is Claude Code's native statusline payload. ContextBar can persist that payload locally:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "context-hud claude-statusline"
+    "command": "context-bar claude-statusline"
   }
 }
 ```
 
-This writes `~/.context-hud/claude-statusline.json`, which ContextHUD reads as the primary Claude context source. If the snapshot is missing or stale, ContextHUD falls back to transcript-based estimation.
+This writes `~/.context-bar/claude-statusline.json`, which ContextBar reads as the primary Claude context source. If the snapshot is missing or stale, ContextBar falls back to transcript-based estimation.
 
 ## Packaging
 
@@ -236,14 +236,14 @@ scripts/create-macos-dmg.sh
 
 Artifacts:
 
-- `dist/ContextHUD.app`
-- `dist/ContextHUD.dmg`
+- `dist/ContextBar.app`
+- `dist/ContextBar.dmg`
 
 ## Repository layout
 
 - `src/` core engine, artifact rendering, and usage aggregation
-- `src/bin/context-hud.rs` standalone CLI entry point
-- `menubar/context-hud.swift` macOS companion app
+- `src/bin/context-bar.rs` standalone CLI entry point
+- `menubar/context-bar.swift` macOS companion app
 - `examples/snapshot.rs` native development harness
 
 ## Development

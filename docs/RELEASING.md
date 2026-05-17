@@ -1,10 +1,10 @@
-# Releasing ContextHUD
+# Releasing ContextBar
 
-This document describes how ContextHUD releases are produced. It targets project maintainers; contributors do not need any of the credentials below to build the app locally.
+This document describes how ContextBar releases are produced. It targets project maintainers; contributors do not need any of the credentials below to build the app locally.
 
 ## Artifact
 
-Every release ships a single primary artifact: `ContextHUD.dmg`.
+Every release ships a single primary artifact: `ContextBar.dmg`.
 
 For the DMG to install cleanly on a stock macOS machine (no "unidentified developer" or "damaged app" warnings), it must be:
 
@@ -35,7 +35,7 @@ The build script auto-detects a `Developer ID Application: ...` identity from th
    - App Store Connect → Users and Access → Integrations → Team Keys → generate a key. Note the Issuer ID and Key ID. Download the `.p8` (one-time).
    - Store the credentials:
      ```bash
-     xcrun notarytool store-credentials contexthud-notary \
+     xcrun notarytool store-credentials contextbar-notary \
        --key /path/to/AuthKey_XXXXXXXXXX.p8 \
        --key-id XXXXXXXXXX \
        --issuer xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -50,15 +50,15 @@ scripts/create-macos-dmg.sh
 The script will:
 
 - Sign the bundle with the first `Developer ID Application` identity it finds (override with `DEVELOPER_ID_IDENTITY`)
-- Apply the hardened runtime and a secure timestamp using `packaging/macos/ContextHUD.entitlements`
+- Apply the hardened runtime and a secure timestamp using `packaging/macos/ContextBar.entitlements`
 - Build the DMG and submit it to Apple's notary service (override the profile with `NOTARY_PROFILE`)
 - Staple the notarization ticket to the DMG when the submission is accepted
 
 Verify a notarized DMG:
 
 ```bash
-spctl -a -t open --context context:primary-signature -v dist/ContextHUD.dmg
-xcrun stapler validate dist/ContextHUD.dmg
+spctl -a -t open --context context:primary-signature -v dist/ContextBar.dmg
+xcrun stapler validate dist/ContextBar.dmg
 ```
 
 Both commands should report `accepted` / `valid`.

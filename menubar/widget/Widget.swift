@@ -22,7 +22,7 @@ struct HudSnapshot {
     static let empty = HudSnapshot(active: nil, agents: [], generatedAt: Date())
 
     static func load() -> HudSnapshot {
-        let path = "\(NSHomeDirectory())/.context-hud/hud.json"
+        let path = "\(NSHomeDirectory())/.context-bar/hud.json"
         guard
             let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
             let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -331,13 +331,13 @@ struct WidgetBackgroundModifier: ViewModifier {
 // MARK: - Widget declaration
 
 @main
-struct ContextHUDWidget: Widget {
-    let kind: String = "ContextHUDWidget"
+struct ContextBarWidget: Widget {
+    let kind: String = "ContextBarWidget"
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: HudProvider()) { entry in
             WidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("ContextHUD")
+        .configurationDisplayName("ContextBar")
         .description("Active agent, project, and context usage.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }

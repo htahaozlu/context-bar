@@ -10,7 +10,7 @@ Stdout: single JSON document. Layout:
   }
 
 AgentBlock contains:
-  - Live HUD fields (used by ~/.context-hud/hud.json):
+  - Live HUD fields (used by ~/.context-bar/hud.json):
       session_5h_tokens, week_7d_tokens, active_session_tokens,
       active_session_file, last_turn_input_tokens, last_turn_output_tokens,
       last_model, last_context_window, last_context_pct, last_turn_at,
@@ -107,17 +107,17 @@ def usage_cache_path():
     home = os.environ.get("HOME", "")
     if not home:
         return None
-    return os.path.join(home, ".context-hud", "usage_api_cache.json")
+    return os.path.join(home, ".context-bar", "usage_api_cache.json")
 
 
 def claude_statusline_path():
-    override = os.environ.get("CONTEXTHUD_CLAUDE_STATUSLINE_PATH")
+    override = os.environ.get("CONTEXTBAR_CLAUDE_STATUSLINE_PATH")
     if override:
         return override
     home = os.environ.get("HOME", "")
     if not home:
         return None
-    return os.path.join(home, ".context-hud", "claude-statusline.json")
+    return os.path.join(home, ".context-bar", "claude-statusline.json")
 
 
 def load_usage_cache():
@@ -312,7 +312,7 @@ def build_active_sessions(per_session):
 
 def claude_context_window(model, observed_max=0, betas=None):
     # Env override for power users who know their window.
-    env = os.environ.get("CONTEXTHUD_CONTEXT_WINDOW")
+    env = os.environ.get("CONTEXTBAR_CONTEXT_WINDOW")
     if env:
         try:
             return int(env)

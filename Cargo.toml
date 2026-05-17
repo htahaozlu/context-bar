@@ -1,5 +1,5 @@
 [package]
-name = "context-hud"
+name = "context-bar"
 version = "0.3.8"
 edition = "2024"
 license = "Apache-2.0"
@@ -24,8 +24,8 @@ name = "snapshot"
 path = "examples/snapshot.rs"
 
 [[bin]]
-name = "context-hud"
-path = "src/bin/context-hud.rs"
+name = "context-bar"
+path = "src/bin/context-bar.rs"
 required-features = []
 
 [profile.release]

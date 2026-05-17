@@ -1,4 +1,4 @@
-//! ContextHUD extension entry point.
+//! ContextBar extension entry point.
 //!
 //! The product surface is an always-on context system, not slash commands.
 //! Slash commands are kept only as debug/fallback surfaces. Modules below are
@@ -9,7 +9,7 @@
 //! ## Verified
 //! - Extension loads in Zed Preview.
 //! - `process:exec` can shell out to `git` inside the worktree.
-//! - Engine writes `.context-hud/{state.json,brief-*.md,AGENT.md}` artifacts.
+//! - Engine writes `.context-bar/{state.json,brief-*.md,AGENT.md}` artifacts.
 //! - `run_slash_command` receives a `Worktree` and is the strongest verified
 //!   hook to wire automatic refresh into.
 //!
@@ -22,7 +22,7 @@
 //!   keeps the surface fresh idempotently. Once a real load hook ships, the
 //!   call site moves; the function does not.
 //! - Codex ACP threads in Zed Preview do not currently invoke extension slash
-//!   commands. Agents are therefore expected to read `.context-hud/AGENT.md`
+//!   commands. Agents are therefore expected to read `.context-bar/AGENT.md`
 //!   from the filesystem (Codex/Claude conventions) until a richer
 //!   automatic-context hook is verified.
 //! - The seam for both cases is [`context_engine::assemble`], which takes

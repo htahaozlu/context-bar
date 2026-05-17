@@ -155,7 +155,7 @@ final class UsageViewController: NSViewController {
     }
 
     private func buildSparkline(forAgent name: String) -> NSView? {
-        let path = "\(NSHomeDirectory())/.context-hud/hud.json"
+        let path = "\(NSHomeDirectory())/.context-bar/hud.json"
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let agent = root[name.lowercased()] as? [String: Any],

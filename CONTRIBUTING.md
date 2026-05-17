@@ -1,14 +1,14 @@
-# Contributing to ContextHUD
+# Contributing to ContextBar
 
 Thanks for contributing.
 
 ## Scope
 
-ContextHUD is a local-first developer tool. Contributions should preserve these principles:
+ContextBar is a local-first developer tool. Contributions should preserve these principles:
 
 - repository context remains local-first
 - outputs stay useful for both humans and coding agents
-- product naming stays consistent as `ContextHUD`
+- product naming stays consistent as `ContextBar`
 - the macOS app remains native in feel and restrained in UI complexity
 
 ## Before opening an issue
@@ -46,7 +46,7 @@ For most pull requests:
 
 ## Naming and positioning
 
-- use `ContextHUD` as the product name
+- use `ContextBar` as the product name
 - do not reintroduce old repository naming such as `zed-context`
 - describe the product as local-first repository context plus a native macOS HUD for coding agents
 

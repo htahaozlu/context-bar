@@ -3,12 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT/dist"
-APP_NAME="ContextHUD.app"
+APP_NAME="ContextBar.app"
 APP_PATH="$DIST_DIR/$APP_NAME"
 STAGE_DIR="$DIST_DIR/dmg-staging"
-DMG_PATH="$DIST_DIR/ContextHUD.dmg"
-APP_ZIP="$DIST_DIR/ContextHUD.zip"
-NOTARY_PROFILE="${NOTARY_PROFILE:-contexthud-notary}"
+DMG_PATH="$DIST_DIR/ContextBar.dmg"
+APP_ZIP="$DIST_DIR/ContextBar.zip"
+NOTARY_PROFILE="${NOTARY_PROFILE:-contextbar-notary}"
 
 "$ROOT/scripts/build-menubar-app.sh"
 
@@ -45,7 +45,7 @@ xattr -cr "$STAGE_DIR/$APP_NAME" 2>/dev/null || true
 ln -s /Applications "$STAGE_DIR/Applications"
 
 hdiutil create \
-  -volname "ContextHUD" \
+  -volname "ContextBar" \
   -srcfolder "$STAGE_DIR" \
   -ov \
   -format UDZO \

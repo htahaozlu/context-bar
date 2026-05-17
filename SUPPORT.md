@@ -9,7 +9,7 @@
 
 When asking for help, include:
 
-- ContextHUD version
+- ContextBar version
 - macOS version
 - installation method
 - exact command or workflow

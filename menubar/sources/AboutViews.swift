@@ -13,7 +13,7 @@ final class AboutHeroView: NSView {
         logoView.imageAlignment = .alignCenter
         logoView.translatesAutoresizingMaskIntoConstraints = false
 
-        let appName = NSTextField(labelWithString: "ContextHUD")
+        let appName = NSTextField(labelWithString: "ContextBar")
         appName.font = NSFont.systemFont(ofSize: 22, weight: .semibold)
         appName.textColor = .labelColor
         appName.alignment = .center

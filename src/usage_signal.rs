@@ -258,7 +258,7 @@ pub fn collect(worktree: &zed::Worktree) -> UsageSnapshot {
 fn resolve_usage_script() -> std::path::PathBuf {
     use std::path::PathBuf;
 
-    if let Ok(override_path) = std::env::var("CONTEXTHUD_USAGE_SCRIPT") {
+    if let Ok(override_path) = std::env::var("CONTEXTBAR_USAGE_SCRIPT") {
         let p = PathBuf::from(override_path);
         if p.is_file() {
             return p;
@@ -284,7 +284,7 @@ fn resolve_usage_script() -> std::path::PathBuf {
 #[cfg(not(target_arch = "wasm32"))]
 fn snapshot_cache_path() -> Option<std::path::PathBuf> {
     let home = std::env::var("HOME").ok()?;
-    Some(std::path::PathBuf::from(home).join(".context-hud").join("usage.cache.json"))
+    Some(std::path::PathBuf::from(home).join(".context-bar").join("usage.cache.json"))
 }
 
 /// TTL for the Rust-side snapshot cache. Matches the Python `CACHE_TTL_OK`

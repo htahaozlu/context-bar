@@ -2,16 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_BIN="$ROOT/dist/ContextHUD.app/Contents/MacOS/context-hud"
+APP_BIN="$ROOT/dist/ContextBar.app/Contents/MacOS/context-bar"
 OUT_DIR="$ROOT/docs/images"
 TMP_DIR="$ROOT/.tmp/demo-video"
-MP4_OUT="$OUT_DIR/context-hud-demo.mp4"
-GIF_OUT="$OUT_DIR/context-hud-demo.gif"
+MP4_OUT="$OUT_DIR/context-bar-demo.mp4"
+GIF_OUT="$OUT_DIR/context-bar-demo.gif"
 
 mkdir -p "$OUT_DIR" "$TMP_DIR"
 
 if [[ ! -x "$APP_BIN" ]]; then
-  echo "ContextHUD.app missing; building it first..."
+  echo "ContextBar.app missing; building it first..."
   "$ROOT/scripts/build-menubar-app.sh"
 fi
 
@@ -163,8 +163,8 @@ frames = [
             last_context_window=200000,
             last_context_pct=34.0,
             last_turn_seconds_ago=38,
-            cwd="/Users/ozlu/projeler/hususi/backend/context-hud",
-            project="context-hud",
+            cwd="/Users/demo/Projects/context-bar",
+            project="context-bar",
             active_minutes=27,
             recent_project="agent-sandbox",
         ),
@@ -178,7 +178,7 @@ frames = [
             last_context_window=256000,
             last_context_pct=19.0,
             last_turn_seconds_ago=590,
-            cwd="/Users/ozlu/projeler/playground/agent-lab",
+            cwd="/Users/demo/Projects/agent-lab",
             project="agent-lab",
             active_minutes=43,
             recent_project="sdk-notes",
@@ -196,8 +196,8 @@ frames = [
             last_context_window=200000,
             last_context_pct=58.0,
             last_turn_seconds_ago=12,
-            cwd="/Users/ozlu/projeler/hususi/backend/context-hud",
-            project="context-hud",
+            cwd="/Users/demo/Projects/context-bar",
+            project="context-bar",
             active_minutes=35,
             recent_project="agent-sandbox",
         ),
@@ -211,7 +211,7 @@ frames = [
             last_context_window=256000,
             last_context_pct=22.0,
             last_turn_seconds_ago=545,
-            cwd="/Users/ozlu/projeler/playground/agent-lab",
+            cwd="/Users/demo/Projects/agent-lab",
             project="agent-lab",
             active_minutes=44,
             recent_project="sdk-notes",
@@ -229,8 +229,8 @@ frames = [
             last_context_window=200000,
             last_context_pct=61.0,
             last_turn_seconds_ago=155,
-            cwd="/Users/ozlu/projeler/hususi/backend/context-hud",
-            project="context-hud",
+            cwd="/Users/demo/Projects/context-bar",
+            project="context-bar",
             active_minutes=38,
             recent_project="agent-sandbox",
         ),
@@ -244,7 +244,7 @@ frames = [
             last_context_window=256000,
             last_context_pct=46.0,
             last_turn_seconds_ago=7,
-            cwd="/Users/ozlu/projeler/playground/agent-lab",
+            cwd="/Users/demo/Projects/agent-lab",
             project="agent-lab",
             active_minutes=52,
             recent_project="sdk-notes",
@@ -262,8 +262,8 @@ frames = [
             last_context_window=200000,
             last_context_pct=82.0,
             last_turn_seconds_ago=5,
-            cwd="/Users/ozlu/projeler/hususi/backend/context-hud",
-            project="context-hud",
+            cwd="/Users/demo/Projects/context-bar",
+            project="context-bar",
             active_minutes=49,
             recent_project="agent-sandbox",
         ),
@@ -277,7 +277,7 @@ frames = [
             last_context_window=256000,
             last_context_pct=49.0,
             last_turn_seconds_ago=42,
-            cwd="/Users/ozlu/projeler/playground/agent-lab",
+            cwd="/Users/demo/Projects/agent-lab",
             project="agent-lab",
             active_minutes=53,
             recent_project="sdk-notes",
@@ -309,8 +309,8 @@ PY
 
 for json_path in "$TMP_DIR"/frame-*.json; do
   png_path="${json_path%.json}.png"
-  CONTEXTHUD_HUD_PATH="$json_path" \
-  CONTEXTHUD_SCREENSHOT_PATH="$png_path" \
+  CONTEXTBAR_HUD_PATH="$json_path" \
+  CONTEXTBAR_SCREENSHOT_PATH="$png_path" \
   "$APP_BIN" >/dev/null 2>&1
 done
 
