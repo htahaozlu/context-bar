@@ -218,6 +218,29 @@ final class FooterIconButton: NSButton {
         }
         super.draw(dirtyRect)
     }
+
+    /// Continuous rotation around the button's centre. Used for the refresh
+    /// icon while the engine re-scans transcripts. The whole NSButton layer
+    /// rotates — fine because footer buttons are image-only squares.
+    func setSpinning(_ on: Bool) {
+        guard let layer else { return }
+        if on {
+            if layer.anchorPoint != CGPoint(x: 0.5, y: 0.5) {
+                let oldFrame = layer.frame
+                layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                layer.frame = oldFrame
+            }
+            let anim = CABasicAnimation(keyPath: "transform.rotation.z")
+            anim.fromValue = 0
+            anim.toValue = -CGFloat.pi * 2
+            anim.duration = 0.8
+            anim.repeatCount = .infinity
+            anim.isRemovedOnCompletion = false
+            layer.add(anim, forKey: "spin")
+        } else {
+            layer.removeAnimation(forKey: "spin")
+        }
+    }
 }
 
 /// Single-row entry used for the "Other tools" list inside the popover.

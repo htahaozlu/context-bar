@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var lastAllAgents: [Agent] = []
     private var engineRunning = false
     private var enginePending = false
+    private var lastForceRefreshAt: Date?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -272,6 +273,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
     @objc func refreshNow() { regenerateThenRefresh() }
 
+    /// User-initiated full refresh from the popover button. Blows away both
+    /// the Rust snapshot cache and the Python upstream-usage cache so the
+    /// engine re-parses every transcript and re-fetches the usage API. The
+    /// 2s debounce protects against double-clicks queueing a second engine
+    /// run on top of the first.
+    @objc func forceRefresh() {
+        let now = Date()
+        if let last = lastForceRefreshAt, now.timeIntervalSince(last) < 2.0 {
+            return
+        }
+        lastForceRefreshAt = now
+        let home = NSHomeDirectory()
+        let fm = FileManager.default
+        for name in ["usage.cache.json", "usage_api_cache.json"] {
+            try? fm.removeItem(atPath: "\(home)/.context-bar/\(name)")
+        }
+        regenerateThenRefresh()
+    }
+
     func popoverWillShow(_ notification: Notification) { popoverVisible = true }
     func popoverDidClose(_ notification: Notification) { popoverVisible = false }
 
@@ -362,8 +382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.openDetail()
         }
         popoverVC.onRefresh = { [weak self] in
-            self?.refreshNow()
-            self?.popoverVC.rebuild()
+            self?.forceRefresh()
         }
         popoverVC.onQuit = { [weak self] in
             self?.quit()

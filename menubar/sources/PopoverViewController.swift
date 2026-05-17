@@ -25,6 +25,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     private let visualEffect = NSVisualEffectView()
     private let contentStack = NSStackView()
 
+    /// Held weakly so the button — which lives on a stack rebuilt every show —
+    /// can be told to spin while a manual refresh is in flight without taking
+    /// ownership of view lifetime.
+    private weak var refreshBtn: FooterIconButton?
+    /// Last manual-refresh click; debounces double-clicks so we don't queue
+    /// duplicate engine runs when a user hammers the button.
+    private var lastRefreshClickAt: Date?
+
     override func loadView() {
         let root = NSView()
         root.translatesAutoresizingMaskIntoConstraints = false
@@ -68,6 +76,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let (active, all, others) = hud.load()
         let primary = active ?? all.first
         let key = snapshotKey(active: active, primary: primary, all: all, others: others)
+        // Engine returned — stop the manual-refresh spinner whether or not the
+        // snapshot key actually changed. If the footer gets rebuilt below the
+        // call is a no-op against the new button.
+        refreshBtn?.setSpinning(false)
         // Bail early when nothing the popover renders has changed — this is
         // the cheapest fix for the 10s tick flicker (no teardown, no relayout).
         if key == lastSnapshotKey, !contentStack.arrangedSubviews.isEmpty {
@@ -781,6 +793,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             target: self,
             action: #selector(handleRefresh)
         )
+        self.refreshBtn = refreshBtn
         let quitBtn = FooterIconButton(
             symbol: "power",
             tooltip: L10n.text("Quit", "Çık"),
@@ -908,7 +921,15 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     // MARK: Actions
 
     @objc private func handleSettings() { onOpenSettings?() }
-    @objc private func handleRefresh() { onRefresh?() }
+    @objc private func handleRefresh() {
+        let now = Date()
+        if let last = lastRefreshClickAt, now.timeIntervalSince(last) < 2.0 {
+            return
+        }
+        lastRefreshClickAt = now
+        refreshBtn?.setSpinning(true)
+        onRefresh?()
+    }
     @objc private func handleQuit() { onQuit?() }
     @objc private func handleShare(_ sender: NSView) { onShare?(sender) }
     @objc private func handleThemePick(_ sender: NSMenuItem) {
