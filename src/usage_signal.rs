@@ -307,8 +307,62 @@ fn load_snapshot_cache() -> Option<UsageSnapshot> {
     if modified.duration_since(UNIX_EPOCH).ok()?.as_secs() == 0 {
         return None;
     }
+    // Active session writes append to a .jsonl in place — file mtime advances,
+    // parent dir mtime does not. Drop the cache when any transcript is newer
+    // so mid-stream assistant turns reach hud.json without a 300s lag.
+    if transcript_newer_than(modified) {
+        return None;
+    }
     let bytes = std::fs::read(&path).ok()?;
     serde_json::from_slice::<UsageSnapshot>(&bytes).ok()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn transcript_newer_than(threshold: std::time::SystemTime) -> bool {
+    let Ok(home) = std::env::var("HOME") else { return false };
+    let roots = [
+        std::path::PathBuf::from(&home).join(".claude").join("projects"),
+        std::path::PathBuf::from(&home).join(".codex").join("sessions"),
+    ];
+    for root in &roots {
+        if jsonl_newer_in_dir(root, threshold, 0) {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn jsonl_newer_in_dir(dir: &std::path::Path, threshold: std::time::SystemTime, depth: usize) -> bool {
+    // Transcripts live at <root>/<project>/<session>.jsonl — 4 levels is plenty
+    // and prevents pathological recursion if symlinks slip past file_type checks.
+    if depth > 4 {
+        return false;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else { return false };
+    for entry in entries.flatten() {
+        let Ok(ft) = entry.file_type() else { continue };
+        if ft.is_symlink() {
+            continue;
+        }
+        let path = entry.path();
+        if ft.is_dir() {
+            if jsonl_newer_in_dir(&path, threshold, depth + 1) {
+                return true;
+            }
+        } else if ft.is_file()
+            && path.extension().and_then(|s| s.to_str()) == Some("jsonl")
+        {
+            if let Ok(meta) = entry.metadata() {
+                if let Ok(m) = meta.modified() {
+                    if m > threshold {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 #[cfg(not(target_arch = "wasm32"))]
