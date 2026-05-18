@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.14] - 2026-05-18
+
+### Fixed
+
+- Popover cards now span the full panel width again and sit flush to the top/right edges instead of leaving an outer gap.
+- Parallel Sessions is hidden unless there is a distinct, recently active background session.
+- Other tools is hidden unless a secondary tool was actively used recently, so stale 7-day history no longer creates a card.
+- Footer layout now keeps the Theme label visible and vertically centered.
+- Refresh icon now spins forward with steady linear motion.
+
 ## [0.3.13] - 2026-05-18
 
 ### Changed

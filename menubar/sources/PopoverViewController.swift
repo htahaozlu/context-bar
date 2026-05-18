@@ -3,6 +3,7 @@ import Foundation
 
 final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     static let contentWidth: CGFloat = 360
+    private static let activeToolWindow: TimeInterval = 30 * 60
     private let hPad: CGFloat = Spacing.m
     private let vGap: CGFloat = Spacing.s
     private var didShowOnce = false
@@ -45,15 +46,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         root.addSubview(visualEffect)
 
         contentStack.orientation = .vertical
-        // `.width` stretches every arranged subview to the stack's content
-        // width. Previous `.leading` alignment installed an implicit
-        // subview.leading == stack.leading constraint that fought the explicit
-        // +Spacing.m leading from `addCard()`. Whichever lost broke layout —
-        // the hero card would either flush-left (gap top+right) or over-
-        // stretch. Horizontal padding now lives entirely in `edgeInsets`.
+        // `.width` stretches every arranged subview to the stack width. Keep
+        // the stack flush to the popover edges; section content owns its own
+        // internal padding.
         contentStack.alignment = .width
         contentStack.spacing = Spacing.s
-        contentStack.edgeInsets = NSEdgeInsets(top: Spacing.m, left: Spacing.m, bottom: Spacing.xs, right: Spacing.m)
+        contentStack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
 
@@ -75,7 +73,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let snapshot = ContextSnapshot()
         let (active, all, others) = snapshot.load()
         let primary = active ?? all.first
-        let activeOthers = others.filter { $0.sessions7d > 0 || $0.tokens7d > 0 }
+        let activeOthers = others.filter { isActivelyUsed($0) }
         let key = snapshotKey(active: active, primary: primary, all: all, others: activeOthers)
         // Engine returned — stop the manual-refresh spinner whether or not the
         // snapshot key actually changed. If the footer gets rebuilt below the
@@ -152,6 +150,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
+        v.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
     }
 
     // MARK: - Sections
@@ -630,8 +629,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// footer appears if exceeded. Caller is responsible for only invoking
     /// this when `hasParallelSessions(agent:)` returns true.
     private func parallelSessions(for a: Agent) -> [ActiveSession] {
+        let recentCutoff = Date().addingTimeInterval(-Self.activeToolWindow)
         let foregroundCwd = a.cwd
         return a.activeSessions.filter { sess in
+            guard (sess.lastTurn ?? .distantPast) >= recentCutoff else {
+                return false
+            }
             if let fg = foregroundCwd, !fg.isEmpty {
                 let proj = (fg as NSString).lastPathComponent
                 return sess.project != proj
@@ -669,6 +672,21 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             stack.addArrangedSubview(more)
         }
         return container
+    }
+
+    private func isActivelyUsed(_ tool: ToolSummary) -> Bool {
+        guard let lastUsed = parseISODate(tool.lastUsed) else { return false }
+        return Date().timeIntervalSince(lastUsed) <= Self.activeToolWindow
+    }
+
+    private func parseISODate(_ raw: String?) -> Date? {
+        guard let raw else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = iso.date(from: raw) { return parsed }
+        let isoNoFrac = ISO8601DateFormatter()
+        isoNoFrac.formatOptions = [.withInternetDateTime]
+        return isoNoFrac.date(from: raw)
     }
 
     /// Single row inside the parallel-sessions card: project · model on top
@@ -821,11 +839,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         NSLayoutConstraint.activate([
             themeBtn.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0),
-            themeBtn.topAnchor.constraint(equalTo: container.topAnchor, constant: Spacing.xs),
-            themeBtn.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Spacing.xs),
+            themeBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             themeBtn.trailingAnchor.constraint(lessThanOrEqualTo: rightStack.leadingAnchor, constant: -Spacing.xs),
             rightStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: 0),
-            rightStack.centerYAnchor.constraint(equalTo: themeBtn.centerYAnchor),
+            rightStack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            container.heightAnchor.constraint(equalToConstant: 40),
         ])
         return container
     }

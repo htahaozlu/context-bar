@@ -244,8 +244,8 @@ final class FooterIconButton: NSButton {
             self.image = nil
             let anim = CABasicAnimation(keyPath: "transform.rotation.z")
             anim.fromValue = 0
-            anim.toValue = -CGFloat.pi * 2
-            anim.duration = 0.9
+            anim.toValue = CGFloat.pi * 2
+            anim.duration = 0.8
             anim.repeatCount = .infinity
             anim.isRemovedOnCompletion = false
             anim.timingFunction = CAMediaTimingFunction(name: .linear)
