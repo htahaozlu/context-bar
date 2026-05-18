@@ -72,8 +72,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     }
 
     func rebuild() {
-        let hud = Hud()
-        let (active, all, others) = hud.load()
+        let snapshot = ContextSnapshot()
+        let (active, all, others) = snapshot.load()
         let primary = active ?? all.first
         let activeOthers = others.filter { $0.sessions7d > 0 || $0.tokens7d > 0 }
         let key = snapshotKey(active: active, primary: primary, all: all, others: activeOthers)
@@ -108,12 +108,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
                 addCard(buildAgentLimits(ag))
             }
         } else {
-            // Before the engine has produced a hud.json (first launch / cache
+            // Before the engine has produced a context.json (first launch / cache
             // miss after purge) show the loading stripe instead of the
             // "no agent" empty state — the latter falsely implies the user has
             // nothing running.
-            let hudExists = FileManager.default.fileExists(atPath: hud.path)
-            if hudExists {
+            let snapshotExists = FileManager.default.fileExists(atPath: snapshot.path)
+            if snapshotExists {
                 addCard(buildEmptyState())
             } else {
                 addCard(buildLoadingState())
@@ -276,7 +276,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         let pct = a.ctxPct
         let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
-        let pctColor: NSColor = pct.map { Hud.ctxColor($0) } ?? .tertiaryLabelColor
+        let pctColor: NSColor = pct.map { ContextSnapshot.ctxColor($0) } ?? .tertiaryLabelColor
         // Use the IDENTICAL font as projectLbl — same family, weight, AND
         // size. `monospacedDigitSystemFont` has different cap/x-height
         // metrics than systemFont so even at 22pt vs 22pt the baseline /
@@ -316,8 +316,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         var metaParts: [String] = []
         metaParts.append(a.name)
         if let m = a.model { metaParts.append(m) }
-        if let t = a.lastTurn { metaParts.append(Hud.relative(t)) }
-        let duration = Hud.formatDuration(a.sessionStarted, a.lastTurn)
+        if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
+        let duration = ContextSnapshot.formatDuration(a.sessionStarted, a.lastTurn)
         if duration != "—" {
             metaParts.append(L10n.text("\(duration) running", "\(duration) aktif"))
         }
@@ -355,9 +355,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let used = a.activeSession
         let detailText: String
         if let w = a.ctxWindow {
-            detailText = "\(Hud.formatTokens(used)) / \(Hud.formatTokens(w))"
+            detailText = "\(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
         } else if used > 0 {
-            detailText = "\(Hud.formatTokens(used)) " + L10n.text("session", "oturum")
+            detailText = "\(ContextSnapshot.formatTokens(used)) " + L10n.text("session", "oturum")
         } else {
             detailText = L10n.text("context unknown", "bağlam bilinmiyor")
         }
@@ -371,12 +371,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         bar.heightAnchor.constraint(equalToConstant: 4).isActive = true
 
         // Burn-rate forecast line — only shown when the prefs flag is on and
-        // the extrapolation cleared the confidence gate inside Hud.burnRate.
+        // the extrapolation cleared the confidence gate inside ContextSnapshot.burnRate.
         if DisplayPrefs.burnRate, (pct ?? 0) > 40,
-           let burn = Hud.burnRate(a) {
-            let eta = Hud.burnRateText(burn.etaSeconds)
+           let burn = ContextSnapshot.burnRate(a) {
+            let eta = ContextSnapshot.burnRateText(burn.etaSeconds)
             let resetTxt: String? = {
-                if let r = a.session5hResetsAt { return Hud.resetsText(r) }
+                if let r = a.session5hResetsAt { return ContextSnapshot.resetsText(r) }
                 return nil
             }()
             var parts: [String] = ["↗ " + L10n.text("on pace to fill in", "doluş süresi") + " \(eta)"]
@@ -425,12 +425,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let pctStr = String(format: "%.0f%%", pct)
         let pctLbl = NSTextField(labelWithString: pctStr)
         pctLbl.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-        pctLbl.textColor = Hud.ctxColor(pct)
+        pctLbl.textColor = ContextSnapshot.ctxColor(pct)
 
         let used = a.activeSession
         let detailText = a.ctxWindow.map { w in
-            "\(Hud.formatTokens(used)) / \(Hud.formatTokens(w))"
-        } ?? Hud.formatTokens(used)
+            "\(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
+        } ?? ContextSnapshot.formatTokens(used)
         let detail = NSTextField(labelWithString: detailText)
         detail.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         detail.textColor = .tertiaryLabelColor
@@ -447,7 +447,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         let bar = ProgressBarView()
         bar.value = max(0, min(1, pct / 100.0))
-        bar.tint = Hud.ctxColor(pct)
+        bar.tint = ContextSnapshot.ctxColor(pct)
         bar.corner = 2.5
         bar.translatesAutoresizingMaskIntoConstraints = false
 
@@ -491,7 +491,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         var metaParts: [String] = []
         if let m = a.model { metaParts.append(m) }
-        if let t = a.lastTurn { metaParts.append(Hud.relative(t)) }
+        if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
         let meta = NSTextField(labelWithString: metaParts.joined(separator: " · "))
         meta.font = NSFont.systemFont(ofSize: 11, weight: .regular)
         meta.textColor = .tertiaryLabelColor
@@ -513,7 +513,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             rows.append(makeLimitRow(
                 label: L10n.text("5h limit", "5sa limit"),
                 percent: a.session5hPercent,
-                fallbackValue: Hud.formatTokens(a.session5h),
+                fallbackValue: ContextSnapshot.formatTokens(a.session5h),
                 resetsAt: a.session5hResetsAt,
                 showsRemaining: showsRemaining
             ))
@@ -522,7 +522,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             rows.append(makeLimitRow(
                 label: L10n.text("7d limit", "7g limit"),
                 percent: a.week7dPercent,
-                fallbackValue: Hud.formatTokens(a.week7d),
+                fallbackValue: ContextSnapshot.formatTokens(a.week7d),
                 resetsAt: a.week7dResetsAt,
                 showsRemaining: showsRemaining
             ))
@@ -530,7 +530,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         if a.activeSession > 0 {
             rows.append(makeSimpleStatRow(
                 label: L10n.text("Session total", "Oturum toplam"),
-                value: Hud.formatTokens(a.activeSession),
+                value: ContextSnapshot.formatTokens(a.activeSession),
                 valueColor: .secondaryLabelColor
             ))
         }
@@ -548,7 +548,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let valueText: String = {
             guard let percent else { return fallbackValue }
             if showsRemaining {
-                return Hud.formatRemainingValue(percentUsed: percent, tokens: 0)
+                return ContextSnapshot.formatRemainingValue(percentUsed: percent, tokens: 0)
             }
             return String(format: "%.0f%%", percent)
         }()
@@ -562,7 +562,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         val.textColor = color
 
         let resetLbl: NSTextField? = resetsAt.map { _ in
-            let l = NSTextField(labelWithString: "↻ \(Hud.resetsText(resetsAt))")
+            let l = NSTextField(labelWithString: "↻ \(ContextSnapshot.resetsText(resetsAt))")
             l.font = NSFont.systemFont(ofSize: 10)
             l.textColor = .tertiaryLabelColor
             return l
@@ -683,7 +683,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         var metaParts: [String] = []
         if let m = sess.model { metaParts.append(m) }
-        if let t = sess.lastTurn { metaParts.append(Hud.relative(t)) }
+        if let t = sess.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
         let meta = NSTextField(labelWithString: metaParts.joined(separator: " · "))
         meta.font = NSFont.systemFont(ofSize: 10, weight: .regular)
         meta.textColor = .tertiaryLabelColor
@@ -693,7 +693,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let pctStr = sess.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
         let pctLbl = NSTextField(labelWithString: pctStr)
         pctLbl.font = Typography.bodyMono(11, weight: .semibold)
-        pctLbl.textColor = Hud.ctxColor(sess.ctxPct)
+        pctLbl.textColor = ContextSnapshot.ctxColor(sess.ctxPct)
         pctLbl.setContentHuggingPriority(.required, for: .horizontal)
 
         let spacer = NSView()

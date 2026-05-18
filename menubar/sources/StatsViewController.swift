@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 /// Stats pane — Claude-app style usage overview computed locally from
-/// ~/.context-bar/hud.json (the same artifact the Usage tab reads).
+/// ~/.context-bar/context.json (the same artifact the Usage tab reads).
 ///
 /// All numbers come from the `claude` AgentBlock written by
 /// src/usage_signal.py — no synthetic data. Fields used:
@@ -125,7 +125,7 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     private func loadSnapshot() -> Snapshot {
-        let path = "\(NSHomeDirectory())/.context-bar/hud.json"
+        let path = ContextSnapshot.resolveSnapshotPath()
         let key: String = (provider == .codex) ? "codex" : "claude"
         guard
             let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
@@ -292,7 +292,7 @@ final class StatsViewController: PreferencePaneViewController {
             ),
             StatTileView(
                 caption: L10n.text("total tokens", "toplam token"),
-                value: Hud.formatTokens(tokens)
+                value: ContextSnapshot.formatTokens(tokens)
             ),
             StatTileView(
                 caption: L10n.text("active days", "aktif gün"),

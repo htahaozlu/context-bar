@@ -84,7 +84,7 @@ if [[ -f "$APP_ICON_SRC" ]]; then
 fi
 chmod +x "$EXECUTABLE"
 
-# Build and embed the Rust engine so the menubar app can regenerate hud.json
+# Build and embed the Rust engine so the menubar app can regenerate context.json
 # on demand without any external daemon. Universal binary via two passes + lipo.
 ENGINE_ARM64="$ROOT/target/aarch64-apple-darwin/release/context-bar"
 ENGINE_X86_64="$ROOT/target/x86_64-apple-darwin/release/context-bar"

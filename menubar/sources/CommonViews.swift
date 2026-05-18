@@ -286,7 +286,7 @@ final class DualStatTileView: NSView {
 // MARK: - LoadingStripeView
 
 /// Animated diagonal-stripe placeholder used while the engine is producing
-/// the first hud.json. Static gradient when reduce-motion is on.
+/// the first context.json. Static gradient when reduce-motion is on.
 final class LoadingStripeView: NSView {
     var tint: NSColor = ThemeStore.current.accent { didSet { needsDisplay = true } }
     private var phase: CGFloat = 0
@@ -428,7 +428,7 @@ final class IncidentBadgeView: NSView {
     }
 }
 
-/// Native Usage panel — rebuilt per refresh from hud.json. One card per agent
+/// Native Usage panel — rebuilt per refresh from context.json. One card per agent
 /// with stat tiles, window progress bars, active-session strip, and a 30-day
 /// sparkline. Replaces the previous webview approach so the panel feels at
 /// home on macOS (no scrollbars, no font drift, no white flash).

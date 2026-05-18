@@ -129,7 +129,7 @@ For Claude Code compatibility, `CLAUDE.md` is mirrored at the repository root.
 
 ### Native macOS companion
 
-The companion app reads `~/.context-bar/hud.json` and provides:
+The companion app reads `~/.context-bar/context.json` (`hud.json` before v0.3.13) and provides:
 
 - a compact menubar status item (active agent + project + context %)
 - a modern AppKit popover with cards for the active agent, context window,
@@ -144,7 +144,7 @@ The companion app reads `~/.context-bar/hud.json` and provides:
 
 ContextBar ships with a native WidgetKit extension in three sizes —
 `systemSmall`, `systemMedium`, and `systemLarge`. The widget reads the same
-`hud.json` as the menubar via a shared App Group container
+`context.json` as the menubar via a shared App Group container
 (`DQJT5BCZCM.com.htahaozlu.contextbar`), so it always reflects the active
 agent, project, model, context %, rolling 5h/7d limits, and a per-agent
 breakdown without any extra daemon.
@@ -166,7 +166,7 @@ To add it:
 The widget extension is sandboxed and signed with the App Group entitlement,
 which is required by `chronod` on macOS 14+ (the previous unsandboxed bundle
 was silently rejected with `Ignoring restricted or unknown extension`).
-The host menubar app mirrors `~/.context-bar/hud.json` into the App Group
+The host menubar app mirrors `~/.context-bar/context.json` into the App Group
 container on every refresh so the sandboxed widget can read it.
 
 ### Share Today's HUD

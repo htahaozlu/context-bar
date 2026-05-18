@@ -429,7 +429,7 @@ final class AboutViewController: PreferencePaneViewController {
             makeInfoRow(title: "Git", value: L10n.text("branch, commits, worktree", "branch, commit, worktree")),
             makeInfoRow(title: "Claude Code", value: "~/.claude/projects/**/*.jsonl"),
             makeInfoRow(title: "Codex CLI", value: "~/.codex/sessions/**/*.jsonl"),
-            makeInfoRow(title: "Output", value: "~/.context-bar/hud.json"),
+            makeInfoRow(title: "Output", value: "~/.context-bar/context.json"),
         ])
         sources.orientation = .vertical
         sources.spacing = 10

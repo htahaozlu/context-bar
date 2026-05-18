@@ -122,7 +122,7 @@ Claude Code uyumluluğu için `CLAUDE.md`, depo köküne de aynalanır.
 
 ### Yerel macOS yardımcısı
 
-Yardımcı uygulama `~/.context-bar/hud.json` dosyasını okur ve şunları sağlar:
+Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) dosyasını okur ve şunları sağlar:
 
 - kompakt menubar durum öğesi (aktif ajan + proje + bağlam %)
 - modern AppKit popover: aktif ajan, bağlam penceresi, ilerleme barlı 5sa/7g
@@ -135,7 +135,7 @@ Yardımcı uygulama `~/.context-bar/hud.json` dosyasını okur ve şunları sağ
 ### Masaüstü ve Bildirim Merkezi widget'ı
 
 ContextBar üç boyutta native bir WidgetKit eklentisiyle gelir:
-`systemSmall`, `systemMedium`, `systemLarge`. Widget aynı `hud.json`'u
+`systemSmall`, `systemMedium`, `systemLarge`. Widget aynı `context.json`'u
 menubar ile paylaşılan App Group container'ı
 (`DQJT5BCZCM.com.htahaozlu.contextbar`) üzerinden okur; aktif agent,
 proje, model, context %, 5h/7d limitleri ve agent başına dökümünü ekstra
@@ -158,7 +158,7 @@ Eklemek için:
 Widget extension sandboxlu ve App Group entitlement'ı ile imzalı. macOS 14+
 (macOS 26 Tahoe dahil) `chronod` sandboxsuz widget extension'larını sessizce
 reddediyordu (`Ignoring restricted or unknown extension`). Host menubar
-uygulaması her refresh'te `~/.context-bar/hud.json`'u App Group container'a
+uygulaması her refresh'te `~/.context-bar/context.json`'u App Group container'a
 mirror'lar; sandbox içindeki widget bunu okur.
 
 ### Bugünün HUD'unu paylaş

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.13] - 2026-05-18
+
+### Changed
+
+- Engine snapshot file renamed from `hud.json` to `context.json` to match the `context-bar` brand. The engine writes both filenames for one release; the menubar app and widget read `context.json` first and fall back to `hud.json` so existing installs keep working until the next regenerate. New env override: `CONTEXTBAR_CONTEXT_PATH` (legacy `CONTEXTBAR_HUD_PATH` still honored). The Swift `Hud` type is now `ContextSnapshot`; the widget's `HudSnapshot` / `HudEntry` / `HudProvider` became `WidgetSnapshot` / `WidgetEntry` / `WidgetSnapshotProvider`.
+- Critical-background menubar suffix uses a more useful threshold set: a background session must reach ≥75 % context **and** be at least 15 points hotter than the foreground, and the foreground itself must still be <70 %. Replaces the prior 80 % / <50 % gate, which under-warned when both sessions sat in the orange band.
+
+### Fixed
+
+- Menubar context % no longer goes blank when the engine drops the top-level `last_context_pct` / `last_cwd` between turns. The Swift parser now falls back to the most-recently-updated entry inside `active_sessions`, so the percentage tracks the live session even when the snapshot's aggregate fields lag.
+- Popover refresh button spinner rotates the SF Symbol around its own centre instead of the entire 30×28 button layer, so the hover background stays put and the icon no longer drifts off-axis. Linear timing replaces the prior ease-in-out so the spin reads as steady motion.
+- "Other tools" card is hidden when every detected secondary tool has zero 7-day sessions and zero 7-day tokens, removing an empty placeholder when no parallel CLI usage exists.
+
 ## [0.3.12] - 2026-05-17
 
 ### Fixed

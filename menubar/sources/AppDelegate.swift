@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var statusItem: NSStatusItem!
     var timer: Timer!
     var detailWindow: DetailWindowController?
-    let hud = Hud()
+    let snapshot = ContextSnapshot()
     var lastActive: Agent?
     private var previewTheme: Theme?
     private let popover = NSPopover()
@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         setupPopover()
         refresh()
-        syncHudToGroupContainer()
+        syncContextToGroupContainer()
         let args = CommandLine.arguments.dropFirst()
         if ProcessInfo.processInfo.environment["CONTEXTBAR_OPEN_WINDOW"] == "1"
             || args.contains("--settings") || args.contains("--open") {
@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         if let sharePath = ProcessInfo.processInfo.environment["CONTEXTBAR_SHARE_RENDER_PATH"] {
             let masked = (ProcessInfo.processInfo.environment["CONTEXTBAR_SHARE_MASK"] ?? "1") == "1"
-            let (_, all, others) = hud.load()
+            let (_, all, others) = snapshot.load()
             let img = ShareCard.render(agents: all, others: others, maskProjects: masked)
             try? ShareCard.writePNG(img, to: URL(fileURLWithPath: sharePath))
             NSApp.terminate(nil)
@@ -296,7 +296,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func popoverWillShow(_ notification: Notification) { popoverVisible = true }
     func popoverDidClose(_ notification: Notification) { popoverVisible = false }
 
-    /// Spawns the bundled engine to rewrite ~/.context-bar/hud.json, then reloads
+    /// Spawns the bundled engine to rewrite ~/.context-bar/context.json, then reloads
     /// the menu. Engine runs off the main thread so the menubar stays responsive;
     /// UI update is dispatched back to main. If the engine binary is missing
     /// (e.g. running the Swift app standalone in dev), we still refresh from the
@@ -305,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // Reentrancy guard: if an engine run is already in flight, just mark
         // pending so we coalesce overlapping ticks (FSEvents burst + 10s timer
         // + wake-from-sleep) into at most one follow-up run. Without this two
-        // engine processes can stomp on hud.json simultaneously.
+        // engine processes can stomp on context.json simultaneously.
         if engineRunning {
             enginePending = true
             return
@@ -327,7 +327,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func reloadWidgets() {
-        syncHudToGroupContainer()
+        syncContextToGroupContainer()
         #if canImport(WidgetKit)
         if #available(macOS 11.0, *) {
             WidgetCenter.shared.reloadAllTimelines()
@@ -335,25 +335,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         #endif
     }
 
-    /// The widget extension is sandboxed so it cannot read `~/.context-bar/hud.json`
+    /// The widget extension is sandboxed so it cannot read `~/.context-bar/context.json`
     /// directly. Mirror the latest snapshot into the shared App Group container
     /// the widget *can* read via `containerURL(forSecurityApplicationGroupIdentifier:)`.
-    private func syncHudToGroupContainer() {
+    /// Also writes a `hud.json` copy for one release so widgets built against
+    /// the old filename keep working.
+    private func syncContextToGroupContainer() {
         let fm = FileManager.default
-        let src = "\(NSHomeDirectory())/.context-bar/hud.json"
+        let home = NSHomeDirectory()
+        let srcNew = "\(home)/.context-bar/context.json"
+        let srcLegacy = "\(home)/.context-bar/hud.json"
+        let src = fm.fileExists(atPath: srcNew) ? srcNew : srcLegacy
         guard fm.fileExists(atPath: src) else { return }
         guard let container = fm.containerURL(
             forSecurityApplicationGroupIdentifier: "DQJT5BCZCM.com.htahaozlu.contextbar"
         ) else { return }
-        let dst = container.appendingPathComponent("hud.json")
-        do {
-            if fm.fileExists(atPath: dst.path) {
-                try fm.removeItem(at: dst)
+        let srcURL = URL(fileURLWithPath: src)
+        for name in ["context.json", "hud.json"] {
+            let dst = container.appendingPathComponent(name)
+            do {
+                if fm.fileExists(atPath: dst.path) {
+                    try fm.removeItem(at: dst)
+                }
+                try fm.copyItem(at: srcURL, to: dst)
+            } catch {
+                // Group container may not exist until the widget is provisioned;
+                // ignore — the widget will fall back to the legacy path.
             }
-            try fm.copyItem(at: URL(fileURLWithPath: src), to: dst)
-        } catch {
-            // Group container may not exist until the widget is provisioned;
-            // ignore — the widget will fall back to the legacy path.
         }
     }
 
@@ -452,7 +460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func refresh() {
-        let (active, all, _) = hud.load()
+        let (active, all, _) = snapshot.load()
         lastActive = active
         lastAllAgents = all
         repaintTitle()
@@ -466,7 +474,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// redacted by default (DisplayPrefs.maskShareProjects) so users can post
     /// the card to social channels without leaking private repository names.
     func presentShareCard(from anchor: NSView) {
-        let (_, all, others) = hud.load()
+        let (_, all, others) = snapshot.load()
         guard !all.isEmpty else { return }
         let image = ShareCard.render(
             agents: all,
@@ -540,14 +548,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         ])
     }
 
-    /// Surfaces a high-pressure background session when the foreground is
-    /// calm. Suppressed when foreground itself is already > 50% (the user is
-    /// already seeing the warning color on the main pct field).
+    /// Surfaces a high-pressure background session when the foreground isn't
+    /// already screaming. Three gates:
+    ///   1. Background pct ≥ 75 (deep orange zone — palette anchors at 70/85/90).
+    ///   2. Foreground pct < 70 (don't double-warn when the main field is
+    ///      already orange/red — user is looking at it).
+    ///   3. Background at least 15 points hotter than foreground (delta gate
+    ///      avoids noisy alerts when both sessions are similar).
     private func criticalBackgroundSuffix(font: NSFont, theme: Theme) -> NSAttributedString? {
         guard DisplayPrefs.criticalBackground else { return nil }
-        guard let fg = lastActive, (fg.ctxPct ?? 0) < 50 else { return nil }
-        // Look across every agent's parallel sessions and find the highest
-        // non-foreground pct. Threshold: 80%.
+        guard let fg = lastActive else { return nil }
+        let fgPct = fg.ctxPct ?? 0
+        guard fgPct < 70 else { return nil }
         var hottest: ActiveSession?
         var hottestPct: Double = 0
         let foregroundProject = fg.project
@@ -555,7 +567,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             for sess in ag.activeSessions {
                 guard sess.project != foregroundProject else { continue }
                 let pct = sess.ctxPct ?? 0
-                if pct > hottestPct, pct >= 80 {
+                guard pct >= 75, pct >= fgPct + 15 else { continue }
+                if pct > hottestPct {
                     hottest = sess
                     hottestPct = pct
                 }

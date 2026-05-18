@@ -169,6 +169,11 @@ final class ActivityDotView: NSView {
 final class FooterIconButton: NSButton {
     private var hovering = false { didSet { needsDisplay = true } }
     private var trackingArea: NSTrackingArea?
+    /// Square overlay that hosts the icon while spinning so rotation pivots on
+    /// the symbol centre instead of the 30×28 button bounds (which would slide
+    /// the icon off-axis and rotate the hover background too).
+    private let iconLayer = CALayer()
+    private var iconImage: NSImage?
 
     init(symbol: String, tooltip: String, target: AnyObject?, action: Selector) {
         super.init(frame: .zero)
@@ -185,6 +190,7 @@ final class FooterIconButton: NSButton {
         let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
         if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)?
             .withSymbolConfiguration(cfg) {
+            self.iconImage = img
             self.image = img
         }
         self.contentTintColor = .secondaryLabelColor
@@ -194,6 +200,10 @@ final class FooterIconButton: NSButton {
             self.widthAnchor.constraint(equalToConstant: 30),
             self.heightAnchor.constraint(equalToConstant: 28),
         ])
+        iconLayer.contentsGravity = .resizeAspect
+        iconLayer.isHidden = true
+        iconLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        layer?.addSublayer(iconLayer)
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -219,27 +229,63 @@ final class FooterIconButton: NSButton {
         super.draw(dirtyRect)
     }
 
-    /// Continuous rotation around the button's centre. Used for the refresh
-    /// icon while the engine re-scans transcripts. The whole NSButton layer
-    /// rotates — fine because footer buttons are image-only squares.
+    /// Spin only the symbol — not the whole button — so the hover background
+    /// stays put and the icon rotates around its own centre at a fixed radius.
     func setSpinning(_ on: Bool) {
-        guard let layer else { return }
         if on {
-            if layer.anchorPoint != CGPoint(x: 0.5, y: 0.5) {
-                let oldFrame = layer.frame
-                layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-                layer.frame = oldFrame
-            }
+            guard let img = iconImage else { return }
+            let side: CGFloat = 16
+            let tinted = tintedIcon(img, color: contentTintColor ?? .secondaryLabelColor)
+            iconLayer.contents = tinted
+            iconLayer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+            iconLayer.bounds = CGRect(x: 0, y: 0, width: side, height: side)
+            iconLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            iconLayer.isHidden = false
+            self.image = nil
             let anim = CABasicAnimation(keyPath: "transform.rotation.z")
             anim.fromValue = 0
             anim.toValue = -CGFloat.pi * 2
-            anim.duration = 0.8
+            anim.duration = 0.9
             anim.repeatCount = .infinity
             anim.isRemovedOnCompletion = false
-            layer.add(anim, forKey: "spin")
+            anim.timingFunction = CAMediaTimingFunction(name: .linear)
+            iconLayer.add(anim, forKey: "spin")
         } else {
-            layer.removeAnimation(forKey: "spin")
+            iconLayer.removeAnimation(forKey: "spin")
+            iconLayer.isHidden = true
+            self.image = iconImage
         }
+    }
+
+    override func layout() {
+        super.layout()
+        iconLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+    }
+
+    private func tintedIcon(_ image: NSImage, color: NSColor) -> CGImage? {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(size.width * 2),
+            pixelsHigh: Int(size.height * 2),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )
+        rep?.size = size
+        guard let rep, let ctx = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        image.draw(in: NSRect(origin: .zero, size: size))
+        color.set()
+        NSRect(origin: .zero, size: size).fill(using: .sourceIn)
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.cgImage
     }
 }
 
@@ -260,7 +306,7 @@ final class OtherToolRowView: NSView {
         nameLbl.toolTip = tool.name
 
         var parts: [String] = []
-        if tool.tokens7d > 0 { parts.append(Hud.formatTokens(tool.tokens7d)) }
+        if tool.tokens7d > 0 { parts.append(ContextSnapshot.formatTokens(tool.tokens7d)) }
         if tool.sessions7d > 0 { parts.append("\(tool.sessions7d)×/\(L10n.text("wk", "hf"))") }
         if let m = tool.lastModel { parts.append(m) }
         let info = NSTextField(labelWithString: parts.joined(separator: " · "))
@@ -287,4 +333,4 @@ final class OtherToolRowView: NSView {
 /// rounded card laid out in a single vertical stack with NSStackView's
 /// .width alignment so every card spans the full content width (minus
 /// stack edge insets) regardless of its intrinsic content. Rebuilt on
-/// every show so the panel reflects the most recent hud.json.
+/// every show so the panel reflects the most recent context.json.

@@ -38,8 +38,8 @@ final class UsageViewController: NSViewController {
     func reload() {
         let savedOrigin = scrollView.contentView.bounds.origin
         container.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let hud = Hud()
-        let (active, all, others) = hud.load()
+        let snapshot = ContextSnapshot()
+        let (active, all, others) = snapshot.load()
         if all.isEmpty {
             let empty = NSTextField(labelWithString: L10n.text(
                 "No agent data yet. Start a Claude or Codex session.",
@@ -91,7 +91,7 @@ final class UsageViewController: NSViewController {
         var metaParts: [String] = []
         if let m = a.model { metaParts.append(m) }
         metaParts.append(a.project)
-        if let t = a.lastTurn { metaParts.append(Hud.relative(t)) }
+        if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
         let metaLbl = NSTextField(labelWithString: metaParts.joined(separator: "  ·  "))
         metaLbl.font = NSFont.systemFont(ofSize: 11)
         metaLbl.textColor = .secondaryLabelColor
@@ -105,29 +105,29 @@ final class UsageViewController: NSViewController {
 
         // Stat tiles
         let ctxPctStr = a.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
-        let ctxSub = a.ctxWindow.map { L10n.text("\(Hud.formatTokens($0)) window", "\(Hud.formatTokens($0)) pencere") } ?? "—"
-        let sessDur = Hud.formatDuration(a.sessionStarted, a.lastTurn)
+        let ctxSub = a.ctxWindow.map { L10n.text("\(ContextSnapshot.formatTokens($0)) window", "\(ContextSnapshot.formatTokens($0)) pencere") } ?? "—"
+        let sessDur = ContextSnapshot.formatDuration(a.sessionStarted, a.lastTurn)
         let showsRemaining = a.name.caseInsensitiveCompare("Codex") == .orderedSame
         let fiveHourValue = showsRemaining
-            ? Hud.formatRemainingValue(percentUsed: a.session5hPercent, tokens: a.session5h)
-            : Hud.formatUsageValue(percent: a.session5hPercent, tokens: a.session5h)
+            ? ContextSnapshot.formatRemainingValue(percentUsed: a.session5hPercent, tokens: a.session5h)
+            : ContextSnapshot.formatUsageValue(percent: a.session5hPercent, tokens: a.session5h)
         let sevenDayValue = showsRemaining
-            ? Hud.formatRemainingValue(percentUsed: a.week7dPercent, tokens: a.week7d)
-            : Hud.formatUsageValue(percent: a.week7dPercent, tokens: a.week7d)
+            ? ContextSnapshot.formatRemainingValue(percentUsed: a.week7dPercent, tokens: a.week7d)
+            : ContextSnapshot.formatUsageValue(percent: a.week7dPercent, tokens: a.week7d)
 
         let tiles = NSStackView(views: [
             DualStatTileView(caption: L10n.text("context", "bağlam"),
-                             value: ctxPctStr, valueColor: Hud.ctxColor(a.ctxPct),
+                             value: ctxPctStr, valueColor: ContextSnapshot.ctxColor(a.ctxPct),
                              sub: ctxSub, mono: false),
             DualStatTileView(caption: L10n.text("session", "oturum"),
-                             value: Hud.formatTokens(a.activeSession),
+                             value: ContextSnapshot.formatTokens(a.activeSession),
                              sub: L10n.text("\(sessDur) running", "\(sessDur) süredir aktif")),
             DualStatTileView(caption: L10n.text("5h window", "5s pencere"),
                              value: fiveHourValue,
-                             sub: L10n.text("resets in \(Hud.resetsIn(a.session5hResetsAt))", "\(Hud.resetsIn(a.session5hResetsAt)) sonra sıfırlanır")),
+                             sub: L10n.text("resets in \(ContextSnapshot.resetsIn(a.session5hResetsAt))", "\(ContextSnapshot.resetsIn(a.session5hResetsAt)) sonra sıfırlanır")),
             DualStatTileView(caption: L10n.text("7d window", "7g pencere"),
                              value: sevenDayValue,
-                             sub: L10n.text("resets in \(Hud.resetsIn(a.week7dResetsAt))", "\(Hud.resetsIn(a.week7dResetsAt)) sonra sıfırlanır")),
+                             sub: L10n.text("resets in \(ContextSnapshot.resetsIn(a.week7dResetsAt))", "\(ContextSnapshot.resetsIn(a.week7dResetsAt)) sonra sıfırlanır")),
         ])
         tiles.orientation = .horizontal
         tiles.distribution = .fillEqually
@@ -162,7 +162,7 @@ final class UsageViewController: NSViewController {
     }
 
     private func buildSparkline(forAgent name: String) -> NSView? {
-        let path = "\(NSHomeDirectory())/.context-bar/hud.json"
+        let path = ContextSnapshot.resolveSnapshotPath()
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let agent = root[name.lowercased()] as? [String: Any],
@@ -180,7 +180,7 @@ final class UsageViewController: NSViewController {
         cap.translatesAutoresizingMaskIntoConstraints = false
 
         let total = values.reduce(0, +)
-        let totalLbl = NSTextField(labelWithString: Hud.formatTokens(UInt64(total)))
+        let totalLbl = NSTextField(labelWithString: ContextSnapshot.formatTokens(UInt64(total)))
         totalLbl.font = Typography.bodyMono(11, weight: .regular)
         totalLbl.textColor = .secondaryLabelColor
         totalLbl.alignment = .right
@@ -226,7 +226,7 @@ final class UsageViewController: NSViewController {
                 font: NSFont.systemFont(ofSize: 12, weight: .medium),
                 color: .labelColor
             )
-            let info = NSTextField(labelWithString: "\(Hud.formatTokens(t.tokens7d))  ·  \(t.sessions7d)×/\(L10n.text("wk", "hf"))  ·  \(t.lastModel ?? "—")")
+            let info = NSTextField(labelWithString: "\(ContextSnapshot.formatTokens(t.tokens7d))  ·  \(t.sessions7d)×/\(L10n.text("wk", "hf"))  ·  \(t.lastModel ?? "—")")
             info.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
             info.textColor = .secondaryLabelColor
             let r = NSStackView(views: [name, NSView(), info])

@@ -1,13 +1,44 @@
 import AppKit
 import Foundation
 
-final class Hud {
+/// Reads the engine-produced `~/.context-bar/context.json` snapshot and turns it
+/// into typed `Agent` / `ActiveSession` / `ToolSummary` values for the UI.
+/// Static helpers on this type also handle formatting (tokens, durations,
+/// reset text) and the traffic-light context color used across panels.
+final class ContextSnapshot {
     let path: String
     let usageCachePath: String
     init() {
         let env = ProcessInfo.processInfo.environment
-        self.path = env["CONTEXTBAR_HUD_PATH"] ?? "\(NSHomeDirectory())/.context-bar/hud.json"
-        self.usageCachePath = env["CONTEXTBAR_USAGE_CACHE_PATH"] ?? "\(NSHomeDirectory())/.context-bar/usage_api_cache.json"
+        let home = NSHomeDirectory()
+        let primary = env["CONTEXTBAR_CONTEXT_PATH"]
+            ?? env["CONTEXTBAR_HUD_PATH"]
+            ?? "\(home)/.context-bar/context.json"
+        // One-release back-compat: if the new file is missing but the legacy
+        // `hud.json` is still around (engine not yet rebuilt), read that.
+        let fm = FileManager.default
+        if fm.fileExists(atPath: primary) {
+            self.path = primary
+        } else {
+            let legacy = "\(home)/.context-bar/hud.json"
+            self.path = fm.fileExists(atPath: legacy) ? legacy : primary
+        }
+        self.usageCachePath = env["CONTEXTBAR_USAGE_CACHE_PATH"] ?? "\(home)/.context-bar/usage_api_cache.json"
+    }
+
+    /// Resolves the snapshot path the same way `ContextSnapshot()` does —
+    /// prefers `context.json`, falls back to legacy `hud.json`. Shared with
+    /// panels that read the file directly (UsageViewController, StatsViewController).
+    static func resolveSnapshotPath() -> String {
+        let env = ProcessInfo.processInfo.environment
+        let home = NSHomeDirectory()
+        let primary = env["CONTEXTBAR_CONTEXT_PATH"]
+            ?? env["CONTEXTBAR_HUD_PATH"]
+            ?? "\(home)/.context-bar/context.json"
+        let fm = FileManager.default
+        if fm.fileExists(atPath: primary) { return primary }
+        let legacy = "\(home)/.context-bar/hud.json"
+        return fm.fileExists(atPath: legacy) ? legacy : primary
     }
 
     func load() -> (active: Agent?, all: [Agent], others: [ToolSummary]) {
@@ -124,6 +155,17 @@ final class Hud {
         let fiveHourOverlay = overlay?["five_hour"] as? [String: Any]
         let sevenDayOverlay = overlay?["seven_day"] as? [String: Any]
 
+        // Engine occasionally drops `last_context_pct` (and sometimes `last_cwd`)
+        // even when an `active_sessions` entry has fresh data. Fall back to the
+        // most-recently-updated session so the menubar % keeps tracking instead
+        // of going blank between turns.
+        let mostRecentActive = actives.max(by: {
+            ($0.lastTurn ?? .distantPast) < ($1.lastTurn ?? .distantPast)
+        })
+        let resolvedCtxPct = dbl(raw["last_context_pct"]) ?? mostRecentActive?.ctxPct
+        let resolvedCwd = (raw["last_cwd"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            ?? mostRecentActive?.project
+
         return Agent(
             name: name,
             session5h: u64(raw["session_5h_tokens"]),
@@ -136,8 +178,8 @@ final class Hud {
                 ?? dbl(sevenDayOverlay?["used_percentage"]),
             activeSession: u64(raw["active_session_tokens"]),
             model: raw["last_model"] as? String,
-            cwd: raw["last_cwd"] as? String,
-            ctxPct: dbl(raw["last_context_pct"]),
+            cwd: resolvedCwd,
+            ctxPct: resolvedCtxPct,
             ctxWindow: u64Opt(raw["last_context_window"]),
             lastTurn: ts,
             sessionStarted: started,
@@ -280,8 +322,3 @@ final class Hud {
         }
     }
 }
-
-// MARK: - Detail window
-
-/// Horizontal progress bar drawn natively. Fills `value` (0...1) with the
-/// supplied tint over a subtle track. Used for window-elapsed limits and

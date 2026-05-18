@@ -309,7 +309,7 @@ fn load_snapshot_cache() -> Option<UsageSnapshot> {
     }
     // Active session writes append to a .jsonl in place — file mtime advances,
     // parent dir mtime does not. Drop the cache when any transcript is newer
-    // so mid-stream assistant turns reach hud.json without a 300s lag.
+    // so mid-stream assistant turns reach context.json without a 300s lag.
     if transcript_newer_than(modified) {
         return None;
     }

@@ -199,11 +199,15 @@ fn refresh_global() -> Result<PathBuf, String> {
         .map_err(|error| format!("write {} failed: {error}", path.display()))?;
 
     // JSON sidecar — consumed by the menubar app for structured rendering.
-    let json_path = dir.join("hud.json");
+    // New canonical name is `context.json`; `hud.json` written too for one
+    // release so menubar apps that haven't been rebuilt keep reading.
+    let json_path = dir.join("context.json");
     let json = serde_json::to_string_pretty(&usage)
-        .map_err(|error| format!("serialize hud.json failed: {error}"))?;
+        .map_err(|error| format!("serialize context.json failed: {error}"))?;
     std::fs::write(&json_path, json.as_bytes())
         .map_err(|error| format!("write {} failed: {error}", json_path.display()))?;
+    let legacy_path = dir.join("hud.json");
+    let _ = std::fs::write(&legacy_path, json.as_bytes());
 
     // Optional HTML export for direct local viewing or sharing.
     let html = context_bar::detail_html::render(&usage);
