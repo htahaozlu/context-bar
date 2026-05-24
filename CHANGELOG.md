@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.15] - 2026-05-24
+
+### Fixed
+
+- Popover cards now float inside the panel with horizontal padding instead of bleeding into the rounded corners — fixes the misaligned-left-edge look reported across themes.
+- Hero meta line (agent · model · last turn · running time) and the in-bar context detail bumped from tertiary to secondary text color so they stay readable when the popover sits over a textured wallpaper or transparent vibrancy material.
+- Hero context detail is now prefixed with "Context · …" / "Bağlam · …" so the big percentage and bar are obviously about context usage.
+- Footer "Theme" label is no longer clipped by the popover's bottom-left rounded corner — added an inner edge guard.
+
+### Changed
+
+- Refresh button "working" indicator replaced the full mechanical rotation with a calm breathing pulse (opacity + subtle scale). Reduce-motion users just get a dim icon.
+
 ## [0.3.14] - 2026-05-18
 
 ### Fixed
