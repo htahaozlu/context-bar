@@ -229,8 +229,10 @@ final class FooterIconButton: NSButton {
         super.draw(dirtyRect)
     }
 
-    /// Spin only the symbol — not the whole button — so the hover background
-    /// stays put and the icon rotates around its own centre at a fixed radius.
+    /// "Working" indicator on the refresh button. Replaces the prior
+    /// mechanical full-rotation spin with a calm breathe — opacity dips and
+    /// the symbol scales down ~12% then back. Reads as "active" without the
+    /// helicopter look. Skipped under reduce-motion (just dim the icon).
     func setSpinning(_ on: Bool) {
         if on {
             guard let img = iconImage else { return }
@@ -242,16 +244,27 @@ final class FooterIconButton: NSButton {
             iconLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
             iconLayer.isHidden = false
             self.image = nil
-            let anim = CABasicAnimation(keyPath: "transform.rotation.z")
-            anim.fromValue = 0
-            anim.toValue = CGFloat.pi * 2
-            anim.duration = 0.8
-            anim.repeatCount = .infinity
-            anim.isRemovedOnCompletion = false
-            anim.timingFunction = CAMediaTimingFunction(name: .linear)
-            iconLayer.add(anim, forKey: "spin")
+            if MotionPrefs.reduceMotion {
+                iconLayer.opacity = 0.55
+                return
+            }
+            let opacityAnim = CABasicAnimation(keyPath: "opacity")
+            opacityAnim.fromValue = 1.0
+            opacityAnim.toValue = 0.35
+            let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
+            scaleAnim.fromValue = 1.0
+            scaleAnim.toValue = 0.88
+            let group = CAAnimationGroup()
+            group.animations = [opacityAnim, scaleAnim]
+            group.duration = 0.85
+            group.autoreverses = true
+            group.repeatCount = .infinity
+            group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            group.isRemovedOnCompletion = false
+            iconLayer.add(group, forKey: "breathe")
         } else {
-            iconLayer.removeAnimation(forKey: "spin")
+            iconLayer.removeAnimation(forKey: "breathe")
+            iconLayer.opacity = 1.0
             iconLayer.isHidden = true
             self.image = iconImage
         }

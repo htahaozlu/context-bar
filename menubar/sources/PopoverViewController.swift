@@ -46,12 +46,18 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         root.addSubview(visualEffect)
 
         contentStack.orientation = .vertical
-        // `.width` stretches every arranged subview to the stack width. Keep
-        // the stack flush to the popover edges; section content owns its own
-        // internal padding.
-        contentStack.alignment = .width
+        // `.leading` here (instead of `.width`) lets each card use the
+        // explicit leading/trailing constraints we add in `addCard`, which
+        // inset the cards from the popover edges. `.width` would force every
+        // arranged subview to span the full stack width and visually negate
+        // the gap — that was the "kartların sol kısımları düzgün değil"
+        // report.
+        contentStack.alignment = .leading
         contentStack.spacing = Spacing.s
-        contentStack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        contentStack.edgeInsets = NSEdgeInsets(
+            top: Spacing.xs, left: 0,
+            bottom: Spacing.xs, right: 0
+        )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
 
@@ -150,7 +156,17 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
-        v.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        // Explicit leading/trailing to the popover edges with horizontal
+        // padding — keeps cards floating inside the rounded popover instead
+        // of bleeding to its corners. NSStackView's `.width` alignment +
+        // edgeInsets alone don't reliably create the visual margin because
+        // the popover sizes itself to fittingSize (no extra slack to inset
+        // into). The constraints below force the gap.
+        let pad: CGFloat = Spacing.s
+        NSLayoutConstraint.activate([
+            v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: pad),
+            v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -pad),
+        ])
     }
 
     // MARK: - Sections
@@ -323,7 +339,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let metaText = metaParts.joined(separator: "  ·  ")
         let meta = NSTextField(labelWithString: metaText)
         meta.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-        meta.textColor = .tertiaryLabelColor
+        // Bumped from tertiary → secondary so the meta line stays readable
+        // when the popover sits over a textured wallpaper (vibrancy blends
+        // tertiary into invisibility on Pastel/green/doodle backgrounds).
+        meta.textColor = .secondaryLabelColor
         meta.lineBreakMode = .byTruncatingTail
         meta.maximumNumberOfLines = 1
         meta.cell?.usesSingleLineMode = true
@@ -352,17 +371,21 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         bar.setAccessibilityLabel(L10n.text("Context usage", "Bağlam kullanımı"))
 
         let used = a.activeSession
+        // Prefix with "Context / Bağlam" so the hero pct + bar are obviously
+        // about context usage. Prior UI showed only "621.1k / 200k" with no
+        // label, leaving users confused about what 27% measured.
+        let ctxLabel = L10n.text("Context", "Bağlam")
         let detailText: String
         if let w = a.ctxWindow {
-            detailText = "\(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
+            detailText = "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
         } else if used > 0 {
-            detailText = "\(ContextSnapshot.formatTokens(used)) " + L10n.text("session", "oturum")
+            detailText = "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) " + L10n.text("session", "oturum")
         } else {
-            detailText = L10n.text("context unknown", "bağlam bilinmiyor")
+            detailText = L10n.text("Context unknown", "Bağlam bilinmiyor")
         }
         let detail = NSTextField(labelWithString: detailText)
         detail.font = Typography.bodyMono(11, weight: .regular)
-        detail.textColor = .tertiaryLabelColor
+        detail.textColor = .secondaryLabelColor
 
         stack.addArrangedSubview(bar)
         stack.addArrangedSubview(detail)
@@ -837,11 +860,15 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         container.addSubview(themeBtn)
         container.addSubview(rightStack)
 
+        // Inner padding so the leftmost (Theme) and rightmost (Quit) glyphs
+        // don't slip behind the popover's rounded bottom corners — at +12 from
+        // the popover edge the "T" of THEME was being clipped by the curve.
+        let edgeGuard: CGFloat = Spacing.xs
         NSLayoutConstraint.activate([
-            themeBtn.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0),
+            themeBtn.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: edgeGuard),
             themeBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             themeBtn.trailingAnchor.constraint(lessThanOrEqualTo: rightStack.leadingAnchor, constant: -Spacing.xs),
-            rightStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: 0),
+            rightStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -edgeGuard),
             rightStack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             container.heightAnchor.constraint(equalToConstant: 40),
         ])
