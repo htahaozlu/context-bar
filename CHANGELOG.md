@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.16] - 2026-05-24
+
+### Fixed
+
+- Popover top/right gaps tightened — hero card no longer floats with an awkward strip of empty space around it.
+- Footer "Theme" label is no longer clipped by the popover's rounded bottom-left corner. The inner edge guard now matches macOS Sequoia's larger corner radius.
+- Hero card gets a touch more top padding so the active project's green dot + title aren't crammed against the card's top edge.
+
 ## [0.3.15] - 2026-05-24
 
 ### Fixed
