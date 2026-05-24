@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.18] - 2026-05-24
+
+### Fixed
+
+- Popover cards now sit with truly equal left and right margins. The previous attempt pinned cards to the stack with `+16` constants, but NSStackView's implicit `.leading`-alignment constraint (`subview.leading == stack.leading + 0`) silently won the race, leaving cards flush against the popover's left edge while keeping the explicit right inset — visible as a small left margin and an oversized right gap. Switched to `.width` alignment with `setHuggingPriority(.required, for: .horizontal)` so the stack's stretch constraint outranks any inner content hugging; all cards now span the same inset rectangle on both sides.
+
 ## [0.3.17] - 2026-05-24
 
 ### Fixed

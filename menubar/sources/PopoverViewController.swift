@@ -46,18 +46,18 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         root.addSubview(visualEffect)
 
         contentStack.orientation = .vertical
-        // `.leading` keeps NSStackView from installing centerX/width
-        // constraints whose priority races with explicit pins. Per-card
-        // leading + trailing are pinned to STACK anchors (not the root view)
-        // in `addCard`, so there is exactly one coordinate system driving
-        // card width. Horizontal edgeInsets stay zero so the explicit pins
-        // own the inset; vertical edgeInsets carry the popover top/bottom
-        // breathing room.
-        contentStack.alignment = .leading
+        // `.width` alignment stretches every arranged subview to the stack's
+        // inset content rectangle. The companion `setHuggingPriority(.required,
+        // for: .horizontal)` lifts the stretch constraint to required so
+        // cards whose inner content hugs strongly (short headers, narrow
+        // rows) can't shrink the card away from the stack edge. Horizontal
+        // padding lives in `edgeInsets`; `addCard` adds no per-card pins.
+        contentStack.alignment = .width
         contentStack.spacing = Spacing.s
+        contentStack.setHuggingPriority(.required, for: .horizontal)
         contentStack.edgeInsets = NSEdgeInsets(
-            top: Spacing.xs, left: 0,
-            bottom: Spacing.xxs, right: 0
+            top: Spacing.xs, left: Spacing.m,
+            bottom: Spacing.xxs, right: Spacing.m
         )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
@@ -157,16 +157,6 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
-        // Pin to STACK anchors (not root view). Previous code pinned to root
-        // — combined with stack.leading == root.leading that produced two
-        // leading constraints with different constants competing on the same
-        // anchor pair, breaking layout non-deterministically. One anchor pair
-        // = one coordinate system.
-        let pad: CGFloat = Spacing.m
-        NSLayoutConstraint.activate([
-            v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
-            v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),
-        ])
     }
 
     // MARK: - Sections
