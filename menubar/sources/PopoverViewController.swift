@@ -49,14 +49,17 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // `.leading` here (instead of `.width`) lets each card use the
         // explicit leading/trailing constraints we add in `addCard`, which
         // inset the cards from the popover edges. `.width` would force every
-        // arranged subview to span the full stack width and visually negate
-        // the gap — that was the "kartların sol kısımları düzgün değil"
-        // report.
+        // arranged subview to span the full stack width.
+        // Zero vertical edgeInsets — NSPopover already provides its own
+        // chrome above/below the contentView, so any extra top/bottom inset
+        // here stacks on top of it and looks like a "garip boşluk".
         contentStack.alignment = .leading
         contentStack.spacing = Spacing.s
+        // Small top/bottom inset so the hero card doesn't kiss the popover's
+        // rounded top edge and the footer breathes off the bottom.
         contentStack.edgeInsets = NSEdgeInsets(
             top: Spacing.xs, left: 0,
-            bottom: Spacing.xs, right: 0
+            bottom: Spacing.xxs, right: 0
         )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
@@ -156,13 +159,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
-        // Explicit leading/trailing to the popover edges with horizontal
-        // padding — keeps cards floating inside the rounded popover instead
-        // of bleeding to its corners. NSStackView's `.width` alignment +
-        // edgeInsets alone don't reliably create the visual margin because
-        // the popover sizes itself to fittingSize (no extra slack to inset
-        // into). The constraints below force the gap.
-        let pad: CGFloat = Spacing.s
+        // Small horizontal pad so cards clear the popover's rounded corner
+        // curve without bleeding into it, but tight enough to avoid the
+        // "garip boşluk" effect at sides. NSPopover handles vertical chrome
+        // itself — we only inset horizontally here.
+        let pad: CGFloat = Spacing.xs
         NSLayoutConstraint.activate([
             v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: pad),
             v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -pad),
@@ -184,8 +185,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         stack.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(stack)
         let pad: CGFloat = hero ? Spacing.m : Spacing.s
+        // Hero gets extra top breathing — the green dot + project title felt
+        // crammed against the top edge at the symmetric Spacing.m.
+        let topPad: CGFloat = hero ? Spacing.l : pad
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: pad),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: topPad),
             stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: pad),
             stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -pad),
             stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -pad),
@@ -860,10 +864,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         container.addSubview(themeBtn)
         container.addSubview(rightStack)
 
-        // Inner padding so the leftmost (Theme) and rightmost (Quit) glyphs
-        // don't slip behind the popover's rounded bottom corners — at +12 from
-        // the popover edge the "T" of THEME was being clipped by the curve.
-        let edgeGuard: CGFloat = Spacing.xs
+        // Inner padding so the leftmost (THEME) and rightmost (Quit) glyphs
+        // clear the popover's rounded bottom corners. macOS popover corner
+        // radius runs up to ~22pt on Sequoia, so we use a generous guard —
+        // smaller values keep clipping the "T" of THEME at the corner curve.
+        let edgeGuard: CGFloat = Spacing.m
         NSLayoutConstraint.activate([
             themeBtn.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: edgeGuard),
             themeBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
