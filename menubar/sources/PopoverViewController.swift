@@ -46,17 +46,15 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         root.addSubview(visualEffect)
 
         contentStack.orientation = .vertical
-        // `.leading` here (instead of `.width`) lets each card use the
-        // explicit leading/trailing constraints we add in `addCard`, which
-        // inset the cards from the popover edges. `.width` would force every
-        // arranged subview to span the full stack width.
-        // Zero vertical edgeInsets — NSPopover already provides its own
-        // chrome above/below the contentView, so any extra top/bottom inset
-        // here stacks on top of it and looks like a "garip boşluk".
+        // `.leading` keeps NSStackView from installing centerX/width
+        // constraints whose priority races with explicit pins. Per-card
+        // leading + trailing are pinned to STACK anchors (not the root view)
+        // in `addCard`, so there is exactly one coordinate system driving
+        // card width. Horizontal edgeInsets stay zero so the explicit pins
+        // own the inset; vertical edgeInsets carry the popover top/bottom
+        // breathing room.
         contentStack.alignment = .leading
         contentStack.spacing = Spacing.s
-        // Small top/bottom inset so the hero card doesn't kiss the popover's
-        // rounded top edge and the footer breathes off the bottom.
         contentStack.edgeInsets = NSEdgeInsets(
             top: Spacing.xs, left: 0,
             bottom: Spacing.xxs, right: 0
@@ -159,14 +157,15 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
-        // Small horizontal pad so cards clear the popover's rounded corner
-        // curve without bleeding into it, but tight enough to avoid the
-        // "garip boşluk" effect at sides. NSPopover handles vertical chrome
-        // itself — we only inset horizontally here.
-        let pad: CGFloat = Spacing.xs
+        // Pin to STACK anchors (not root view). Previous code pinned to root
+        // — combined with stack.leading == root.leading that produced two
+        // leading constraints with different constants competing on the same
+        // anchor pair, breaking layout non-deterministically. One anchor pair
+        // = one coordinate system.
+        let pad: CGFloat = Spacing.m
         NSLayoutConstraint.activate([
-            v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: pad),
-            v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -pad),
+            v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
+            v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),
         ])
     }
 
