@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.19] - 2026-05-24
+
+### Fixed
+
+- Popover top and side gaps tightened. Cards were sitting 16pt off the popover edge, leaving a visibly empty rim above the hero card and along the right side after upgrade. Insets pulled in to 8pt horizontal (still clears the rounded corner curve) and 4pt vertical so cards hug the popover chrome the way they did before the layout-instability fix landed.
+
 ## [0.3.18] - 2026-05-24
 
 ### Fixed

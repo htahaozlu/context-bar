@@ -55,9 +55,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         contentStack.alignment = .width
         contentStack.spacing = Spacing.s
         contentStack.setHuggingPriority(.required, for: .horizontal)
+        // Tight insets so cards hug the popover edge — wider insets push
+        // every card visibly inward, reading as "boşluk" on top + sides.
+        // Horizontal Spacing.xs (8) clears the popover's rounded corner
+        // curve without leaving an empty rim; vertical Spacing.xxs (4) lets
+        // the hero card breathe just above the popover chrome.
         contentStack.edgeInsets = NSEdgeInsets(
-            top: Spacing.xs, left: Spacing.m,
-            bottom: Spacing.xxs, right: Spacing.m
+            top: Spacing.xxs, left: Spacing.xs,
+            bottom: Spacing.xxs, right: Spacing.xs
         )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
