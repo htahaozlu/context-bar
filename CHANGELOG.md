@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.21] - 2026-05-24
+
+### Changed
+
+- Popover card horizontal padding bumped from 8pt to 12pt so cards no longer feel pinched against the popover wall. Padding stays exactly equal on both sides — the `.notAnAttribute` alignment from v0.3.20 guarantees there is no priority race that can pull a card to one edge.
+
 ## [0.3.20] - 2026-05-24
 
 ### Fixed

@@ -163,8 +163,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         contentStack.addArrangedSubview(v)
         // Single horizontal source of truth — pinned to stack anchors at
         // required priority. Stack's alignment is `.notAnAttribute`, so no
-        // implicit horizontal constraint competes with these.
-        let pad: CGFloat = Spacing.xs
+        // implicit horizontal constraint competes with these. 12pt clears
+        // the popover's rounded corner curve and gives cards a generous,
+        // legible breathing margin without looking pinched.
+        let pad: CGFloat = Spacing.s
         NSLayoutConstraint.activate([
             v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
             v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),
