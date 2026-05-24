@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.22] - 2026-05-24
+
+### Fixed
+
+- Parallel Sessions and Other Tools card headers now left-align with the card content edge, matching agent cards. Captions used to render right-aligned because they had no width pin and inherited their intrinsic content width inside a width-aligned stack — a `sectionCaption` helper now stretches them like every other card header.
+- Hero meta row (brand · model · last turn · duration) no longer truncates spuriously while leaving unused width on the right. Row now uses `.distribution = .fill` with low horizontal hugging/compression on the meta label so the text claims the full row minus the brand icon.
+- Limit-row and parallel-session-row inner stacks switched from `.leading` to `.width` alignment so the header line and progress bar share the same content rectangle as the row meta line — no more sub-stacks drifting to the leading edge.
+
 ## [0.3.21] - 2026-05-24
 
 ### Changed

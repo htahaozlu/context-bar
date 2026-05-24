@@ -346,18 +346,17 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let metaText = metaParts.joined(separator: "  ·  ")
         let meta = NSTextField(labelWithString: metaText)
         meta.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-        // Bumped from tertiary → secondary so the meta line stays readable
-        // when the popover sits over a textured wallpaper (vibrancy blends
-        // tertiary into invisibility on Pastel/green/doodle backgrounds).
         meta.textColor = .secondaryLabelColor
         meta.lineBreakMode = .byTruncatingTail
         meta.maximumNumberOfLines = 1
         meta.cell?.usesSingleLineMode = true
-        meta.toolTip = metaText
+        meta.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        meta.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let metaRow = NSStackView(views: [brandView, meta])
         metaRow.orientation = .horizontal
         metaRow.alignment = .centerY
+        metaRow.distribution = .fill
         metaRow.spacing = Spacing.xs
 
         stack.addArrangedSubview(topRow)
@@ -621,11 +620,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         let stack = NSStackView(views: [header, bar])
         stack.orientation = .vertical
-        stack.alignment = .leading
+        stack.alignment = .width
         stack.spacing = 5
         stack.translatesAutoresizingMaskIntoConstraints = false
-        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        bar.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         bar.heightAnchor.constraint(equalToConstant: 4).isActive = true
         return stack
     }
@@ -681,9 +678,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
 
-        let header = NSTextField(labelWithAttributedString:
-            Typography.captionAttributed(L10n.text("Parallel Sessions", "Paralel oturumlar")))
+        let header = sectionCaption(
+            Typography.captionAttributed(L10n.text("Parallel Sessions", "Paralel oturumlar"))
+        )
         stack.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
         let allOthers = parallelSessions(for: a)
         let cap = 5
@@ -766,11 +765,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         let stack = NSStackView(views: [topRow, bar, meta])
         stack.orientation = .vertical
-        stack.alignment = .leading
+        stack.alignment = .width
         stack.spacing = 3
         stack.translatesAutoresizingMaskIntoConstraints = false
-        topRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        bar.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         bar.heightAnchor.constraint(equalToConstant: 4).isActive = true
         return stack
     }
@@ -809,14 +806,32 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         return parts.joined(separator: "\u{1F}")
     }
 
+    /// Card section caption — left-aligned title with low horizontal hugging
+    /// so it stretches to fill the card content width via `widthAnchor`,
+    /// matching how agent-card headers anchor to the card's leading edge.
+    /// Without this, captions built from short attributed strings (e.g.
+    /// "Parallel Sessions") fall back to their intrinsic content width and
+    /// drift right inside a `.width`-aligned stack.
+    private func sectionCaption(_ text: NSAttributedString) -> NSTextField {
+        let lbl = NSTextField(labelWithAttributedString: text)
+        lbl.alignment = .left
+        lbl.lineBreakMode = .byTruncatingTail
+        lbl.maximumNumberOfLines = 1
+        lbl.cell?.usesSingleLineMode = true
+        lbl.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        lbl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return lbl
+    }
+
     private func buildOthers(tools: [ToolSummary]) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = 4
 
-        let header = NSTextField(labelWithString: L10n.text("Other tools", "Diğer araçlar"))
-        header.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        header.textColor = .secondaryLabelColor
+        let header = sectionCaption(
+            Typography.captionAttributed(L10n.text("Other tools", "Diğer araçlar"))
+        )
         stack.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
         for tool in tools {
             let r = OtherToolRowView(tool: tool)
