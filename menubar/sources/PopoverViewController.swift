@@ -52,17 +52,16 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // cards whose inner content hugs strongly (short headers, narrow
         // rows) can't shrink the card away from the stack edge. Horizontal
         // padding lives in `edgeInsets`; `addCard` adds no per-card pins.
-        contentStack.alignment = .width
         contentStack.spacing = Spacing.s
-        contentStack.setHuggingPriority(.required, for: .horizontal)
-        // Tight insets so cards hug the popover edge — wider insets push
-        // every card visibly inward, reading as "boşluk" on top + sides.
-        // Horizontal Spacing.xs (8) clears the popover's rounded corner
-        // curve without leaving an empty rim; vertical Spacing.xxs (4) lets
-        // the hero card breathe just above the popover chrome.
+        // `.notAnAttribute` tells NSStackView to install NO implicit
+        // horizontal alignment constraint. Every horizontal pin then comes
+        // exclusively from `addCard` — no priority race, no flush-left /
+        // right-gap split. Vertical insets stay on the stack so it still
+        // lays out top-to-bottom with the right top/bottom breathing room.
+        contentStack.alignment = .notAnAttribute
         contentStack.edgeInsets = NSEdgeInsets(
-            top: Spacing.xxs, left: Spacing.xs,
-            bottom: Spacing.xxs, right: Spacing.xs
+            top: Spacing.xxs, left: 0,
+            bottom: Spacing.xxs, right: 0
         )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
@@ -162,6 +161,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
+        // Single horizontal source of truth — pinned to stack anchors at
+        // required priority. Stack's alignment is `.notAnAttribute`, so no
+        // implicit horizontal constraint competes with these.
+        let pad: CGFloat = Spacing.xs
+        NSLayoutConstraint.activate([
+            v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
+            v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),
+        ])
     }
 
     // MARK: - Sections

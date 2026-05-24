@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.20] - 2026-05-24
+
+### Fixed
+
+- Popover cards now sit with truly symmetric left and right margins on the released build, not just in dev. NSStackView's `.width` alignment still installed its own leading + trailing pins whose effective priority outranked the per-card pins; `setHuggingPriority(.required, for: .horizontal)` did not lift them as expected, so cards stayed flush against the popover's left edge while a visible gap opened on the right. Switched the stack's alignment to `.notAnAttribute` so no implicit horizontal constraint is installed; `addCard` is now the single horizontal source of truth.
+
 ## [0.3.19] - 2026-05-24
 
 ### Fixed
