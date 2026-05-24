@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.17] - 2026-05-24
+
+### Fixed
+
+- Popover layout no longer shuffles between launches. Cards used to be pinned to both the root view (explicit constants) and the content stack (implicit `.leading`-alignment constraint), producing two competing leading constraints whose loser AutoLayout picked non-deterministically — manifesting as left-bleed, right-bleed, asymmetric gaps, or a hero card with a huge empty bottom half. Cards now pin exclusively to the content stack's anchors, so card width is single-sourced and the layout is identical across rebuilds, refresh ticks, and theme switches.
+
 ## [0.3.16] - 2026-05-24
 
 ### Fixed
