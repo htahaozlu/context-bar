@@ -22,6 +22,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// this to repaint the menubar title in the theme's colors live, without
     /// persisting the choice until the menu item is actually selected.
     var onPreviewTheme: ((String?) -> Void)?
+    /// Called at the end of every rebuild with the freshly measured content
+    /// size. The host forces `NSPopover.contentSize` from it so the panel
+    /// SHRINKS as well as grows — `preferredContentSize` alone only grows the
+    /// popover; it keeps its tallest frame on shrink, leaving a blank band.
+    var onSized: ((NSSize) -> Void)?
 
     private let visualEffect = NSVisualEffectView()
     private let contentStack = NSStackView()
@@ -81,11 +86,22 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     }
 
     func rebuild() {
+        // One instant for the whole pass — every 30-min-cutoff visibility check
+        // (parallel sessions, other tools) must agree, or a card can flap in/out
+        // mid-rebuild and the measured size won't match what's drawn.
+        let now = Date()
         let snapshot = ContextSnapshot()
         let (active, all, others) = snapshot.load()
         let primary = active ?? all.first
-        let activeOthers = others.filter { isActivelyUsed($0) }
-        let key = snapshotKey(active: active, primary: primary, all: all, others: activeOthers)
+        let activeOthers = others.filter { isActivelyUsed($0, now: now) }
+        // Parallel-session visibility is time-dependent but NOT reflected in the
+        // raw session timestamps the key already hashes, so fold the visible
+        // count in explicitly. Without this, a session aging past the 30-min
+        // cutoff leaves the key byte-identical → the early-bail fires → the
+        // parallel card is never removed and the popover never shrinks.
+        let parallelVisible = primary.map { parallelSessions(for: $0, now: now).count } ?? 0
+        let key = snapshotKey(active: active, primary: primary, all: all,
+                              others: activeOthers, parallelVisible: parallelVisible)
         // Engine returned — stop the manual-refresh spinner whether or not the
         // snapshot key actually changed. If the footer gets rebuilt below the
         // call is a no-op against the new button.
@@ -108,8 +124,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             // Card order: hero (active session) → parallel sessions →
             // per-agent limits (primary first, then any others) → other tools.
             addCard(buildHero(agent: agent, isActive: agent.name == active?.name))
-            if hasParallelSessions(agent: agent) {
-                addCard(buildParallelSessions(agent: agent))
+            if hasParallelSessions(agent: agent, now: now) {
+                addCard(buildParallelSessions(agent: agent, now: now))
             }
             // Primary agent's limits first, then any other agents with data.
             let orderedAgents = [agent] + all.filter { $0.name != agent.name }
@@ -135,11 +151,22 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         view.layoutSubtreeIfNeeded()
         CATransaction.commit()
-        let fit = view.fittingSize
-        preferredContentSize = NSSize(
-            width: Self.contentWidth,
-            height: max(fit.height, 1)
-        )
+        // DON'T use view.fittingSize: once the popover is shown it pins the root
+        // view to fill the popover window, so view.fittingSize reports the
+        // window-IMPOSED height (never shrinking) instead of the natural content
+        // height. Sum the cards directly — each card hugs its content vertically
+        // (addCard sets required hugging) so its own fittingSize is accurate and
+        // immune to the window's imposed size.
+        let subs = contentStack.arrangedSubviews
+        var contentH = contentStack.edgeInsets.top + contentStack.edgeInsets.bottom
+        contentH += contentStack.spacing * CGFloat(max(0, subs.count - 1))
+        for v in subs { contentH += v.fittingSize.height }
+        let target = NSSize(width: Self.contentWidth, height: max(contentH, 1))
+        preferredContentSize = target
+        // Drive the popover frame explicitly so it contracts on shrink, not just
+        // expands on grow (see `onSized`). Host no-ops when the popover isn't
+        // shown — the pre-show rebuild is sized by `show()` from preferredContentSize.
+        onSized?(target)
 
         // First-show fade-in. Subsequent rebuilds skip this so the panel
         // doesn't flicker on data refresh.
@@ -660,8 +687,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// last-turn relative time on the right. Capped at 5 rows; a "+N more"
     /// footer appears if exceeded. Caller is responsible for only invoking
     /// this when `hasParallelSessions(agent:)` returns true.
-    private func parallelSessions(for a: Agent) -> [ActiveSession] {
-        let recentCutoff = Date().addingTimeInterval(-Self.activeToolWindow)
+    private func parallelSessions(for a: Agent, now: Date = Date()) -> [ActiveSession] {
+        let recentCutoff = now.addingTimeInterval(-Self.activeToolWindow)
         let foregroundCwd = a.cwd
         return a.activeSessions.filter { sess in
             guard (sess.lastTurn ?? .distantPast) >= recentCutoff else {
@@ -675,11 +702,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         }
     }
 
-    private func hasParallelSessions(agent a: Agent) -> Bool {
-        !parallelSessions(for: a).isEmpty
+    private func hasParallelSessions(agent a: Agent, now: Date = Date()) -> Bool {
+        !parallelSessions(for: a, now: now).isEmpty
     }
 
-    private func buildParallelSessions(agent a: Agent) -> NSView {
+    private func buildParallelSessions(agent a: Agent, now: Date = Date()) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
 
@@ -689,7 +716,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         stack.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
-        let allOthers = parallelSessions(for: a)
+        let allOthers = parallelSessions(for: a, now: now)
         let cap = 5
         let shown = Array(allOthers.prefix(cap))
         let overflow = max(0, allOthers.count - cap)
@@ -708,9 +735,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         return container
     }
 
-    private func isActivelyUsed(_ tool: ToolSummary) -> Bool {
+    private func isActivelyUsed(_ tool: ToolSummary, now: Date = Date()) -> Bool {
         guard let lastUsed = parseISODate(tool.lastUsed) else { return false }
-        return Date().timeIntervalSince(lastUsed) <= Self.activeToolWindow
+        return now.timeIntervalSince(lastUsed) <= Self.activeToolWindow
     }
 
     private func parseISODate(_ raw: String?) -> Date? {
@@ -780,9 +807,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// Fingerprint of the data the popover actually renders. Two consecutive
     /// refreshes producing the same key skip the rebuild entirely so the
     /// popover doesn't tear down + re-add its cards on every 10s tick.
-    private func snapshotKey(active: Agent?, primary: Agent?, all: [Agent], others: [ToolSummary]) -> String {
+    private func snapshotKey(active: Agent?, primary: Agent?, all: [Agent], others: [ToolSummary], parallelVisible: Int) -> String {
         var parts: [String] = []
         parts.append(active?.name ?? "-")
+        // Time-derived visible count — folds the 30-min parallel-session cutoff
+        // into the key so an aging-out card isn't stranded by the early-bail.
+        parts.append("PV:\(parallelVisible)")
         if let p = primary {
             parts.append(p.name)
             parts.append(p.project)

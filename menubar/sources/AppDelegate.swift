@@ -81,7 +81,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self?.togglePopover(nil)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
                     self?.capturePopover(to: popoverPath)
-                    NSApp.terminate(nil)
+                    let env = ProcessInfo.processInfo.environment
+                    // Shrink regression harness: overwrite the live context file
+                    // with a smaller fixture and drive the production refresh
+                    // path, then re-capture. Proves the popover CONTRACTS (not
+                    // just grows) — the blank-band bug. Gated; no effect in prod.
+                    if let shrinkJSON = env["CONTEXTBAR_POPOVER_SHRINK_JSON"],
+                       let shrinkOut = env["CONTEXTBAR_POPOVER_SHRINK_OUT"],
+                       let data = try? Data(contentsOf: URL(fileURLWithPath: shrinkJSON)) {
+                        let target = ContextSnapshot.resolveSnapshotPath()
+                        try? data.write(to: URL(fileURLWithPath: target))
+                        self?.refresh()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            self?.capturePopover(to: shrinkOut)
+                            NSApp.terminate(nil)
+                        }
+                    } else {
+                        NSApp.terminate(nil)
+                    }
                 }
             }
         }
@@ -417,6 +434,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.delegate = self
         if #available(macOS 14.0, *) {
             popover.hasFullSizeContent = true
+        }
+        // NSPopover grows to a larger preferredContentSize but won't shrink back
+        // while shown — it keeps its tallest frame, leaving a blank band below
+        // the footer when a card disappears on a refresh tick. Assigning
+        // contentSize explicitly forces the window to contract too. No-op before
+        // the popover is shown (the first show() sizes it from preferredContentSize).
+        popoverVC.onSized = { [weak self] size in
+            guard let self, self.popover.isShown else { return }
+            self.popover.contentSize = size
         }
 
         popoverVC.onOpenSettings = { [weak self] in
