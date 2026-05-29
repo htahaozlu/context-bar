@@ -28,6 +28,9 @@ final class CostViewController: PreferencePaneViewController {
     private let sparkHost = NSView()
     private let instancesStack = NSStackView()
     private let footnote = NSTextField(labelWithString: "")
+    /// Generation token so a deferred instances render is dropped if a newer
+    /// reload superseded it (rapid range/provider switches or daemon refreshes).
+    private var instancesGen = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -283,7 +286,18 @@ final class CostViewController: PreferencePaneViewController {
         renderProjection(data)
         renderSavings(data)
         renderTrend(data.dailyPoints)
-        renderInstances(visible)
+        // The per-project instances table is the heavy part (up to ~30 day
+        // cards × several rows × cells, all Auto-Layout). Build it AFTER the
+        // first paint so the Cost tab opens instantly and the table fills a
+        // frame later (staged load). The instancesStack was already cleared
+        // above, so the gap shows nothing rather than stale rows.
+        instancesGen &+= 1
+        let gen = instancesGen
+        let pending = visible
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.instancesGen == gen else { return }
+            self.renderInstances(pending)
+        }
 
         let src = data.pricingSource.map { srcLabel($0) } ?? "—"
         footnote.stringValue = L10n.text(

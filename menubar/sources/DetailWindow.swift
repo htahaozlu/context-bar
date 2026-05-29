@@ -105,6 +105,10 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
            let index = Int(rawIndex) {
             selectTab(index: index)
         }
+        // Let deferred (DispatchQueue.main.async) renders — e.g. the Cost tab's
+        // staged instances table — run before we snapshot, since capture()
+        // doesn't otherwise pump the runloop.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         guard let window, let targetView = window.contentView?.superview ?? window.contentView else { return }
         window.displayIfNeeded()
         targetView.layoutSubtreeIfNeeded()
