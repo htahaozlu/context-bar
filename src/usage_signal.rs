@@ -86,6 +86,20 @@ pub struct AgentUsage {
     pub total_sessions_30d: u64,
     #[serde(default)]
     pub max_session_minutes: f64,
+    // Estimated API-equivalent cost (USD). Subscription users aren't billed
+    // per token — these mirror what the metered API would charge.
+    #[serde(default)]
+    pub cost_5h: f64,
+    #[serde(default)]
+    pub cost_7d: f64,
+    #[serde(default)]
+    pub cost_today: f64,
+    #[serde(default)]
+    pub total_cost_30d: f64,
+    #[serde(default)]
+    pub total_input_30d: u64,
+    #[serde(default)]
+    pub total_output_30d: u64,
     #[serde(default)]
     pub by_day: Vec<TimeBucket>,
     #[serde(default)]
@@ -96,6 +110,8 @@ pub struct AgentUsage {
     pub by_model: Vec<NamedBucket>,
     #[serde(default)]
     pub by_project: Vec<NamedBucket>,
+    #[serde(default)]
+    pub by_day_project: Vec<DailyInstance>,
     #[serde(default)]
     pub recent_sessions: Vec<SessionRecord>,
     #[serde(default)]
@@ -114,6 +130,17 @@ pub struct TimeBucket {
     pub tokens: u64,
     #[serde(default)]
     pub sessions: u64,
+    // Token-category split + estimated USD cost (cost view).
+    #[serde(default)]
+    pub input: u64,
+    #[serde(default)]
+    pub output: u64,
+    #[serde(default)]
+    pub cache_creation: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cost: f64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -124,6 +151,16 @@ pub struct NamedBucket {
     pub tokens: u64,
     #[serde(default)]
     pub sessions: u64,
+    #[serde(default)]
+    pub input: u64,
+    #[serde(default)]
+    pub output: u64,
+    #[serde(default)]
+    pub cache_creation: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cost: f64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -142,6 +179,41 @@ pub struct SessionRecord {
     pub model: String,
     #[serde(default)]
     pub project: String,
+    #[serde(default)]
+    pub input: u64,
+    #[serde(default)]
+    pub output: u64,
+    #[serde(default)]
+    pub cache_creation: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cost: f64,
+}
+
+/// One (day × project) row — the `better-ccusage daily --instances` cross-tab.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct DailyInstance {
+    #[serde(default)]
+    pub date: String,
+    #[serde(default)]
+    pub project: String,
+    #[serde(default)]
+    pub models: Vec<String>,
+    #[serde(default)]
+    pub tokens: u64,
+    #[serde(default)]
+    pub sessions: u64,
+    #[serde(default)]
+    pub input: u64,
+    #[serde(default)]
+    pub output: u64,
+    #[serde(default)]
+    pub cache_creation: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cost: f64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -205,6 +277,12 @@ pub struct UsageSnapshot {
     pub collected_at: Option<String>,
     #[serde(default)]
     pub source: String,
+    /// Where the cost rate table came from: "live", "cache", or "fallback".
+    #[serde(default)]
+    pub pricing_source: Option<String>,
+    /// Always true: costs are API-equivalent estimates, not billed amounts.
+    #[serde(default)]
+    pub pricing_is_estimate: bool,
 }
 
 impl UsageSnapshot {

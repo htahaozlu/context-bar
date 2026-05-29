@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.23] - 2026-05-29
+
+### Added
+
+- **Cost view** — a new "Cost" tab in the menubar app that estimates the API-equivalent dollar cost of Claude and Codex usage, replicating `better-ccusage daily --instances`. Shows estimated cost for today / last 7 days / last 30 days, 30-day input vs. output token totals, and a per-day-per-project breakdown (project, models, input/output tokens, cost) so subscription users can see what their usage would bill on the metered API.
+- Cost estimation in the engine (`usage_signal.py`): each turn is priced by model from the LiteLLM rate table — the same source ccusage uses — fetched live with a 24h on-disk cache (`~/.context-bar/pricing.cache.json`) and a bundled offline fallback. Cost = input·input_rate + output·output_rate + cache_creation·cache_write_rate + cache_read·cache_read_rate, with Anthropic's >200K long-context tier applied per token-category when the model carries one. A precomputed `costUSD` on a transcript turn is honored when present (ccusage "auto" mode). Set `CONTEXTBAR_PRICING_OFFLINE=1` to skip the live fetch.
+- Cost columns surfaced in the standalone `detail.html` export: a new Cost tab with the daily×instances table, plus cost columns on the by-model / by-project / recent-sessions tables and est. cost metrics on the Today cards.
+- Snapshot now carries per-bucket token splits (input / output / cache_creation / cache_read) and estimated cost on `by_day` / `by_week` / `by_month` / `by_model` / `by_project` / `recent_sessions`, plus `by_day_project`, `cost_today` / `cost_5h` / `cost_7d` / `total_cost_30d`, `total_input_30d` / `total_output_30d`, and `pricing_source` / `pricing_is_estimate`.
+
 ## [0.3.22] - 2026-05-24
 
 ### Fixed

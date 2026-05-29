@@ -4,7 +4,7 @@
 //! export. The macOS menubar app uses a native AppKit window; this file exists
 //! as a standalone artifact for direct local viewing or sharing.
 
-use crate::usage_signal::{AccountInfo, AgentUsage, NamedBucket, SessionRecord, TimeBucket, ToolSummary, UsageSnapshot};
+use crate::usage_signal::{AccountInfo, AgentUsage, DailyInstance, NamedBucket, SessionRecord, TimeBucket, ToolSummary, UsageSnapshot};
 
 pub fn render(snap: &UsageSnapshot) -> String {
     let lang = Language::detect();
@@ -21,11 +21,13 @@ pub fn render(snap: &UsageSnapshot) -> String {
     html.push_str(
         &format!(r#"<nav class="tabs"><div class="seg-ctrl">
   <button class="tab-btn active" data-tab="today">{}</button>
+  <button class="tab-btn" data-tab="cost">{}</button>
   <button class="tab-btn" data-tab="history">{}</button>
   <button class="tab-btn" data-tab="sessions">{}</button>
   <button class="tab-btn" data-tab="breakdown">{}</button>
 </div></nav>"#,
             lang.text("Today", "Bugün"),
+            lang.text("Cost", "Maliyet"),
             lang.text("History", "Geçmiş"),
             lang.text("Sessions", "Oturumlar"),
             lang.text("Breakdown", "Kırılım"),
@@ -33,6 +35,7 @@ pub fn render(snap: &UsageSnapshot) -> String {
     );
     html.push_str(r#"<main>"#);
     html.push_str(&panel("today", true, &render_today(snap, lang)));
+    html.push_str(&panel("cost", false, &render_cost(snap, lang)));
     html.push_str(&panel("history", false, &render_history(snap, lang)));
     html.push_str(&panel("sessions", false, &render_sessions(snap, lang)));
     html.push_str(&panel("breakdown", false, &render_breakdown(snap, lang)));
@@ -93,6 +96,90 @@ fn render_today(snap: &UsageSnapshot, lang: Language) -> String {
         out.push_str(&render_other_tools(&snap.others, lang));
     }
     out
+}
+
+fn render_cost(snap: &UsageSnapshot, lang: Language) -> String {
+    let note = format!(
+        r#"<div class="cost-note">{}</div>"#,
+        lang.text(
+            "Estimated API-equivalent cost. You're on a subscription, so these are not billed amounts — they show what the metered API would charge, priced from the LiteLLM rate table (same source as ccusage).",
+            "Tahmini API-eşdeğeri maliyet. Abonelik kullandığınız için bunlar faturalandırılan tutarlar değildir — ölçümlü API'nin ne kadar ücretlendireceğini gösterir; oranlar LiteLLM tablosundan (ccusage ile aynı kaynak) alınır.",
+        ),
+    );
+    format!(
+        r#"<div class="stack">{note}{}{}</div>"#,
+        cost_agent("Claude", &snap.claude, lang),
+        cost_agent("Codex", &snap.codex, lang),
+    )
+}
+
+fn cost_agent(name: &str, usage: &AgentUsage, lang: Language) -> String {
+    let tiles = format!(
+        r#"<div class="metric-grid cost-tiles">{}{}{}{}</div>"#,
+        metric(lang.text("Today", "Bugün"), &format_usd(usage.cost_today)),
+        metric(lang.text("Last 7 days", "Son 7 gün"), &format_usd(usage.cost_7d)),
+        metric(lang.text("Last 30 days", "Son 30 gün"), &format_usd(usage.total_cost_30d)),
+        metric(
+            lang.text("30d in / out", "30g girdi / çıktı"),
+            &format!("{} / {}", format_tokens(usage.total_input_30d), format_tokens(usage.total_output_30d)),
+        ),
+    );
+    format!(
+        r#"<section class="agent-section"><h2>{}</h2>{tiles}{}</section>"#,
+        html_escape(name),
+        daily_instances_table(&usage.by_day_project, lang),
+    )
+}
+
+/// The `better-ccusage daily --instances` cross-tab: one row per (day × project)
+/// with the token-category split and estimated cost shown side by side.
+fn daily_instances_table(items: &[DailyInstance], lang: Language) -> String {
+    let mut rows = String::new();
+    let mut last_date = "";
+    for it in items.iter().take(120) {
+        // Visually group by day: dim the date except on its first row.
+        let date_cell = if it.date == last_date {
+            String::new()
+        } else {
+            html_escape(&it.date)
+        };
+        last_date = &it.date;
+        let models = it
+            .models
+            .iter()
+            .map(|m| html_escape(&short_model(m)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        rows.push_str(&format!(
+            r#"<tr><td class="date">{date_cell}</td><td><strong>{}</strong></td><td class="muted">{}</td><td class="num">{}</td><td class="num">{}</td><td class="num">{}</td><td class="num">{}</td><td class="num">{}</td><td class="num cost">{}</td></tr>"#,
+            html_escape(&it.project),
+            models,
+            format_tokens(it.input),
+            format_tokens(it.output),
+            format_tokens(it.cache_creation),
+            format_tokens(it.cache_read),
+            format_tokens(it.tokens),
+            format_usd(it.cost),
+        ));
+    }
+    if rows.is_empty() {
+        rows = format!(
+            r#"<tr><td colspan="9" class="empty">{}</td></tr>"#,
+            lang.text("no usage in the last 30 days", "son 30 günde kullanım yok")
+        );
+    }
+    format!(
+        r#"<div class="table-card wide" style="margin-top:14px"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div>"#,
+        lang.text("date", "tarih"),
+        lang.text("project", "proje"),
+        lang.text("models", "modeller"),
+        lang.text("input", "girdi"),
+        lang.text("output", "çıktı"),
+        lang.text("cache +", "önbellek +"),
+        lang.text("cache read", "önbellek oku"),
+        lang.text("tokens", "token"),
+        lang.text("cost", "maliyet"),
+    )
 }
 
 fn plan_label(a: &AccountInfo) -> &'static str {
@@ -265,6 +352,14 @@ fn today_agent(name: &str, usage: &AgentUsage, lang: Language) -> String {
         &usage.total_sessions_30d.to_string(),
     ));
     out.push_str(&metric(
+        lang.text("Est. 30d cost", "Tahmini 30g maliyet"),
+        &format_usd(usage.total_cost_30d),
+    ));
+    out.push_str(&metric(
+        lang.text("Est. today cost", "Tahmini bugünkü maliyet"),
+        &format_usd(usage.cost_today),
+    ));
+    out.push_str(&metric(
         lang.text("Last model", "Son model"),
         usage.last_model.as_deref().unwrap_or("-"),
     ));
@@ -416,26 +511,28 @@ fn named_table(title: &str, name_heading: &str, items: &[NamedBucket], lang: Lan
     for it in items.iter().take(12) {
         let pct = it.tokens as f64 / total as f64 * 100.0;
         rows.push_str(&format!(
-            r#"<tr><td>{}</td><td class="num">{}</td><td class="num">{}</td><td class="bar-cell"><div class="hbar" style="width:{:.1}%"></div><span>{:.1}%</span></td></tr>"#,
+            r#"<tr><td>{}</td><td class="num">{}</td><td class="num">{}</td><td class="num cost">{}</td><td class="bar-cell"><div class="hbar" style="width:{:.1}%"></div><span>{:.1}%</span></td></tr>"#,
             html_escape(&it.model),
             it.sessions,
             format_tokens(it.tokens),
+            format_usd(it.cost),
             pct,
             pct
         ));
     }
     if rows.is_empty() {
         rows = format!(
-            r#"<tr><td colspan="4" class="empty">{}</td></tr>"#,
+            r#"<tr><td colspan="5" class="empty">{}</td></tr>"#,
             lang.text("no data", "veri yok")
         );
     }
     format!(
-        r#"<div class="table-card"><h3>{}</h3><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div>"#,
+        r#"<div class="table-card"><h3>{}</h3><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div>"#,
         html_escape(title),
         html_escape(name_heading),
         lang.text("sessions", "oturum"),
         lang.text("tokens", "token"),
+        lang.text("cost", "maliyet"),
         lang.text("share", "pay"),
     )
 }
@@ -444,28 +541,30 @@ fn recent_sessions_table(items: &[SessionRecord], lang: Language) -> String {
     let mut rows = String::new();
     for s in items {
         rows.push_str(&format!(
-            r#"<tr><td>{}</td><td>{}</td><td>{}</td><td>{:.0} min</td><td class="num">{}</td><td><code>{}</code></td></tr>"#,
+            r#"<tr><td>{}</td><td>{}</td><td>{}</td><td>{:.0} min</td><td class="num">{}</td><td class="num cost">{}</td><td><code>{}</code></td></tr>"#,
             html_escape(&format_time(&s.started_at)),
             html_escape(&s.project),
             html_escape(&s.model),
             s.duration_minutes,
             format_tokens(s.tokens),
+            format_usd(s.cost),
             html_escape(&s.id)
         ));
     }
     if rows.is_empty() {
         rows = format!(
-            r#"<tr><td colspan="6" class="empty">{}</td></tr>"#,
+            r#"<tr><td colspan="7" class="empty">{}</td></tr>"#,
             lang.text("no recent sessions", "yakın oturum yok")
         );
     }
     format!(
-        r#"<div class="table-card wide"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div>"#,
+        r#"<div class="table-card wide"><table><thead><tr><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th></tr></thead><tbody>{rows}</tbody></table></div>"#,
         lang.text("started", "başlangıç"),
         lang.text("project", "proje"),
         lang.text("model", "model"),
         lang.text("duration", "süre"),
         lang.text("tokens", "token"),
+        lang.text("cost", "maliyet"),
         lang.text("session id", "oturum id"),
     )
 }
@@ -480,6 +579,62 @@ fn format_tokens(value: u64) -> String {
     } else {
         value.to_string()
     }
+}
+
+/// USD with thousands separators and cents. `<$0.01` for tiny non-zero values.
+fn format_usd(value: f64) -> String {
+    if value <= 0.0 {
+        return "$0.00".to_string();
+    }
+    if value < 0.01 {
+        return "&lt;$0.01".to_string();
+    }
+    let cents = (value * 100.0).round() as u64;
+    let dollars = cents / 100;
+    let frac = cents % 100;
+    format!("${}.{:02}", group_thousands(dollars), frac)
+}
+
+fn group_thousands(mut n: u64) -> String {
+    if n == 0 {
+        return "0".to_string();
+    }
+    let mut parts: Vec<String> = Vec::new();
+    while n > 0 {
+        parts.push(format!("{:03}", n % 1000));
+        n /= 1000;
+    }
+    parts.reverse();
+    // Trim leading zeros on the most-significant group only.
+    parts.join(",").trim_start_matches('0').to_string()
+}
+
+/// Trim an Anthropic/OpenAI model id to a short, readable label for tables.
+fn short_model(id: &str) -> String {
+    let m = id.to_lowercase();
+    let label = if m.contains("opus-4-8") { "Opus 4.8" }
+        else if m.contains("opus-4-7") { "Opus 4.7" }
+        else if m.contains("opus-4-6") { "Opus 4.6" }
+        else if m.contains("opus-4-5") { "Opus 4.5" }
+        else if m.contains("opus-4-1") { "Opus 4.1" }
+        else if m.contains("opus-4") { "Opus 4" }
+        else if m.contains("sonnet-4-6") { "Sonnet 4.6" }
+        else if m.contains("sonnet-4-5") { "Sonnet 4.5" }
+        else if m.contains("sonnet-4") { "Sonnet 4" }
+        else if m.contains("haiku-4-5") { "Haiku 4.5" }
+        else if m.contains("haiku") { "Haiku" }
+        else if m.contains("mythos") { "Mythos" }
+        else if m.contains("gpt-5.5") { "GPT-5.5" }
+        else if m.contains("gpt-5.4") { "GPT-5.4" }
+        else if m.contains("gpt-5.3") { "GPT-5.3" }
+        else if m.contains("gpt-5.2") { "GPT-5.2" }
+        else if m.contains("gpt-5.1") { "GPT-5.1" }
+        else if m.contains("gpt-5") { "GPT-5" }
+        else { return id.to_string(); };
+    let suffix = if m.contains("codex") { " codex" }
+        else if m.contains("[1m]") || m.contains("-1m") { " (1M)" }
+        else { "" };
+    format!("{label}{suffix}")
 }
 
 fn format_pct(value: Option<f64>) -> String {
@@ -724,6 +879,10 @@ code { font-family: "SF Mono", ui-monospace, "Menlo", monospace; font-size: 10.5
 .bar-cell .hbar { height: 5px; background: var(--bar2); border-radius: 3px; opacity: 0.75; }
 .bar-cell span { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); }
 .empty { color: var(--muted); font-size: 11.5px; padding: 10px 8px; }
+.cost-note { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.cost-tiles { margin-bottom: 4px; }
+td.cost { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+td.date { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (max-width: 920px) {
   .today-grid,

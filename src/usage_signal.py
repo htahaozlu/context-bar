@@ -32,6 +32,7 @@ extension sandbox in pure Rust would duplicate logic python3 ships natively.
 import glob
 import json
 import os
+import re
 import select
 import shutil
 import subprocess
@@ -57,6 +58,323 @@ ACTIVE_WINDOW = 30 * 60
 CACHE_TTL_OK = 5 * 60
 CACHE_TTL_ERR = 15
 STATUSLINE_TTL = 12 * 3600
+
+# ── Cost estimation ───────────────────────────────────────────────────────────
+# We surface an *estimated* per-token cost so subscription users can see what
+# their usage would bill on the metered API. Method mirrors ccusage /
+# better-ccusage exactly (the tools this view replicates):
+#   cost = input*input_rate + output*output_rate
+#        + cache_creation*cache_write_rate + cache_read*cache_read_rate
+# applied per turn (so the model that produced each turn is priced correctly),
+# with Anthropic's >200K long-context tier applied per token-category when the
+# model carries an `*_above_200k_tokens` rate (Sonnet 4.5 does; the current 1M
+# models — Opus 4.6/4.7/4.8, Sonnet 4.6 — bill flat, so their tier rates are
+# absent). Rates come from LiteLLM's canonical dataset (same source ccusage
+# uses), fetched live with a 24h disk cache and a bundled offline fallback.
+LITELLM_PRICING_URL = (
+    "https://raw.githubusercontent.com/BerriAI/litellm/main/"
+    "model_prices_and_context_window.json"
+)
+PRICING_TTL = 24 * 3600
+TIER_THRESHOLD = 200_000
+
+# Bundled fallback rates (USD per token), captured from the LiteLLM dataset.
+# Used only when the live fetch fails and no fresh cache exists, so a fully
+# offline machine still reports sensible costs. Keys mirror LiteLLM model keys;
+# the matcher below resolves dated / suffixed transcript model ids onto these.
+# Fields: in=input, out=output, cw=cache write (5m), cr=cache read, and the
+# optional *_200k variants for the >200K tier.
+FALLBACK_PRICING = {
+    # Claude — Opus 4.5+ share the lower flagship tier ($5/$25); 4.1/4.0 are
+    # the legacy high tier ($15/$75).
+    "claude-opus-4-8": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
+    "claude-opus-4-7": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
+    "claude-opus-4-6": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
+    "claude-opus-4-5": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
+    "claude-opus-4-1": {"in": 15e-6, "out": 75e-6, "cw": 18.75e-6, "cr": 1.5e-6},
+    "claude-opus-4": {"in": 15e-6, "out": 75e-6, "cw": 18.75e-6, "cr": 1.5e-6},
+    # Sonnet 4.6 bills flat; Sonnet 4.5 / 4.0 carry the >200K tier.
+    "claude-sonnet-4-6": {"in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6},
+    "claude-sonnet-4-5": {
+        "in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6,
+        "in_200k": 6e-6, "out_200k": 22.5e-6, "cw_200k": 7.5e-6, "cr_200k": 0.6e-6,
+    },
+    "claude-sonnet-4": {
+        "in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6,
+        "in_200k": 6e-6, "out_200k": 22.5e-6, "cw_200k": 7.5e-6, "cr_200k": 0.6e-6,
+    },
+    "claude-3-7-sonnet": {"in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6},
+    "claude-3-5-sonnet": {"in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6},
+    "claude-haiku-4-5": {"in": 1e-6, "out": 5e-6, "cw": 1.25e-6, "cr": 0.1e-6},
+    "claude-3-5-haiku": {"in": 0.8e-6, "out": 4e-6, "cw": 1e-6, "cr": 0.08e-6},
+    # Mythos preview has no published per-token row; price as the current
+    # flagship (Opus 4.8) — an estimate, flagged as such by pricing_is_estimate.
+    "mythos": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
+    # OpenAI / Codex — no cache-write charge (cw absent); cached input billed at
+    # the read rate.
+    "gpt-5": {"in": 1.25e-6, "out": 10e-6, "cr": 0.125e-6},
+    "gpt-5-codex": {"in": 1.25e-6, "out": 10e-6, "cr": 0.125e-6},
+    "gpt-5-pro": {"in": 15e-6, "out": 120e-6},
+    "gpt-5-mini": {"in": 0.25e-6, "out": 2e-6, "cr": 0.025e-6},
+    "gpt-5-nano": {"in": 0.05e-6, "out": 0.4e-6, "cr": 0.005e-6},
+    "gpt-5.1": {"in": 1.25e-6, "out": 10e-6, "cr": 0.125e-6},
+    "gpt-5.1-codex": {"in": 1.25e-6, "out": 10e-6, "cr": 0.125e-6},
+    "gpt-5.1-codex-max": {"in": 1.25e-6, "out": 10e-6, "cr": 0.125e-6},
+    "gpt-5.1-codex-mini": {"in": 0.25e-6, "out": 2e-6, "cr": 0.025e-6},
+    "gpt-5.2": {"in": 1.75e-6, "out": 14e-6, "cr": 0.175e-6},
+    "gpt-5.2-codex": {"in": 1.75e-6, "out": 14e-6, "cr": 0.175e-6},
+    "gpt-5.3-codex": {"in": 1.75e-6, "out": 14e-6, "cr": 0.175e-6},
+    "gpt-5.4": {"in": 2.5e-6, "out": 15e-6, "cr": 0.25e-6},
+    "gpt-5.4-codex": {"in": 2.5e-6, "out": 15e-6, "cr": 0.25e-6},
+    "gpt-5.4-mini": {"in": 0.75e-6, "out": 4.5e-6, "cr": 0.075e-6},
+    "gpt-5.4-nano": {"in": 0.2e-6, "out": 1.25e-6, "cr": 0.02e-6},
+    "gpt-5.4-pro": {"in": 30e-6, "out": 180e-6, "cr": 3e-6},
+    "gpt-5.5": {"in": 5e-6, "out": 30e-6, "cr": 0.5e-6},
+    "gpt-5.5-pro": {"in": 30e-6, "out": 180e-6, "cr": 3e-6},
+    "codex-mini-latest": {"in": 1.5e-6, "out": 6e-6, "cr": 0.375e-6},
+    "o4-mini": {"in": 1.1e-6, "out": 4.4e-6, "cr": 0.275e-6},
+    "o3": {"in": 2e-6, "out": 8e-6, "cr": 0.5e-6},
+    "o3-mini": {"in": 1.1e-6, "out": 4.4e-6, "cr": 0.55e-6},
+}
+
+# Coarse family fallback for model ids that resolve to no exact / dated key.
+# Checked last. Order matters: more specific patterns first.
+FAMILY_FALLBACK = [
+    (re.compile(r"opus-4-(?:5|6|7|8)"), "claude-opus-4-8"),
+    (re.compile(r"opus-4"), "claude-opus-4"),
+    (re.compile(r"mythos"), "mythos"),
+    (re.compile(r"sonnet-4"), "claude-sonnet-4-6"),
+    (re.compile(r"3-7-sonnet"), "claude-3-7-sonnet"),
+    (re.compile(r"3-5-sonnet"), "claude-3-5-sonnet"),
+    (re.compile(r"haiku-4"), "claude-haiku-4-5"),
+    (re.compile(r"3-5-haiku|haiku"), "claude-3-5-haiku"),
+    (re.compile(r"gpt-5\.5-pro"), "gpt-5.5-pro"),
+    (re.compile(r"gpt-5\.5"), "gpt-5.5"),
+    (re.compile(r"gpt-5\.4-codex"), "gpt-5.4-codex"),
+    (re.compile(r"gpt-5\.4"), "gpt-5.4"),
+    (re.compile(r"gpt-5\.3-codex|gpt-5\.2-codex|gpt-5\.2|gpt-5\.3"), "gpt-5.2"),
+    (re.compile(r"gpt-5\.1-codex"), "gpt-5.1-codex"),
+    (re.compile(r"gpt-5\.1"), "gpt-5.1"),
+    (re.compile(r"gpt-5-codex|codex"), "gpt-5-codex"),
+    (re.compile(r"gpt-5"), "gpt-5"),
+    (re.compile(r"o4-mini"), "o4-mini"),
+    (re.compile(r"o3-mini"), "o3-mini"),
+    (re.compile(r"o3"), "o3"),
+]
+
+_DATE_SUFFIX = re.compile(r"-(?:\d{8}|\d{4}-\d{2}-\d{2})(?:-v\d+:\d+)?$")
+_VER_SUFFIX = re.compile(r"-v\d+:\d+$")
+_PRICING_CACHE = None  # memoized (table, source) per process
+
+
+def pricing_cache_path():
+    home = os.environ.get("HOME", "")
+    if not home:
+        return None
+    return os.path.join(home, ".context-bar", "pricing.cache.json")
+
+
+def _normalize_litellm_entry(entry):
+    """Project a LiteLLM model entry onto our short rate dict, dropping nulls."""
+    if not isinstance(entry, dict):
+        return None
+    out = {}
+    mapping = {
+        "in": "input_cost_per_token",
+        "out": "output_cost_per_token",
+        "cw": "cache_creation_input_token_cost",
+        "cr": "cache_read_input_token_cost",
+        "in_200k": "input_cost_per_token_above_200k_tokens",
+        "out_200k": "output_cost_per_token_above_200k_tokens",
+        "cw_200k": "cache_creation_input_token_cost_above_200k_tokens",
+        "cr_200k": "cache_read_input_token_cost_above_200k_tokens",
+    }
+    for short, key in mapping.items():
+        v = entry.get(key)
+        if isinstance(v, (int, float)) and v >= 0:
+            out[short] = float(v)
+    # Need at least an input or output rate to be useful.
+    if "in" in out or "out" in out:
+        return out
+    return None
+
+
+def _pricing_is_relevant(key):
+    k = key.lower()
+    return any(s in k for s in (
+        "claude", "sonnet", "opus", "haiku", "mythos",
+        "gpt-5", "gpt-4", "codex", "o1", "o3", "o4", "gemini",
+        # Other coding-agent backends the app surfaces or users may route to.
+        "glm", "zai", "deepseek", "qwen", "kimi", "moonshot",
+        "minimax", "mistral", "grok", "llama",
+    ))
+
+
+def fetch_litellm_pricing():
+    """Fetch + filter the LiteLLM rate dataset. Returns short-rate table or None."""
+    req = request.Request(
+        LITELLM_PRICING_URL,
+        headers={"User-Agent": "context-bar/usage", "Accept": "application/json"},
+    )
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            if getattr(resp, "status", 200) != 200:
+                return None
+            raw = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    table = {}
+    for key, entry in raw.items():
+        if not _pricing_is_relevant(key):
+            continue
+        norm = _normalize_litellm_entry(entry)
+        if norm:
+            table[key.lower()] = norm
+    return table or None
+
+
+def load_pricing():
+    """(table, source) where source ∈ {live, cache, fallback}. Memoized per run.
+
+    Strategy mirrors ccusage: fresh 24h cache → live LiteLLM fetch (then cache)
+    → stale cache → bundled fallback. The bundled table is merged underneath so
+    a partial live dataset never loses coverage of a known family.
+    """
+    global _PRICING_CACHE
+    if _PRICING_CACHE is not None:
+        return _PRICING_CACHE
+
+    base = dict(FALLBACK_PRICING)
+    path = pricing_cache_path()
+    now = time.time()
+
+    # 1. Fresh on-disk cache.
+    if path and os.path.exists(path):
+        try:
+            age = now - os.path.getmtime(path)
+            if age < PRICING_TTL:
+                with open(path, "r", encoding="utf-8") as fh:
+                    cached = json.load(fh)
+                if isinstance(cached, dict) and cached.get("table"):
+                    base.update(cached["table"])
+                    _PRICING_CACHE = (base, "cache")
+                    return _PRICING_CACHE
+        except Exception:
+            pass
+
+    # 2. Live fetch (and refresh cache) — unless offline mode is forced.
+    offline = os.environ.get("CONTEXTBAR_PRICING_OFFLINE", "").lower() in ("1", "true", "yes")
+    live = None if offline else fetch_litellm_pricing()
+    if live:
+        base.update(live)
+        if path:
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as fh:
+                    json.dump({"timestamp": int(now), "table": live}, fh)
+            except Exception:
+                pass
+        _PRICING_CACHE = (base, "live")
+        return _PRICING_CACHE
+
+    # 3. Stale cache (network down but we fetched successfully before).
+    if path and os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                cached = json.load(fh)
+            if isinstance(cached, dict) and cached.get("table"):
+                base.update(cached["table"])
+                _PRICING_CACHE = (base, "cache")
+                return _PRICING_CACHE
+        except Exception:
+            pass
+
+    # 4. Bundled fallback only.
+    _PRICING_CACHE = (base, "fallback")
+    return _PRICING_CACHE
+
+
+def normalize_model(model):
+    if not model:
+        return ""
+    m = str(model).lower().strip()
+    for prefix in (
+        "anthropic/", "anthropic.", "us.anthropic.", "eu.anthropic.",
+        "apac.anthropic.", "openai/", "openrouter/", "claude-code/",
+        "github_copilot/", "bedrock/", "vertex_ai/",
+    ):
+        if m.startswith(prefix):
+            m = m[len(prefix):]
+    # Drop a 1M-context tag — pricing is identical to the base model.
+    m = m.replace("[1m]", "").replace("-1m-", "-")
+    if m.endswith("-1m"):
+        m = m[:-3]
+    return m
+
+
+def match_pricing(model, table):
+    """Resolve a transcript model id onto a rate dict. None when unpriceable."""
+    norm = normalize_model(model)
+    if not norm:
+        return None
+    if norm in table:
+        return table[norm]
+    # Strip a trailing release date / bedrock version, then retry exact.
+    stripped = _VER_SUFFIX.sub("", _DATE_SUFFIX.sub("", norm))
+    if stripped in table:
+        return table[stripped]
+    # Longest table key that is a prefix of the (stripped) model id — handles
+    # ids more specific than any catalog key, e.g. claude-opus-4-8-<date>.
+    best, best_len = None, 0
+    for key, rate in table.items():
+        if stripped.startswith(key) and len(key) > best_len:
+            best, best_len = rate, len(key)
+    if best is not None:
+        return best
+    # Coarse family fallback.
+    for pattern, key in FAMILY_FALLBACK:
+        if pattern.search(stripped) and key in table:
+            return table[key]
+    return None
+
+
+def _tiered(tokens, base, above):
+    """Anthropic >200K tiering for one token category (ccusage-compatible)."""
+    if not tokens or tokens <= 0 or base is None:
+        return 0.0
+    if above is not None and tokens > TIER_THRESHOLD:
+        return TIER_THRESHOLD * base + (tokens - TIER_THRESHOLD) * above
+    return tokens * base
+
+
+def turn_cost(rate, inp, cache_create, cache_read, outp):
+    """Estimated USD for one turn given its rate dict and token buckets."""
+    if not rate:
+        return 0.0
+    return (
+        _tiered(inp, rate.get("in"), rate.get("in_200k"))
+        + _tiered(outp, rate.get("out"), rate.get("out_200k"))
+        + _tiered(cache_create, rate.get("cw"), rate.get("cw_200k"))
+        + _tiered(cache_read, rate.get("cr"), rate.get("cr_200k"))
+    )
+
+
+def empty_metrics():
+    return {
+        "total": 0, "cache_read": 0, "input": 0, "output": 0,
+        "cache_creation": 0, "cost": 0.0,
+    }
+
+
+def _add_metrics(dst, m):
+    dst["total"] += m["total"]
+    dst["cache_read"] += m["cache_read"]
+    dst["input"] += m["input"]
+    dst["output"] += m["output"]
+    dst["cache_creation"] += m["cache_creation"]
+    dst["cost"] += m["cost"]
 
 
 def parse_iso(value):
@@ -91,11 +409,21 @@ def empty_block():
         # aggregates
         "total_tokens_30d": 0,
         "total_sessions_30d": 0,
+        # Estimated API-equivalent cost (USD). See pricing section: these are
+        # estimates for subscription users, not billed amounts.
+        "cost_5h": 0.0,
+        "cost_7d": 0.0,
+        "cost_today": 0.0,
+        "total_cost_30d": 0.0,
+        "total_input_30d": 0,
+        "total_output_30d": 0,
         "by_day": [],
         "by_week": [],
         "by_month": [],
         "by_model": [],
         "by_project": [],
+        # Per (day × project) rows — the `better-ccusage daily --instances` view.
+        "by_day_project": [],
         "recent_sessions": [],
         "active_sessions": [],
         # When the rolling 5h / 7d usage windows next free up — the timestamp
@@ -563,24 +891,50 @@ def project_name_from_cwd(cwd):
     return os.path.basename(cwd.rstrip("/")) or cwd
 
 
-def bucket_aggregates(per_session, days=365, weeks=52, months=24):
+def _empty_bucket():
+    return {
+        "tokens": 0, "sessions": 0, "cache_read": 0,
+        "input": 0, "output": 0, "cache_creation": 0, "cost": 0.0,
+    }
+
+
+def _accumulate(bucket, s, cache_read):
+    bucket["tokens"] += s["tokens"]
+    bucket["sessions"] += 1
+    bucket["cache_read"] += cache_read
+    bucket["input"] += int(s.get("input", 0) or 0)
+    bucket["output"] += int(s.get("output", 0) or 0)
+    bucket["cache_creation"] += int(s.get("cache_creation", 0) or 0)
+    bucket["cost"] += float(s.get("cost", 0.0) or 0.0)
+
+
+def bucket_aggregates(per_session, days=365, weeks=52, months=24,
+                      instance_days=30, instance_rows=200):
     """Roll a list of session records into time buckets.
 
     Bucketing uses the LOCAL timezone so "most active day" and streaks line up
     with what a human reading their calendar would see. `by_day` is padded
     with zero-token entries for every calendar day inside the history window
     so consumers can compute streaks by walking the array without first
-    filling in missing dates themselves.
+    filling in missing dates themselves. Each bucket also carries the cost +
+    token-category split (input/output/cache_creation/cache_read) used by the
+    cost view; `by_day_project` is the per (day × project) cross-tab that
+    replicates `better-ccusage daily --instances`.
     """
-    by_day = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
-    by_week = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
-    by_month = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
-    by_model = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
-    by_project = defaultdict(lambda: {"tokens": 0, "sessions": 0, "cache_read": 0})
+    by_day = defaultdict(_empty_bucket)
+    by_week = defaultdict(_empty_bucket)
+    by_month = defaultdict(_empty_bucket)
+    by_model = defaultdict(_empty_bucket)
+    by_project = defaultdict(_empty_bucket)
+    by_day_project = {}  # (day, project) -> bucket + models set
 
     total30 = 0
     sessions30 = 0
+    cost30 = 0.0
+    input30 = 0
+    output30 = 0
     cutoff30 = NOW - WIN_30D
+    today_key = datetime.fromtimestamp(NOW).astimezone().strftime("%Y-%m-%d")
 
     for s in per_session:
         ts = s["last_ts"]
@@ -592,50 +946,80 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24):
         iy, iw, _ = dt.isocalendar()
         week = f"{iy}-W{iw:02d}"
         month = dt.strftime("%Y-%m")
-
-        by_day[day]["tokens"] += s["tokens"]
-        by_day[day]["sessions"] += 1
-        by_day[day]["cache_read"] += cache_read
-        by_week[week]["tokens"] += s["tokens"]
-        by_week[week]["sessions"] += 1
-        by_week[week]["cache_read"] += cache_read
-        by_month[month]["tokens"] += s["tokens"]
-        by_month[month]["sessions"] += 1
-        by_month[month]["cache_read"] += cache_read
-
-        if s["model"]:
-            by_model[s["model"]]["tokens"] += s["tokens"]
-            by_model[s["model"]]["sessions"] += 1
-            by_model[s["model"]]["cache_read"] += cache_read
         proj = project_name_from_cwd(s["cwd"])
-        by_project[proj]["tokens"] += s["tokens"]
-        by_project[proj]["sessions"] += 1
-        by_project[proj]["cache_read"] += cache_read
+
+        _accumulate(by_day[day], s, cache_read)
+        _accumulate(by_week[week], s, cache_read)
+        _accumulate(by_month[month], s, cache_read)
+        if s["model"]:
+            _accumulate(by_model[s["model"]], s, cache_read)
+        _accumulate(by_project[proj], s, cache_read)
+
+        # Per-day-per-project cross-tab, scoped to the recent instance window.
+        if NOW - ts <= instance_days * 86400:
+            key = (day, proj)
+            entry = by_day_project.get(key)
+            if entry is None:
+                entry = {"bucket": _empty_bucket(), "models": set()}
+                by_day_project[key] = entry
+            _accumulate(entry["bucket"], s, cache_read)
+            if s["model"]:
+                entry["models"].add(s["model"])
 
         if ts >= cutoff30:
             total30 += s["tokens"]
             sessions30 += 1
+            cost30 += float(s.get("cost", 0.0) or 0.0)
+            input30 += int(s.get("input", 0) or 0)
+            output30 += int(s.get("output", 0) or 0)
 
     today_local = datetime.fromtimestamp(NOW).astimezone().date()
     padded_day = []
     for i in range(days):
         d = today_local - timedelta(days=i)
         key = d.strftime("%Y-%m-%d")
-        rec = by_day.get(key) or {"tokens": 0, "sessions": 0, "cache_read": 0}
+        rec = by_day.get(key) or _empty_bucket()
         padded_day.append({
             "date": key,
             "tokens": rec["tokens"],
             "sessions": rec["sessions"],
-            "cache_read": rec.get("cache_read", 0),
+            "cache_read": rec["cache_read"],
+            "input": rec["input"],
+            "output": rec["output"],
+            "cache_creation": rec["cache_creation"],
+            "cost": round(rec["cost"], 6),
         })
 
     def take(d, key_name, n, sort_key=None):
-        items = [{key_name: k, **v} for k, v in d.items()]
+        items = []
+        for k, v in d.items():
+            v = dict(v)
+            v["cost"] = round(v["cost"], 6)
+            items.append({key_name: k, **v})
         if sort_key:
             items.sort(key=sort_key, reverse=True)
         else:
             items.sort(key=lambda x: x["tokens"], reverse=True)
         return items[:n]
+
+    # Per (day × project) rows: newest day first, within a day by cost desc.
+    instances = []
+    for (day, proj), entry in by_day_project.items():
+        b = entry["bucket"]
+        instances.append({
+            "date": day,
+            "project": proj,
+            "models": sorted(entry["models"]),
+            "tokens": b["tokens"],
+            "sessions": b["sessions"],
+            "input": b["input"],
+            "output": b["output"],
+            "cache_creation": b["cache_creation"],
+            "cache_read": b["cache_read"],
+            "cost": round(b["cost"], 6),
+        })
+    instances.sort(key=lambda r: (r["date"], r["cost"]), reverse=True)
+    instances = instances[:instance_rows]
 
     # Longest single session across the whole scanned history (minutes).
     # Computed here so it isn't capped to recent_sessions (last 20).
@@ -646,15 +1030,22 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24):
         dur = (s["last_ts"] - s["first_ts"]) / 60.0
         if dur > max_session_minutes:
             max_session_minutes = dur
+
+    today_bucket = by_day.get(today_key) or _empty_bucket()
     return {
         "total_tokens_30d": total30,
         "total_sessions_30d": sessions30,
+        "total_cost_30d": round(cost30, 6),
+        "total_input_30d": input30,
+        "total_output_30d": output30,
+        "cost_today": round(today_bucket["cost"], 6),
         "max_session_minutes": round(max_session_minutes, 1),
         "by_day": padded_day,
         "by_week": take(by_week, "week", weeks, sort_key=lambda x: x["week"]),
         "by_month": take(by_month, "month", months, sort_key=lambda x: x["month"]),
         "by_model": take(by_model, "model", 20),
         "by_project": take(by_project, "project", 20),
+        "by_day_project": instances,
     }
 
 
@@ -674,12 +1065,8 @@ def split_logical_sessions(per_session):
         events = sorted(s.get("events") or [], key=lambda e: e[0])
         if not events:
             continue
-        # Events are 3-tuples (ts, total, cache_read). Tolerate legacy 2-tuple
-        # entries by padding cache_read to 0.
-        def _ev(e):
-            if len(e) >= 3:
-                return e[0], e[1], e[2]
-            return e[0], e[1], 0
+        # Events are (ts, metrics) where metrics carries the token-category
+        # split + estimated cost for that turn.
         chunks = []
         cur = [events[0]]
         session_start = events[0][0]
@@ -695,11 +1082,14 @@ def split_logical_sessions(per_session):
         for i, chunk in enumerate(chunks):
             first_ts = chunk[0][0]
             last_ts = chunk[-1][0]
-            tokens = sum(_ev(e)[1] for e in chunk)
-            cache_read = sum(_ev(e)[2] for e in chunk)
+            agg = empty_metrics()
+            for _, m in chunk:
+                _add_metrics(agg, m)
             sessions.append({
-                "tokens": tokens, "cache_read": cache_read, "last_ts": last_ts,
-                "first_ts": first_ts,
+                "tokens": agg["total"], "cache_read": agg["cache_read"],
+                "input": agg["input"], "output": agg["output"],
+                "cache_creation": agg["cache_creation"], "cost": agg["cost"],
+                "last_ts": last_ts, "first_ts": first_ts,
                 "model": s["model"], "cwd": s["cwd"],
             })
             recent.append({
@@ -707,8 +1097,12 @@ def split_logical_sessions(per_session):
                 "started_at": datetime.fromtimestamp(first_ts, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
                 "ended_at": datetime.fromtimestamp(last_ts, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
                 "duration_minutes": round((last_ts - first_ts) / 60.0, 1),
-                "tokens": tokens,
-                "cache_read": cache_read,
+                "tokens": agg["total"],
+                "cache_read": agg["cache_read"],
+                "input": agg["input"],
+                "output": agg["output"],
+                "cache_creation": agg["cache_creation"],
+                "cost": round(agg["cost"], 6),
                 "model": s["model"] or "—",
                 "project": project_name_from_cwd(s["cwd"]),
             })
@@ -720,6 +1114,7 @@ def collect_claude():
     home = os.environ.get("HOME", "")
     if not home:
         return out
+    pricing_table, _ = load_pricing()
     last_ts = 0.0
     per_session = {}  # path -> {first_ts, last_ts, tokens, model, cwd}
     session_5h_oldest = None  # oldest turn ts within last 5h
@@ -792,14 +1187,31 @@ def collect_claude():
                     # /usage doesn't surface it under "Total tokens" (it
                     # multiplies wildly across turns and would not match what
                     # users see in their Anthropic UI). cache_read tracked
-                    # separately so the future cost view can still bill it.
+                    # separately so the cost view can still bill it.
                     total = fresh_in + outp
+                    # Estimated API-equivalent cost for this turn. Honor a
+                    # precomputed costUSD on the row when present (ccusage "auto"
+                    # mode); otherwise price the four token buckets by model.
+                    turn_model = msg.get("model")
+                    precomputed = obj.get("costUSD")
+                    if isinstance(precomputed, (int, float)):
+                        cost = float(precomputed)
+                    else:
+                        cost = turn_cost(
+                            match_pricing(turn_model, pricing_table),
+                            fresh_in, cache_create, cache_read, outp,
+                        )
+                    metrics = {
+                        "total": total, "cache_read": cache_read,
+                        "input": fresh_in, "output": outp,
+                        "cache_creation": cache_create, "cost": cost,
+                    }
                     ts = parse_iso(obj.get("timestamp")) or mtime
                     age = NOW - ts
 
                     sess = per_session.setdefault(path, {
                         "first_ts": ts, "last_ts": 0, "tokens": 0,
-                        "cache_read": 0,
+                        "cache_read": 0, "cost": 0.0,
                         "model": msg.get("model"), "cwd": obj.get("cwd"),
                         "last_input": 0,
                         "max_ctx": 0,
@@ -812,7 +1224,8 @@ def collect_claude():
                         sess["last_input"] = inp
                     sess["tokens"] += total
                     sess["cache_read"] += cache_read
-                    sess["events"].append((ts, total, cache_read))
+                    sess["cost"] += cost
+                    sess["events"].append((ts, metrics))
                     if inp > sess["max_ctx"]:
                         sess["max_ctx"] = inp
                     # Collect betas if recorded anywhere on the JSONL row.
@@ -829,11 +1242,13 @@ def collect_claude():
                     if age <= WIN_WEEK:
                         out["week_7d_tokens"] += total
                         out["cache_read_tokens_7d"] += cache_read
+                        out["cost_7d"] += cost
                         if week_7d_oldest is None or ts < week_7d_oldest:
                             week_7d_oldest = ts
                     if age <= WIN_SESSION:
                         out["session_5h_tokens"] += total
                         out["cache_read_tokens_5h"] += cache_read
+                        out["cost_5h"] += cost
                         if session_5h_oldest is None or ts < session_5h_oldest:
                             session_5h_oldest = ts
                     if age <= WIN_30D:
@@ -941,6 +1356,8 @@ def collect_claude():
     if week_7d_oldest is not None:
         ts = week_7d_oldest + WIN_WEEK
         out["week_7d_resets_at"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    out["cost_5h"] = round(out["cost_5h"], 6)
+    out["cost_7d"] = round(out["cost_7d"], 6)
     out = apply_claude_statusline_snapshot(out)
     return apply_claude_usage_api(out)
 
@@ -950,6 +1367,7 @@ def collect_codex():
     home = os.environ.get("HOME", "")
     if not home:
         return out
+    pricing_table, _ = load_pricing()
     last_ts = 0.0
     per_session = {}
     session_5h_oldest = None
@@ -1008,14 +1426,26 @@ def collect_codex():
                     # avoid counting the same cached prefix every turn.
                     fresh_in = max(0, inp_raw - cached)
                     inp = inp_raw  # context-window view (full prompt)
-                    total = fresh_in + outp + reasoning  # consumed view
+                    billed_out = outp + reasoning  # reasoning bills as output
+                    total = fresh_in + billed_out  # consumed view
+                    # OpenAI has no cache-write charge; cached input bills at the
+                    # read rate, reasoning at the output rate.
+                    cost = turn_cost(
+                        match_pricing(current_model, pricing_table),
+                        fresh_in, 0, cached, billed_out,
+                    )
+                    metrics = {
+                        "total": total, "cache_read": cached,
+                        "input": fresh_in, "output": billed_out,
+                        "cache_creation": 0, "cost": cost,
+                    }
                     window = info.get("model_context_window")
                     ts = parse_iso(obj.get("timestamp")) or mtime
                     age = NOW - ts
 
                     sess = per_session.setdefault(path, {
                         "first_ts": ts, "last_ts": 0, "tokens": 0,
-                        "cache_read": 0,
+                        "cache_read": 0, "cost": 0.0,
                         "model": current_model, "cwd": current_cwd,
                         "last_input": 0, "last_window": window,
                         "events": [],
@@ -1028,7 +1458,8 @@ def collect_codex():
                             sess["last_window"] = window
                     sess["tokens"] += total
                     sess["cache_read"] += cached
-                    sess["events"].append((ts, total, cached))
+                    sess["cost"] += cost
+                    sess["events"].append((ts, metrics))
                     if current_model:
                         sess["model"] = current_model
                     if current_cwd:
@@ -1037,11 +1468,13 @@ def collect_codex():
                     if age <= WIN_WEEK:
                         out["week_7d_tokens"] += total
                         out["cache_read_tokens_7d"] += cached
+                        out["cost_7d"] += cost
                         if week_7d_oldest is None or ts < week_7d_oldest:
                             week_7d_oldest = ts
                     if age <= WIN_SESSION:
                         out["session_5h_tokens"] += total
                         out["cache_read_tokens_5h"] += cached
+                        out["cost_5h"] += cost
                         if session_5h_oldest is None or ts < session_5h_oldest:
                             session_5h_oldest = ts
                     if age <= WIN_30D:
@@ -1080,6 +1513,8 @@ def collect_codex():
     if week_7d_oldest is not None:
         ts = week_7d_oldest + WIN_WEEK
         out["week_7d_resets_at"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    out["cost_5h"] = round(out["cost_5h"], 6)
+    out["cost_7d"] = round(out["cost_7d"], 6)
     out = apply_codex_rate_limits(out, latest_rate_limits)
     out = apply_codex_rate_limits(out, fetch_codex_rate_limits_app_server())
     return out
@@ -1317,12 +1752,17 @@ def collect_others():
 
 
 def main():
+    _, pricing_source = load_pricing()
     snap = {
         "claude": collect_claude(),
         "codex": collect_codex(),
         "others": collect_others(),
         "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": "python3",
+        # Cost numbers are estimates (subscription users aren't billed per
+        # token); pricing_source records where the rate table came from.
+        "pricing_source": pricing_source,
+        "pricing_is_estimate": True,
     }
     sys.stdout.write(json.dumps(snap))
 

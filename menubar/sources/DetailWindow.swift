@@ -5,6 +5,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
     private let tabVC = NSTabViewController()
     let usageVC = UsageViewController()
     let statsVC = StatsViewController()
+    let costVC = CostViewController()
     private let appearanceVC = AppearanceSettingsViewController()
     private let menubarVC = MenubarSettingsViewController()
     private let displayVC = DisplaySettingsViewController()
@@ -24,6 +25,10 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         let statsItem = NSTabViewItem(viewController: statsVC)
         statsItem.label = L10n.text("Stats", "İstatistik")
         statsItem.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis", accessibilityDescription: statsItem.label)
+
+        let costItem = NSTabViewItem(viewController: costVC)
+        costItem.label = L10n.text("Cost", "Maliyet")
+        costItem.image = NSImage(systemSymbolName: "dollarsign.circle", accessibilityDescription: costItem.label)
 
         let appearanceItem = NSTabViewItem(viewController: appearanceVC)
         appearanceItem.label = L10n.text("Appearance", "Görünüm")
@@ -49,7 +54,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         aboutItem.label = L10n.text("About", "Hakkında")
         aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
 
-        [usageItem, statsItem, appearanceItem, menubarItem, displayItem, notificationsItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
+        [usageItem, statsItem, costItem, appearanceItem, menubarItem, displayItem, notificationsItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
@@ -96,6 +101,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
     func load() {
         usageVC.reload()
         statsVC.reload()
+        costVC.reload()
     }
 
     func selectTab(index: Int) {
