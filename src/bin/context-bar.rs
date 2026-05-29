@@ -228,7 +228,7 @@ fn run_report(spec: ReportSpec, args: &[String]) -> i32 {
     }
 
     let snapshot = usage_signal::collect_native();
-    if snapshot.source != "python3" {
+    if !matches!(snapshot.source.as_str(), "python3" | "rust") {
         eprintln!("context-bar: usage unavailable: {}", snapshot.source);
     }
 
@@ -396,7 +396,7 @@ fn refresh_global() -> Result<PathBuf, String> {
     out.push_str("|---|---:|---:|---:|---|---|\n");
     out.push_str(&format_usage_row("Claude", &usage.claude));
     out.push_str(&format_usage_row("Codex", &usage.codex));
-    if usage.source != "python3" {
+    if !matches!(usage.source.as_str(), "python3" | "rust") {
         out.push_str(&format!("\n> Usage unavailable: {}\n", usage.source));
     }
 

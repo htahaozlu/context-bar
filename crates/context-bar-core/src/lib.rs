@@ -30,6 +30,9 @@ pub mod collect;
 // Native-only other-AI-tool probes (~/.gemini, ~/.aider, ~/.zsh_history).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod others;
+// Native-only online/host enrichments (statusline, usage API, rate limits).
+#[cfg(not(target_arch = "wasm32"))]
+pub mod online;
 pub mod context_engine;
 pub mod detail_html;
 pub mod git_signal;

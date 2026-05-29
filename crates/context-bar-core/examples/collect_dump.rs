@@ -17,8 +17,10 @@ fn main() {
                 .as_secs_f64()
         });
 
-    let claude = context_bar_core::collect::collect_claude(&home, now);
-    let codex = context_bar_core::collect::collect_codex(&home, now);
+    // Offline env (set by the differential harness) makes this the fallback table.
+    let (table, _src) = context_bar_core::pricing::load_pricing();
+    let claude = context_bar_core::collect::collect_claude(&home, now, &table);
+    let codex = context_bar_core::collect::collect_codex(&home, now, &table);
     let others = context_bar_core::others::collect_others(&home, now);
     let out = serde_json::json!({ "claude": claude, "codex": codex, "others": others });
     println!("{}", serde_json::to_string(&out).unwrap());

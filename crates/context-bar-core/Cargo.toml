@@ -18,6 +18,8 @@ time = { version = "0.3", features = ["formatting", "macros", "parsing", "local-
 # Native hosts (CLI, menubar engine): real serde_json + filesystem/process access.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 serde_json = "1.0"
+# Live pricing fetch (LiteLLM) + Anthropic usage API. Blocking, rustls TLS.
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 
 # Wasm host (Zed extension): zed_extension_api re-exports serde_json and provides
 # the Worktree-backed collectors. Keeps the engine usable from the extension

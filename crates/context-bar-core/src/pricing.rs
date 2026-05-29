@@ -17,15 +17,25 @@ pub const TIER_THRESHOLD: u64 = 200_000;
 /// One model's per-token rates. `None` = the category isn't billed / has no
 /// tier (e.g. OpenAI models have no cache-write `cw`; flat models have no
 /// `*_200k`). Mirrors the Python short-rate dict keys exactly.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Rate {
+    // Short keys match the Python short-rate dict + the on-disk pricing cache,
+    // so the Rust engine reads/writes the same `pricing.cache.json`.
+    #[serde(rename = "in", default, skip_serializing_if = "Option::is_none")]
     pub input: Option<f64>,
+    #[serde(rename = "out", default, skip_serializing_if = "Option::is_none")]
     pub output: Option<f64>,
+    #[serde(rename = "cw", default, skip_serializing_if = "Option::is_none")]
     pub cache_write: Option<f64>,
+    #[serde(rename = "cr", default, skip_serializing_if = "Option::is_none")]
     pub cache_read: Option<f64>,
+    #[serde(rename = "in_200k", default, skip_serializing_if = "Option::is_none")]
     pub input_200k: Option<f64>,
+    #[serde(rename = "out_200k", default, skip_serializing_if = "Option::is_none")]
     pub output_200k: Option<f64>,
+    #[serde(rename = "cw_200k", default, skip_serializing_if = "Option::is_none")]
     pub cache_write_200k: Option<f64>,
+    #[serde(rename = "cr_200k", default, skip_serializing_if = "Option::is_none")]
     pub cache_read_200k: Option<f64>,
 }
 
@@ -170,12 +180,15 @@ static FAMILY_FALLBACK: &[(&[&str], &str)] = &[
     (&["o3"], "o3"),
 ];
 
-/// Look up a key in the fallback table (exact).
-fn table_get(key: &str) -> Option<Rate> {
-    FALLBACK_PRICING
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, r)| *r)
+/// A resolved rate table (the bundled fallback merged with any live/cached
+/// LiteLLM rates). Keyed by normalized model id.
+pub type Table = std::collections::HashMap<String, Rate>;
+
+/// The bundled offline table as a [`Table`] — the deterministic baseline that
+/// `CONTEXTBAR_PRICING_OFFLINE=1` selects in the Python, and what the golden
+/// tests pin against.
+pub fn fallback_table() -> Table {
+    FALLBACK_PRICING.iter().map(|(k, r)| (k.to_string(), *r)).collect()
 }
 
 /// Normalize a transcript model id: lowercase, strip provider prefixes, drop
@@ -268,26 +281,27 @@ fn strip_ver_suffix(s: &str) -> &str {
     }
 }
 
-/// Resolve a transcript model id onto a rate. `None` when unpriceable
-/// (cost 0 — an honest undercount, never a crash). Mirrors `match_pricing`.
-pub fn match_pricing(model: &str) -> Option<Rate> {
+/// Resolve a transcript model id onto a rate using `table`. `None` when
+/// unpriceable (cost 0 — an honest undercount, never a crash). Mirrors
+/// `match_pricing(model, table)`.
+pub fn match_pricing(model: &str, table: &Table) -> Option<Rate> {
     let norm = normalize_model(model);
     if norm.is_empty() {
         return None;
     }
-    if let Some(r) = table_get(&norm) {
-        return Some(r);
+    if let Some(r) = table.get(&norm) {
+        return Some(*r);
     }
     // Strip trailing release date / bedrock version, then retry exact.
     let stripped = strip_ver_suffix(strip_date_suffix(&norm)).to_string();
-    if let Some(r) = table_get(&stripped) {
-        return Some(r);
+    if let Some(r) = table.get(&stripped) {
+        return Some(*r);
     }
     // Longest table key that is a prefix of the stripped id.
     let mut best: Option<Rate> = None;
     let mut best_len = 0usize;
-    for (key, rate) in FALLBACK_PRICING {
-        if stripped.starts_with(key) && key.len() > best_len {
+    for (key, rate) in table {
+        if stripped.starts_with(key.as_str()) && key.len() > best_len {
             best = Some(*rate);
             best_len = key.len();
         }
@@ -298,8 +312,8 @@ pub fn match_pricing(model: &str) -> Option<Rate> {
     // Coarse family fallback.
     for (needles, key) in FAMILY_FALLBACK {
         if needles.iter().any(|n| stripped.contains(n)) {
-            if let Some(r) = table_get(key) {
-                return Some(r);
+            if let Some(r) = table.get(*key) {
+                return Some(*r);
             }
         }
     }
@@ -355,9 +369,181 @@ pub fn turn_cache_savings(rate: Option<&Rate>, cache_create: u64, cache_read: u6
     no_cache - actual
 }
 
+/// Live + cached pricing resolution (native only — needs HTTP + filesystem).
+/// Mirrors the Python `load_pricing`: fresh 24h cache → live LiteLLM fetch
+/// (then cache) → stale cache → bundled fallback. `CONTEXTBAR_PRICING_OFFLINE`
+/// forces the offline (fallback) path.
+#[cfg(not(target_arch = "wasm32"))]
+pub use live::load_pricing;
+
+#[cfg(not(target_arch = "wasm32"))]
+mod live {
+    use super::{fallback_table, Rate, Table};
+    use std::sync::OnceLock;
+
+    const LITELLM_URL: &str = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
+    const PRICING_TTL: u64 = 24 * 3600;
+    static MEMO: OnceLock<(Table, String)> = OnceLock::new();
+
+    fn cache_path() -> Option<std::path::PathBuf> {
+        let home = std::env::var("HOME").ok()?;
+        Some(std::path::PathBuf::from(home).join(".context-bar").join("pricing.cache.json"))
+    }
+
+    fn relevant(key: &str) -> bool {
+        let k = key.to_ascii_lowercase();
+        [
+            "claude", "sonnet", "opus", "haiku", "mythos", "gpt-5", "gpt-4", "codex", "o1", "o3",
+            "o4", "gemini", "glm", "zai", "deepseek", "qwen", "kimi", "moonshot", "minimax",
+            "mistral", "grok", "llama",
+        ]
+        .iter()
+        .any(|s| k.contains(s))
+    }
+
+    /// Project a LiteLLM entry onto a short [`Rate`], dropping nulls/negatives.
+    fn normalize_entry(entry: &serde_json::Value) -> Option<Rate> {
+        let obj = entry.as_object()?;
+        let get = |k: &str| -> Option<f64> {
+            obj.get(k)
+                .and_then(|v| v.as_f64())
+                .filter(|v| *v >= 0.0)
+        };
+        let rate = Rate {
+            input: get("input_cost_per_token"),
+            output: get("output_cost_per_token"),
+            cache_write: get("cache_creation_input_token_cost"),
+            cache_read: get("cache_read_input_token_cost"),
+            input_200k: get("input_cost_per_token_above_200k_tokens"),
+            output_200k: get("output_cost_per_token_above_200k_tokens"),
+            cache_write_200k: get("cache_creation_input_token_cost_above_200k_tokens"),
+            cache_read_200k: get("cache_read_input_token_cost_above_200k_tokens"),
+        };
+        // Need at least an input or output rate to be useful.
+        if rate.input.is_some() || rate.output.is_some() {
+            Some(rate)
+        } else {
+            None
+        }
+    }
+
+    fn parse_live(raw: &serde_json::Value) -> Option<std::collections::HashMap<String, Rate>> {
+        let obj = raw.as_object()?;
+        let mut table = std::collections::HashMap::new();
+        for (key, entry) in obj {
+            if !relevant(key) {
+                continue;
+            }
+            if let Some(rate) = normalize_entry(entry) {
+                table.insert(key.to_ascii_lowercase(), rate);
+            }
+        }
+        if table.is_empty() { None } else { Some(table) }
+    }
+
+    fn fetch_live() -> Option<std::collections::HashMap<String, Rate>> {
+        let resp = ureq::get(LITELLM_URL)
+            .set("User-Agent", "context-bar/usage")
+            .set("Accept", "application/json")
+            .timeout(std::time::Duration::from_secs(15))
+            .call()
+            .ok()?;
+        let raw: serde_json::Value = resp.into_json().ok()?;
+        parse_live(&raw)
+    }
+
+    fn now_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    }
+
+    fn read_cache_table(path: &std::path::Path) -> Option<std::collections::HashMap<String, Rate>> {
+        let bytes = std::fs::read(path).ok()?;
+        let v: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        let tbl = v.get("table")?.as_object()?;
+        let mut out = std::collections::HashMap::new();
+        for (k, rv) in tbl {
+            if let Ok(rate) = serde_json::from_value::<Rate>(rv.clone()) {
+                out.insert(k.clone(), rate);
+            }
+        }
+        Some(out)
+    }
+
+    fn cache_age(path: &std::path::Path) -> Option<u64> {
+        let m = std::fs::metadata(path).ok()?.modified().ok()?;
+        Some(now_secs().saturating_sub(m.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs()))
+    }
+
+    fn write_cache(path: &std::path::Path, live: &std::collections::HashMap<String, Rate>) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let doc = serde_json::json!({ "timestamp": now_secs(), "table": live });
+        if let Ok(bytes) = serde_json::to_vec(&doc) {
+            let _ = std::fs::write(path, bytes);
+        }
+    }
+
+    pub fn load_pricing() -> (Table, String) {
+        if let Some(v) = MEMO.get() {
+            return v.clone();
+        }
+        let resolved = resolve();
+        let _ = MEMO.set(resolved.clone());
+        resolved
+    }
+
+    fn resolve() -> (Table, String) {
+        let mut base = fallback_table();
+        let path = cache_path();
+
+        // 1. Fresh on-disk cache.
+        if let Some(p) = &path {
+            if cache_age(p).is_some_and(|age| age < PRICING_TTL) {
+                if let Some(tbl) = read_cache_table(p) {
+                    base.extend(tbl);
+                    return (base, "cache".to_string());
+                }
+            }
+        }
+
+        // 2. Live fetch (unless offline forced).
+        let offline = std::env::var("CONTEXTBAR_PRICING_OFFLINE")
+            .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .unwrap_or(false);
+        if !offline {
+            if let Some(live) = fetch_live() {
+                base.extend(live.clone());
+                if let Some(p) = &path {
+                    write_cache(p, &live);
+                }
+                return (base, "live".to_string());
+            }
+        }
+
+        // 3. Stale cache.
+        if let Some(p) = &path {
+            if let Some(tbl) = read_cache_table(p) {
+                base.extend(tbl);
+                return (base, "cache".to_string());
+            }
+        }
+
+        // 4. Bundled fallback only.
+        (base, "fallback".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn t() -> Table {
+        fallback_table()
+    }
 
     #[test]
     fn normalize_strips_prefixes_and_1m_tag() {
@@ -383,21 +569,21 @@ mod tests {
 
     #[test]
     fn match_exact_dated_and_family() {
-        assert!(match_pricing("claude-opus-4-8").is_some());
+        assert!(match_pricing("claude-opus-4-8", &t()).is_some());
         // dated variant resolves to the base.
-        assert_eq!(match_pricing("claude-opus-4-8-20260514"), match_pricing("claude-opus-4-8"));
+        assert_eq!(match_pricing("claude-opus-4-8-20260514", &t()), match_pricing("claude-opus-4-8", &t()));
         // 1M tag.
-        assert_eq!(match_pricing("claude-opus-4-8[1m]"), match_pricing("claude-opus-4-8"));
+        assert_eq!(match_pricing("claude-opus-4-8[1m]", &t()), match_pricing("claude-opus-4-8", &t()));
         // family fallback: unknown opus-4-7-ish id -> new flagship tier.
-        assert_eq!(match_pricing("some-opus-4-7-preview"), match_pricing("claude-opus-4-8"));
+        assert_eq!(match_pricing("some-opus-4-7-preview", &t()), match_pricing("claude-opus-4-8", &t()));
         // unknown -> None.
-        assert_eq!(match_pricing("totally-unknown-model"), None);
+        assert_eq!(match_pricing("totally-unknown-model", &t()), None);
     }
 
     #[test]
     fn turn_cost_matches_hand_computed() {
         // opus-4-8: in 5e-6, out 25e-6, cw 6.25e-6, cr 0.5e-6.
-        let rate = match_pricing("claude-opus-4-8");
+        let rate = match_pricing("claude-opus-4-8", &t());
         let c = turn_cost(rate.as_ref(), 1000, 2000, 3000, 4000);
         // 1000*5e-6 + 4000*25e-6 + 2000*6.25e-6 + 3000*0.5e-6
         let expect = 1000.0 * 5e-6 + 4000.0 * 25e-6 + 2000.0 * 6.25e-6 + 3000.0 * 0.5e-6;
@@ -407,13 +593,13 @@ mod tests {
     #[test]
     fn tiering_only_applies_above_threshold_when_rate_present() {
         // sonnet-4-5 has a >200K input tier (6e-6 above).
-        let rate = match_pricing("claude-sonnet-4-5").unwrap();
+        let rate = match_pricing("claude-sonnet-4-5", &t()).unwrap();
         let n = TIER_THRESHOLD + 100;
         let c = tiered(n, rate.input, rate.input_200k);
         let expect = TIER_THRESHOLD as f64 * 3e-6 + 100.0 * 6e-6;
         assert!((c - expect).abs() < 1e-12);
         // opus-4-8 has no tier: linear even above threshold.
-        let r2 = match_pricing("claude-opus-4-8").unwrap();
+        let r2 = match_pricing("claude-opus-4-8", &t()).unwrap();
         assert!((tiered(n, r2.input, r2.input_200k) - n as f64 * 5e-6).abs() < 1e-12);
     }
 }

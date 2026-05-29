@@ -340,64 +340,38 @@ pub fn collect(worktree: &zed::Worktree) -> UsageSnapshot {
     }
 }
 
-/// The aggregator script, baked into the binary. The native engine prefers a
-/// real on-disk copy (app bundle Resources, exe sibling, dev source tree) but
-/// falls back to materializing this so a `cargo install`ed binary — which has
-/// no sidecar .py — is self-contained (still needs `python3` on PATH).
+/// Pure-Rust native snapshot — the engine, no `python3`. Reads `~/.claude` +
+/// `~/.codex` transcripts directly, prices with the live/cached LiteLLM table,
+/// applies the statusline + usage-API + Codex rate-limit overlays, and probes
+/// other AI tools. `accounts` is filled in by [`collect_native`].
 #[cfg(not(target_arch = "wasm32"))]
-const EMBEDDED_USAGE_SCRIPT: &str = include_str!("usage_signal.py");
+fn collect_rust() -> UsageSnapshot {
+    use crate::aggregate::iso_utc;
 
-#[cfg(not(target_arch = "wasm32"))]
-fn resolve_usage_script() -> std::path::PathBuf {
-    use std::path::PathBuf;
+    let home = match std::env::var("HOME") {
+        Ok(h) => std::path::PathBuf::from(h),
+        Err(_) => return UsageSnapshot::unavailable("HOME not set"),
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as f64)
+        .unwrap_or(0.0);
 
-    if let Ok(override_path) = std::env::var("CONTEXTBAR_USAGE_SCRIPT") {
-        let p = PathBuf::from(override_path);
-        if p.is_file() {
-            return p;
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let sibling = dir.join("usage_signal.py");
-            if sibling.is_file() {
-                return sibling;
-            }
-            let resources = dir.join("../Resources/usage_signal.py");
-            if resources.is_file() {
-                return resources;
-            }
-        }
-    }
-    // Dev tree: the source lives next to this crate (valid under `cargo run`).
-    let manifest_copy = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/src/usage_signal.py"));
-    if manifest_copy.is_file() {
-        return manifest_copy;
-    }
-    // Installed binary with no sidecar: write the embedded copy once and run it.
-    materialize_embedded_script().unwrap_or(manifest_copy)
-}
+    let (table, pricing_source) = crate::pricing::load_pricing();
+    let claude = crate::collect::collect_claude_enriched(&home, now, &table);
+    let codex = crate::collect::collect_codex_enriched(&home, now, &table);
+    let others = crate::others::collect_others(&home, now);
 
-/// Write [`EMBEDDED_USAGE_SCRIPT`] to `~/.context-bar/usage_signal.py` (only
-/// when missing or stale) and return its path.
-#[cfg(not(target_arch = "wasm32"))]
-fn materialize_embedded_script() -> Option<std::path::PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    let dir = std::path::PathBuf::from(home).join(".context-bar");
-    let path = dir.join("usage_signal.py");
-    let up_to_date = std::fs::metadata(&path)
-        .map(|m| m.len() as usize == EMBEDDED_USAGE_SCRIPT.len())
-        .unwrap_or(false);
-    if up_to_date {
-        return Some(path);
+    UsageSnapshot {
+        claude,
+        codex,
+        others,
+        accounts: Vec::new(),
+        collected_at: Some(iso_utc(now)),
+        source: "rust".to_string(),
+        pricing_source: Some(pricing_source),
+        pricing_is_estimate: true,
     }
-    std::fs::create_dir_all(&dir).ok()?;
-    // Stage to a unique tmp sibling then rename, so a concurrent reader never
-    // sees a half-written script.
-    let tmp = dir.join(format!("usage_signal.py.tmp.{}", std::process::id()));
-    std::fs::write(&tmp, EMBEDDED_USAGE_SCRIPT).ok()?;
-    std::fs::rename(&tmp, &path).ok()?;
-    Some(path)
 }
 
 /// Where we cache the full Python-emitted snapshot. Distinct from
@@ -500,46 +474,22 @@ fn save_snapshot_cache(snapshot: &UsageSnapshot) {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn collect_native() -> UsageSnapshot {
-    use std::process::Command;
-
-    // Fast path: reuse a fresh on-disk snapshot to avoid spawning python3 on
-    // every daemon tick. Python's own internal cache is per-process, so when
-    // we re-spawn it pays full JSONL parse cost every time.
+    // Fast path: reuse a fresh on-disk snapshot to avoid re-scanning every
+    // transcript on each daemon tick. Invalidated at 300s or when any
+    // transcript is newer (see load_snapshot_cache).
     if let Some(mut cached) = load_snapshot_cache() {
         cached.accounts = collect_accounts();
         return cached;
     }
 
-    let script_path = resolve_usage_script();
-
-    let output = match Command::new("python3").arg(&script_path).output() {
-        Ok(out) => out,
-        Err(_) => match Command::new("python").arg(&script_path).output() {
-            Ok(out) => out,
-            Err(error) => {
-                return UsageSnapshot::unavailable(format!("python spawn failed: {error}"));
-            }
-        },
-    };
-
-    if !output.status.success() {
-        return UsageSnapshot::unavailable(format!(
-            "usage_signal.py exited with {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+    let mut snapshot = collect_rust();
+    if snapshot.source == "rust" {
+        // Persist the heavy collection (accounts are cheap + host-specific, so
+        // they're re-read each call below rather than cached).
+        save_snapshot_cache(&snapshot);
     }
-
-    match serde_json::from_slice::<UsageSnapshot>(&output.stdout) {
-        Ok(mut snapshot) => {
-            // Persist the parsed snapshot (without accounts, which are cheap
-            // and host-specific) so the next tick within TTL skips Python.
-            save_snapshot_cache(&snapshot);
-            snapshot.accounts = collect_accounts();
-            snapshot
-        }
-        Err(error) => UsageSnapshot::unavailable(format!("usage parse failed: {error}")),
-    }
+    snapshot.accounts = collect_accounts();
+    snapshot
 }
 
 /// Reads all `~/.claude/auth-*.json` files and returns one `AccountInfo` per file.

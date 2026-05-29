@@ -19,10 +19,10 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use crate::aggregate::{
-    bucket_aggregates, iso_utc, project_name_from_cwd, split_logical_sessions, Buckets, FileEvents,
-    TurnMetrics,
+    bucket_aggregates, iso_utc, parse_iso, project_name_from_cwd, split_logical_sessions, Buckets,
+    FileEvents, TurnMetrics,
 };
-use crate::pricing::{match_pricing, turn_cache_savings, turn_cost};
+use crate::pricing::{match_pricing, turn_cache_savings, turn_cost, Table};
 use crate::usage_signal::{ActiveSession, AgentUsage};
 
 const WIN_SESSION: f64 = 5.0 * 3600.0;
@@ -63,17 +63,6 @@ fn num_u64(v: &Value, key: &str) -> u64 {
 
 fn str_field(v: &Value, key: &str) -> Option<String> {
     v.get(key).and_then(|x| x.as_str()).map(str::to_string)
-}
-
-fn parse_iso(value: Option<&str>) -> Option<f64> {
-    let s = value?;
-    if s.is_empty() {
-        return None;
-    }
-    use time::format_description::well_known::Rfc3339;
-    time::OffsetDateTime::parse(s, &Rfc3339)
-        .ok()
-        .map(|dt| dt.unix_timestamp_nanos() as f64 / 1e9)
 }
 
 fn mtime_secs(path: &Path) -> Option<f64> {
@@ -294,7 +283,7 @@ fn local_offset() -> time::UtcOffset {
 }
 
 /// Port of `collect_claude`. Deterministic transcript path only.
-pub fn collect_claude(home: &Path, now: f64) -> AgentUsage {
+pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
     let mut out = AgentUsage::default();
     let mut per_session: BTreeMap<String, PerFile> = BTreeMap::new();
     let mut last_ts = 0.0f64;
@@ -364,7 +353,7 @@ pub fn collect_claude(home: &Path, now: f64) -> AgentUsage {
             let total = fresh_in + outp;
 
             let turn_model = str_field(msg, "model");
-            let rate = match_pricing(turn_model.as_deref().unwrap_or(""));
+            let rate = match_pricing(turn_model.as_deref().unwrap_or(""), table);
             let cost = match obj.get("costUSD") {
                 Some(Value::Number(n)) => n.as_f64().unwrap_or(0.0),
                 _ => turn_cost(rate.as_ref(), fresh_in, cache_create, cache_read, outp),
@@ -527,12 +516,20 @@ fn truthy(v: &Value) -> bool {
 }
 
 /// Port of `collect_codex`. Deterministic transcript path only.
-pub fn collect_codex(home: &Path, now: f64) -> AgentUsage {
+pub fn collect_codex(home: &Path, now: f64, table: &Table) -> AgentUsage {
+    collect_codex_inner(home, now, table).0
+}
+
+/// Like [`collect_codex`] but also returns the latest transcript-reported
+/// `rate_limits` object (for the enriched path to overlay account %).
+fn collect_codex_inner(home: &Path, now: f64, table: &Table) -> (AgentUsage, Option<Value>) {
     let mut out = AgentUsage::default();
     let mut per_session: BTreeMap<String, PerFile> = BTreeMap::new();
     let mut last_ts = 0.0f64;
     let mut session_5h_oldest: Option<f64> = None;
     let mut week_7d_oldest: Option<f64> = None;
+    let mut latest_rate_ts = 0.0f64;
+    let mut latest_rate_limits: Option<Value> = None;
 
     let sessions_dir = home.join(".codex").join("sessions");
     let mut files = Vec::new();
@@ -574,6 +571,15 @@ pub fn collect_codex(home: &Path, now: f64) -> AgentUsage {
             if payload.get("type").and_then(|x| x.as_str()) != Some("token_count") {
                 continue;
             }
+            // Track the latest transcript-reported rate_limits (for the
+            // enriched path), keyed by timestamp.
+            if let Some(rl) = payload.get("rate_limits").filter(|v| v.is_object()) {
+                let ts_rl = parse_iso(obj.get("timestamp").and_then(|x| x.as_str())).unwrap_or(mtime);
+                if ts_rl > latest_rate_ts {
+                    latest_rate_ts = ts_rl;
+                    latest_rate_limits = Some(rl.clone());
+                }
+            }
             // Python: `info = payload.get("info") or {}` and
             // `last_use = info.get("last_token_usage") or {}` — a dict (incl.
             // empty) or any falsy value yields {} and STILL records a
@@ -591,7 +597,7 @@ pub fn collect_codex(home: &Path, now: f64) -> AgentUsage {
             let billed_out = outp + reasoning;
             let total = fresh_in + billed_out;
 
-            let rate = match_pricing(current_model.as_deref().unwrap_or(""));
+            let rate = match_pricing(current_model.as_deref().unwrap_or(""), table);
             let cost = turn_cost(rate.as_ref(), fresh_in, 0, cached, billed_out);
             let cache_saved = turn_cache_savings(rate.as_ref(), 0, cached);
             let metrics = TurnMetrics {
@@ -672,5 +678,26 @@ pub fn collect_codex(home: &Path, now: f64) -> AgentUsage {
         }
     }
 
-    finish(out, per_session, now, session_5h_oldest, week_7d_oldest)
+    let out = finish(out, per_session, now, session_5h_oldest, week_7d_oldest);
+    (out, latest_rate_limits)
+}
+
+/// Full Claude collection: deterministic transcript path + online overlays
+/// (statusline snapshot, then the Anthropic usage API). Used by wiring.
+pub fn collect_claude_enriched(home: &Path, now: f64, table: &Table) -> AgentUsage {
+    let mut out = collect_claude(home, now, table);
+    crate::online::apply_claude_statusline(&mut out, home, now);
+    crate::online::apply_claude_usage_api(&mut out, home, now);
+    out
+}
+
+/// Full Codex collection: deterministic transcript path + transcript-reported
+/// rate-limit overlay. (The live `codex app-server` JSON-RPC probe is not
+/// ported — it degrades gracefully, as in the Python when offline.)
+pub fn collect_codex_enriched(home: &Path, now: f64, table: &Table) -> AgentUsage {
+    let (mut out, rate_limits) = collect_codex_inner(home, now, table);
+    if let Some(rl) = rate_limits {
+        crate::online::apply_codex_rate_limits(&mut out, &rl, now);
+    }
+    out
 }

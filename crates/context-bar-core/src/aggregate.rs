@@ -134,6 +134,19 @@ pub fn iso_utc(ts: f64) -> String {
     }
 }
 
+/// Parse an ISO-8601 / RFC-3339 timestamp to epoch seconds (mirrors Python
+/// `datetime.fromisoformat(...).timestamp()` for the `Z`/offset forms used in
+/// transcripts). Returns `None` on empty/unparseable input.
+pub fn parse_iso(value: Option<&str>) -> Option<f64> {
+    let s = value?;
+    if s.is_empty() {
+        return None;
+    }
+    time::OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339)
+        .ok()
+        .map(|dt| dt.unix_timestamp_nanos() as f64 / 1e9)
+}
+
 /// Local civil date/labels for an epoch second at a fixed UTC offset.
 fn local_dt(ts: f64, offset: UtcOffset) -> OffsetDateTime {
     OffsetDateTime::from_unix_timestamp(ts.floor() as i64)

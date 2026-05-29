@@ -8,7 +8,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use context_bar_core::collect::{collect_claude, collect_codex};
-use context_bar_core::pricing::{match_pricing, turn_cost};
+use context_bar_core::pricing::{fallback_table, match_pricing, turn_cost};
 use time::format_description::well_known::Rfc3339;
 
 fn epoch(rfc3339: &str) -> f64 {
@@ -48,7 +48,7 @@ fn collect_claude_extracts_buckets_and_cost() {
     );
 
     let now = epoch(ts) + 300.0; // 5 minutes later — within all windows
-    let out = collect_claude(&home, now);
+    let out = collect_claude(&home, now, &fallback_table());
 
     // total = fresh_in + output = 150.
     assert_eq!(out.session_5h_tokens, 150);
@@ -58,7 +58,7 @@ fn collect_claude_extracts_buckets_and_cost() {
     assert_eq!(out.total_input_30d, 100);
     assert_eq!(out.total_output_30d, 50);
 
-    let want_cost = turn_cost(match_pricing("claude-opus-4-8").as_ref(), 100, 200, 1000, 50);
+    let want_cost = turn_cost(match_pricing("claude-opus-4-8", &fallback_table()).as_ref(), 100, 200, 1000, 50);
     assert!((out.total_cost_30d - want_cost).abs() < 1e-9, "cost {} vs {}", out.total_cost_30d, want_cost);
 
     assert_eq!(out.recent_sessions.len(), 1);
@@ -106,7 +106,7 @@ fn collect_codex_subtracts_cached_input_and_bills_reasoning() {
     );
 
     let now = epoch(ts) + 300.0;
-    let out = collect_codex(&home, now);
+    let out = collect_codex(&home, now, &fallback_table());
 
     // fresh_in = 1000 - 800 = 200; billed_out = 50 + 10 = 60; total = 260.
     assert_eq!(out.session_5h_tokens, 260);
@@ -114,7 +114,7 @@ fn collect_codex_subtracts_cached_input_and_bills_reasoning() {
     assert_eq!(out.total_input_30d, 200);
     assert_eq!(out.total_output_30d, 60);
 
-    let want_cost = turn_cost(match_pricing("gpt-5.5").as_ref(), 200, 0, 800, 60);
+    let want_cost = turn_cost(match_pricing("gpt-5.5", &fallback_table()).as_ref(), 200, 0, 800, 60);
     assert!((out.total_cost_30d - want_cost).abs() < 1e-9);
 
     let r = &out.recent_sessions[0];
@@ -145,7 +145,7 @@ fn null_usage_records_zero_event_not_skipped() {
         &format!("{}\n{}\n", l1, l2),
     );
     let now = epoch("2026-05-28T10:01:00.000Z") + 60.0;
-    let out = collect_claude(&home, now);
+    let out = collect_claude(&home, now, &fallback_table());
     // One session, two turns; tokens from the non-null turn only (15).
     assert_eq!(out.recent_sessions.len(), 1);
     assert_eq!(out.total_tokens_30d, 15);

@@ -5,7 +5,7 @@
 //! `FALLBACK_PRICING` table over a model × token grid. Regenerate it (see the
 //! generator in the repo history) only with a deliberate, reviewed cost change.
 
-use context_bar_core::pricing::{match_pricing, turn_cache_savings, turn_cost};
+use context_bar_core::pricing::{fallback_table, match_pricing, turn_cache_savings, turn_cost};
 use serde_json::Value;
 
 #[test]
@@ -20,6 +20,7 @@ fn rust_kernel_matches_python_golden() {
     // bit-identical; allow a hair of slack for any formatting round-trip.
     const EPS: f64 = 1e-9;
 
+    let table = fallback_table();
     let mut checked = 0usize;
     for row in rows {
         let model = row["model"].as_str().unwrap();
@@ -31,7 +32,7 @@ fn rust_kernel_matches_python_golden() {
         let want_cost = row["cost"].as_f64().unwrap();
         let want_savings = row["savings"].as_f64().unwrap();
 
-        let rate = match_pricing(model);
+        let rate = match_pricing(model, &table);
         assert_eq!(
             rate.is_some(),
             want_matched,
