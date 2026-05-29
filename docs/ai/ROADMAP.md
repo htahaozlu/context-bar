@@ -51,7 +51,12 @@ ccusage auto-detects Claude Code, Codex, OpenCode, Amp, Droid, Gemini CLI, Copil
 4. ⏳ **A0** — reserve crates.io (`context-bar-core` + `context-bar`) + npm (`context-bar` + `@context-bar`) names. Prep + metadata done; the maintainer runs the publish per `docs/PUBLISHING.md` (needs creds; irreversible).
 
 **0.5.0 — pure-Rust engine + real cross-platform reach (the unlock):**
-5. **E1 (port half)** — fold `usage_signal.py` into `context-bar-core` (incremental, golden-test-pinned cost fidelity: cost kernel → transformation core → JSONL parse → online/host probes). Replace the macOS `security` keychain with a cross-platform credential source. Retires the Python↔Rust struct-mirror drift + the python3 runtime dep.
+5. **E1 (port half)** — fold `usage_signal.py` into `context-bar-core`, incremental + golden-test-pinned so cost fidelity can't regress. Slices:
+   - ✅ **Slice 1 — cost kernel** (`core::pricing`): `FALLBACK_PRICING` + matcher + `_tiered`/`turn_cost`/`turn_cache_savings`, ported 1:1. Pinned by `tests/pricing_golden.rs` (488 model×token rows generated from the Python, byte-for-byte). DONE.
+   - ⏳ **Slice 2 — deterministic transforms**: `parse_iso`, `split_logical_sessions` (5h idle gap), `bucket_aggregates` (day/week/month/model/project + day×project, **LOCAL-tz END-day attribution**, 30d totals, `cost_today`), `build_active_sessions`, `claude_context_window`, `project_name_from_cwd`. Golden harness: synthetic `.jsonl` fixtures + a **fixed `NOW` (env) and `TZ`** fed to both Python and Rust → assert equal deterministic snapshot fields.
+   - ⏳ **Slice 3 — JSONL discovery + parse**: `collect_claude` / `collect_codex` turn parsing + token extraction, against checked-in sample transcripts.
+   - ⏳ **Slice 4 (defer/feature-gate)** — online/host probes: LiteLLM live fetch + 24h disk cache (needs an HTTP path), Anthropic usage API + keychain (cross-platform credential source replacing macOS `security`), Codex app-server JSON-RPC, shell-history probes.
+   When slices 1–3 land + validate, delete `usage_signal.py`, wire `collect_native` to the Rust path, and the struct-mirror drift + python3 runtime dep are gone.
 6. **A1 + A2** — taiki-e release matrix (6 targets, musl Linux) + `npx context-bar` via cargo-npm/optionalDependencies. Now legitimate (self-contained static binary).
 7. **B2** — `ratatui` `context-bar live` 5h-block burn dashboard (the crown jewel).
 
