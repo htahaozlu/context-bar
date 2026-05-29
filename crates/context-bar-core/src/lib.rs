@@ -28,6 +28,7 @@ pub mod detail_html;
 pub mod git_signal;
 pub mod hud;
 pub mod i18n;
+pub mod pricing;
 pub mod report;
 pub mod state_writer;
 pub mod time_windows;

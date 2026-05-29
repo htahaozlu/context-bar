@@ -1,0 +1,4886 @@
+{
+ "note": "Generated from usage_signal.py FALLBACK_PRICING (offline). Pins Rust core::pricing parity.",
+ "count": 488,
+ "rows": [
+  {
+   "model": "claude-opus-4-8",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-8",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-7",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-6",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-5",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.357,
+   "savings": 0.033
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 18.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 33.074999999999996,
+   "savings": 2.9250000000000007
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0874035,
+   "savings": 0.008941500000000002
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 3.0000802500000003,
+   "savings": 9.750000000000003e-06
+  },
+  {
+   "model": "claude-opus-4-1",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 3.000015,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.357,
+   "savings": 0.033
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 18.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 33.074999999999996,
+   "savings": 2.9250000000000007
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0874035,
+   "savings": 0.008941500000000002
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 3.0000802500000003,
+   "savings": 9.750000000000003e-06
+  },
+  {
+   "model": "claude-opus-4",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 3.000015,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 6.615,
+   "savings": 0.585
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-sonnet-4-6",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000030000000001,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.8999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 4.125,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 8.07,
+   "savings": 0.7799999999999998
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-sonnet-4-5",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000059999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.8999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 4.125,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 8.07,
+   "savings": 0.7799999999999998
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-sonnet-4",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000059999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 6.615,
+   "savings": 0.585
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-3-7-sonnet",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000030000000001,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 6.615,
+   "savings": 0.585
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-3-5-sonnet",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000030000000001,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0238,
+   "savings": 0.0022
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 2.205,
+   "savings": 0.19499999999999995
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0058269,
+   "savings": 0.0005960999999999999
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.20000535,
+   "savings": 6.499999999999997e-07
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.20000099999999998,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.019039999999999998,
+   "savings": 0.0017599999999999998
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.19999999999999998,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 1.764,
+   "savings": 0.15599999999999997
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.00466152,
+   "savings": 0.00047687999999999995
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.16000428,
+   "savings": 5.199999999999999e-07
+  },
+  {
+   "model": "claude-3-5-haiku",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.1600008,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "mythos",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "mythos",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "mythos",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "mythos",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "gpt-5",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "gpt-5",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "gpt-5",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "gpt-5",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "gpt-5-codex",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.49500000000000005,
+   "savings": 0.075
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 30.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 40.5,
+   "savings": 9.0
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.123165,
+   "savings": 0.018675
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 3.000105,
+   "savings": 3e-05
+  },
+  {
+   "model": "gpt-5-pro",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 3.000015,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.008325,
+   "savings": 0.001175
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0625,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 0.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 0.6824999999999999,
+   "savings": 0.1425
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.002072475,
+   "savings": 0.000291525
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.050001775,
+   "savings": 4.75e-07
+  },
+  {
+   "model": "gpt-5-mini",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.050000249999999996,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0016649999999999998,
+   "savings": 0.000235
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.012499999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 0.09999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 0.1365,
+   "savings": 0.028499999999999998
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.00041449499999999997,
+   "savings": 5.830499999999999e-05
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.010000354999999999,
+   "savings": 9.499999999999999e-08
+  },
+  {
+   "model": "gpt-5-nano",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.01000005,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "gpt-5.1",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "gpt-5.1-codex",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "gpt-5.1-codex-max",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.008325,
+   "savings": 0.001175
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0625,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 0.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 0.6824999999999999,
+   "savings": 0.1425
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.002072475,
+   "savings": 0.000291525
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.050001775,
+   "savings": 4.75e-07
+  },
+  {
+   "model": "gpt-5.1-codex-mini",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.050000249999999996,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.058275,
+   "savings": 0.008225000000000001
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.4375,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 4.777500000000001,
+   "savings": 0.9975
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.014507325,
+   "savings": 0.002040675
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.350012425,
+   "savings": 3.325e-06
+  },
+  {
+   "model": "gpt-5.2",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.35000175,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.058275,
+   "savings": 0.008225000000000001
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.4375,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 4.777500000000001,
+   "savings": 0.9975
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.014507325,
+   "savings": 0.002040675
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.350012425,
+   "savings": 3.325e-06
+  },
+  {
+   "model": "gpt-5.2-codex",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.35000175,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.058275,
+   "savings": 0.008225000000000001
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.4375,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 4.777500000000001,
+   "savings": 0.9975
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.014507325,
+   "savings": 0.002040675
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.350012425,
+   "savings": 3.325e-06
+  },
+  {
+   "model": "gpt-5.3-codex",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.35000175,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.06325,
+   "savings": 0.01175
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.625,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 5.325,
+   "savings": 1.4250000000000003
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.01566975,
+   "savings": 0.0029152500000000007
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.5000127500000001,
+   "savings": 4.75e-06
+  },
+  {
+   "model": "gpt-5.4",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.5000025,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.06325,
+   "savings": 0.01175
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.625,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 5.325,
+   "savings": 1.4250000000000003
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.01566975,
+   "savings": 0.0029152500000000007
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.5000127500000001,
+   "savings": 4.75e-06
+  },
+  {
+   "model": "gpt-5.4-codex",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.5000025,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.018975000000000002,
+   "savings": 0.0035250000000000004
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.1875,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 1.5975000000000001,
+   "savings": 0.4275
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.004700925,
+   "savings": 0.0008745750000000002
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.15000382499999998,
+   "savings": 1.4250000000000001e-06
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.15000075000000002,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.00526,
+   "savings": 0.00094
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.049999999999999996,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 0.44100000000000006,
+   "savings": 0.11399999999999999
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0013041300000000001,
+   "savings": 0.00023321999999999997
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.04000107,
+   "savings": 3.7999999999999996e-07
+  },
+  {
+   "model": "gpt-5.4-nano",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0400002,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.7590000000000001,
+   "savings": 0.141
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 7.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 45.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 63.9,
+   "savings": 17.1
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.188037,
+   "savings": 0.034983
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 6.000153000000001,
+   "savings": 5.7e-05
+  },
+  {
+   "model": "gpt-5.4-pro",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 6.00003,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.1265,
+   "savings": 0.0235
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 7.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 10.65,
+   "savings": 2.8500000000000005
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0313395,
+   "savings": 0.0058305000000000015
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000255000000002,
+   "savings": 9.5e-06
+  },
+  {
+   "model": "gpt-5.5",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.7590000000000001,
+   "savings": 0.141
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 7.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 45.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 63.9,
+   "savings": 17.1
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.188037,
+   "savings": 0.034983
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 6.000153000000001,
+   "savings": 5.7e-05
+  },
+  {
+   "model": "gpt-5.5-pro",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 6.00003,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.026625000000000003,
+   "savings": 0.0063750000000000005
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.375,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.5,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 2.3625,
+   "savings": 0.7875
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.006546375,
+   "savings": 0.001571625
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.300004875,
+   "savings": 2.6250000000000003e-06
+  },
+  {
+   "model": "codex-mini-latest",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.30000150000000003,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.019525,
+   "savings": 0.0046749999999999995
+  },
+  {
+   "model": "o4-mini",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.275,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.1,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 1.7325000000000002,
+   "savings": 0.5775
+  },
+  {
+   "model": "o4-mini",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.004800675,
+   "savings": 0.0011525250000000002
+  },
+  {
+   "model": "o4-mini",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.220003575,
+   "savings": 1.925e-06
+  },
+  {
+   "model": "o4-mini",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.2200011,
+   "savings": 0.0
+  },
+  {
+   "model": "o3",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o3",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.035500000000000004,
+   "savings": 0.0085
+  },
+  {
+   "model": "o3",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.5,
+   "savings": 0.0
+  },
+  {
+   "model": "o3",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o3",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.15,
+   "savings": 1.05
+  },
+  {
+   "model": "o3",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0087285,
+   "savings": 0.0020955
+  },
+  {
+   "model": "o3",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.4000065,
+   "savings": 3.5e-06
+  },
+  {
+   "model": "o3",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.40000199999999997,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-mini",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.02035,
+   "savings": 0.0038499999999999997
+  },
+  {
+   "model": "o3-mini",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.275,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-mini",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.1,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-mini",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 1.8150000000000002,
+   "savings": 0.495
+  },
+  {
+   "model": "o3-mini",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.005017649999999999,
+   "savings": 0.00093555
+  },
+  {
+   "model": "o3-mini",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.22000385,
+   "savings": 1.65e-06
+  },
+  {
+   "model": "o3-mini",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.2200011,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-8[1m]",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "anthropic/claude-opus-4-8",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-8-20260514",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "claude-opus-4-8-2026-05-14",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.8999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 4.125,
+   "savings": 0.0
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 8.07,
+   "savings": 0.7799999999999998
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "us.anthropic.claude-sonnet-4-5",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000059999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.8999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 4.125,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 8.07,
+   "savings": 0.7799999999999998
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-sonnet-4-5-v1:0",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000059999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.8999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 4.125,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 8.07,
+   "savings": 0.7799999999999998
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-sonnet-4-5-20260101-v1:0",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000059999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.8999999999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 4.125,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 8.07,
+   "savings": 0.7799999999999998
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-sonnet-4-5-1m",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000059999999999,
+   "savings": 0.0
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "openai/gpt-5.1-codex",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.06325,
+   "savings": 0.01175
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.625,
+   "savings": 0.0
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 5.325,
+   "savings": 1.4250000000000003
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.01566975,
+   "savings": 0.0029152500000000007
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.5000127500000001,
+   "savings": 4.75e-06
+  },
+  {
+   "model": "github_copilot/gpt-5.4",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.5000025,
+   "savings": 0.0
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "foo-opus-4-7-preview",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.75,
+   "savings": 0.0
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 6.615,
+   "savings": 0.585
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "some-sonnet-4-thing",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000030000000001,
+   "savings": 0.0
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.019039999999999998,
+   "savings": 0.0017599999999999998
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.19999999999999998,
+   "savings": 0.0
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.0,
+   "savings": 0.0
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 1.764,
+   "savings": 0.15599999999999997
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.00466152,
+   "savings": 0.00047687999999999995
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.16000428,
+   "savings": 5.199999999999999e-07
+  },
+  {
+   "model": "weird-haiku-x",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.1600008,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.058275,
+   "savings": 0.008225000000000001
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.4375,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.5,
+   "savings": 0.0
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 4.777500000000001,
+   "savings": 0.9975
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.014507325,
+   "savings": 0.002040675
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.350012425,
+   "savings": 3.325e-06
+  },
+  {
+   "model": "gpt-5.3-codex-max",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.35000175,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-something",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-something",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.041625,
+   "savings": 0.005875
+  },
+  {
+   "model": "codex-something",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.3125,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-something",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.5,
+   "savings": 0.0
+  },
+  {
+   "model": "codex-something",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.4125000000000005,
+   "savings": 0.7125000000000001
+  },
+  {
+   "model": "codex-something",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.010362375,
+   "savings": 0.0014576250000000004
+  },
+  {
+   "model": "codex-something",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.250008875,
+   "savings": 2.375e-06
+  },
+  {
+   "model": "codex-something",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.25000125,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-pro",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.035500000000000004,
+   "savings": 0.0085
+  },
+  {
+   "model": "o3-pro",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.5,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-pro",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 2.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o3-pro",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 3.15,
+   "savings": 1.05
+  },
+  {
+   "model": "o3-pro",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0087285,
+   "savings": 0.0020955
+  },
+  {
+   "model": "o3-pro",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.4000065,
+   "savings": 3.5e-06
+  },
+  {
+   "model": "o3-pro",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.40000199999999997,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.019525,
+   "savings": 0.0046749999999999995
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.275,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 1.1,
+   "savings": 0.0
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 1.7325000000000002,
+   "savings": 0.5775
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.004800675,
+   "savings": 0.0011525250000000002
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.220003575,
+   "savings": 1.925e-06
+  },
+  {
+   "model": "o4-mini-high",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.2200011,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "totally-unknown-model",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "MiniMax-M2.7",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "glm-5.1",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "<synthetic>",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": false,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.0714,
+   "savings": 0.0066
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 3.75,
+   "savings": 0.0
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 6.615,
+   "savings": 0.585
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0174807,
+   "savings": 0.0017883000000000003
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 0.6000160499999999,
+   "savings": 1.95e-06
+  },
+  {
+   "model": "claude-3-5-sonnet-20241022",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.6000030000000001,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 0.0,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 1000,
+   "cache_create": 2000,
+   "cache_read": 3000,
+   "outp": 4000,
+   "matched": true,
+   "cost": 0.11900000000000001,
+   "savings": 0.011000000000000001
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 250000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.25,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 250000,
+   "matched": true,
+   "cost": 6.25,
+   "savings": 0.0
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 300000,
+   "cache_create": 300000,
+   "cache_read": 300000,
+   "outp": 300000,
+   "matched": true,
+   "cost": 11.025,
+   "savings": 0.9750000000000005
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 123,
+   "cache_create": 456,
+   "cache_read": 789,
+   "outp": 1011,
+   "matched": true,
+   "cost": 0.0291345,
+   "savings": 0.0029805000000000014
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 199999,
+   "cache_create": 1,
+   "cache_read": 1,
+   "outp": 1,
+   "matched": true,
+   "cost": 1.0000267500000002,
+   "savings": 3.2500000000000002e-06
+  },
+  {
+   "model": "mythos-preview",
+   "inp": 200001,
+   "cache_create": 0,
+   "cache_read": 0,
+   "outp": 0,
+   "matched": true,
+   "cost": 1.000005,
+   "savings": 0.0
+  }
+ ]
+}
