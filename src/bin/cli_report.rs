@@ -9,7 +9,9 @@
 use comfy_table::{Attribute, Cell, CellAlignment, Color, ContentArrangement, Table, presets};
 
 use context_bar::i18n::Language;
-use context_bar::report::{Report, ReportKind, ReportRow, RowKind};
+use context_bar::live::{block_status, Tier};
+use context_bar::report::{AgentFilter, Report, ReportKind, ReportRow, RowKind};
+use context_bar::usage_signal::{AgentUsage, UsageSnapshot};
 
 /// Rendering knobs resolved once from the environment + flags.
 #[derive(Clone, Copy)]
@@ -377,6 +379,110 @@ pub fn fmt_usd(c: f64) -> String {
     format!("{}${}.{:02}", if neg { "-" } else { "" }, fmt_int(dollars), rem)
 }
 
+// ---- blocks (live 5h window) ----------------------------------------------
+
+fn fmt_dur(secs: i64) -> String {
+    let s = secs.max(0);
+    let (h, m) = (s / 3600, (s % 3600) / 60);
+    if h > 0 {
+        format!("{h}h {m}m")
+    } else if m > 0 {
+        format!("{m}m")
+    } else {
+        format!("{s}s")
+    }
+}
+
+fn tier_color(t: Tier) -> Color {
+    match t {
+        Tier::Ok => Color::Green,
+        Tier::Warn => Color::Yellow,
+        Tier::Critical => Color::Red,
+    }
+}
+
+/// A 10-cell bar for a 0..100 percent.
+fn pct_bar(pct: f64) -> String {
+    let filled = ((pct / 10.0).round() as usize).min(10);
+    format!("{}{}", "█".repeat(filled), "░".repeat(10 - filled))
+}
+
+/// Render the active 5h-block burn panel(s). One-shot (the `--live`
+/// auto-refresh TUI builds on the same `block_status`).
+pub fn render_blocks(snap: &UsageSnapshot, now: f64, ctx: RenderCtx, agent: AgentFilter) -> String {
+    let lang = ctx.lang;
+    let mut out = String::new();
+    out.push_str(&format!(
+        "{}\n\n",
+        lang.text("Active 5h block", "Aktif 5s blok")
+    ));
+
+    let agents: &[(&str, &AgentUsage)] = &[("Claude", &snap.claude), ("Codex", &snap.codex)];
+    let mut shown = 0;
+    for (name, a) in agents {
+        let include = match agent {
+            AgentFilter::All => true,
+            AgentFilter::Claude => *name == "Claude",
+            AgentFilter::Codex => *name == "Codex",
+        };
+        if !include {
+            continue;
+        }
+        let Some(b) = block_status(a, now) else { continue };
+        shown += 1;
+
+        let row = |k: &str, v: String| format!("  {:<14}{}\n", k, v);
+
+        out.push_str(&format!("{name}\n"));
+        if let Some(pct) = b.pct_of_limit {
+            let line = format!("{}  {pct:.0}% {}", pct_bar(pct), lang.text("of limit", "limitin"));
+            let line = if ctx.color {
+                ansi(&line, tier_color(Tier::from_pct(pct)))
+            } else {
+                line
+            };
+            out.push_str(&row(lang.text("Usage", "Kullanım"), line));
+        }
+        out.push_str(&row(lang.text("Tokens", "Token"), fmt_int(b.tokens)));
+        out.push_str(&row(lang.text("Cost", "Maliyet"), fmt_usd(b.cost)));
+        if let (Some(ch), Some(tpm)) = (b.burn_cost_per_hr, b.burn_tokens_per_min) {
+            out.push_str(&row(
+                lang.text("Burn", "Yakım"),
+                format!("{}/{} · {} {}", fmt_usd(ch), lang.text("hr", "sa"), fmt_int(tpm as u64), lang.text("tok/min", "tok/dk")),
+            ));
+        }
+        if let Some(p) = b.projected_cost {
+            out.push_str(&row(
+                lang.text("Projected", "Öngörülen"),
+                format!("{} {}", fmt_usd(p), lang.text("(if rate holds)", "(hız sürerse)")),
+            ));
+        }
+        if let Some(s) = b.secs_until_reset {
+            out.push_str(&row(lang.text("Resets in", "Sıfırlanma"), fmt_dur(s)));
+        }
+        if let Some(s) = b.eta_to_limit_secs {
+            out.push_str(&row(lang.text("ETA to limit", "Limite tahmini"), fmt_dur(s)));
+        }
+        out.push('\n');
+    }
+    if shown == 0 {
+        out.push_str(lang.text("No active 5h block.\n", "Aktif 5s blok yok.\n"));
+    }
+    out
+}
+
+/// Wrap text in an ANSI fg color (used for the gauge; gated by the caller).
+fn ansi(text: &str, color: Color) -> String {
+    let code = match color {
+        Color::Green => "32",
+        Color::Yellow => "33",
+        Color::Red => "31",
+        Color::Cyan => "36",
+        _ => "0",
+    };
+    format!("\x1b[{code}m{text}\x1b[0m")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395,6 +501,22 @@ mod tests {
         assert_eq!(fmt_usd(0.0), "$0.00");
         assert_eq!(fmt_usd(2823.09), "$2,823.09");
         assert_eq!(fmt_usd(-1.5), "-$1.50");
+    }
+
+    #[test]
+    fn duration_formatting() {
+        assert_eq!(fmt_dur(0), "0s");
+        assert_eq!(fmt_dur(45), "45s");
+        assert_eq!(fmt_dur(90), "1m");
+        assert_eq!(fmt_dur(3661), "1h 1m");
+        assert_eq!(fmt_dur(-5), "0s");
+    }
+
+    #[test]
+    fn percent_bar_cells() {
+        assert_eq!(pct_bar(0.0), "░░░░░░░░░░");
+        assert_eq!(pct_bar(100.0), "██████████");
+        assert_eq!(pct_bar(25.0).chars().filter(|&c| c == '█').count(), 3); // 2.5→3
     }
 
     #[test]

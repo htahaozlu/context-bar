@@ -28,7 +28,7 @@ use std::time::Duration;
 
 use serde_json;
 
-use cli_report::{RenderCtx, render_report};
+use cli_report::{RenderCtx, render_blocks, render_report};
 use context_bar::claude_statusline;
 use context_bar::context_engine::{self, ContextSnapshot};
 use context_bar::git_signal::{self, ChangeSummary, CommitSummary, GitSignals};
@@ -93,7 +93,7 @@ fn print_help() {
          \x20   context-bar weekly     [flags]   per-ISO-week table\n\
          \x20   context-bar monthly    [flags]   per-month table\n\
          \x20   context-bar session    [flags]   recent sessions table\n\
-         \x20   context-bar blocks               5h rolling-window view (live dashboard: see roadmap)\n\n\
+         \x20   context-bar blocks     [flags]   active 5h block: usage %, burn rate, ETA-to-limit, projected\n\n\
          REPORT FLAGS:\n\
          \x20   --instances            split the daily table by project (per day x project)\n\
          \x20   --breakdown, -b        also print a per-model breakdown table\n\
@@ -275,16 +275,53 @@ fn run_report(spec: ReportSpec, args: &[String]) -> i32 {
     0
 }
 
-fn run_blocks(_args: &[String]) -> i32 {
-    let lang = Language::detect();
-    eprintln!(
+fn run_blocks(args: &[String]) -> i32 {
+    let flags = match CliFlags::parse(&args[1..]) {
+        Ok(f) => f,
+        Err(error) => {
+            eprintln!("context-bar: {error}");
+            return 2;
+        }
+    };
+    if flags.offline {
+        // SAFETY: single-threaded here, before any python-free collection.
+        unsafe {
+            std::env::set_var("CONTEXTBAR_PRICING_OFFLINE", "1");
+        }
+    }
+    let snapshot = usage_signal::collect_native();
+    if !matches!(snapshot.source.as_str(), "python3" | "rust") {
+        eprintln!("context-bar: usage unavailable: {}", snapshot.source);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+
+    if flags.json {
+        let blocks = serde_json::json!({
+            "claude": context_bar::live::block_status(&snapshot.claude, now),
+            "codex": context_bar::live::block_status(&snapshot.codex, now),
+        });
+        match serde_json::to_string_pretty(&blocks) {
+            Ok(text) => {
+                println!("{text}");
+                return 0;
+            }
+            Err(error) => {
+                eprintln!("context-bar: json serialize failed: {error}");
+                return 1;
+            }
+        }
+    }
+
+    let lang = flags.lang.unwrap_or_else(Language::detect);
+    let color = !flags.no_color
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::io::stdout().is_terminal();
+    print!(
         "{}",
-        lang.text(
-            "context-bar blocks: the live 5h-window dashboard ships in a later release \
-             (see docs/ai/ROADMAP.md, EPIC B2). For now use `context-bar daily`.",
-            "context-bar blocks: canlı 5s pencere panosu sonraki bir sürümde gelecek \
-             (bkz. docs/ai/ROADMAP.md, EPIC B2). Şimdilik `context-bar daily` kullanın.",
-        )
+        render_blocks(&snapshot, now, RenderCtx { lang, color }, flags.agent)
     );
     0
 }

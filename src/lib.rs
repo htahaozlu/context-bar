@@ -32,7 +32,7 @@
 // (`context_bar::<mod>` in the bin/example, `crate::<mod>` in the wasm glue)
 // need no import changes after the workspace split.
 pub use context_bar_core::{
-    agent_context, context_engine, detail_html, git_signal, hud, i18n, report, state_writer,
+    agent_context, context_engine, detail_html, git_signal, hud, i18n, live, report, state_writer,
     time_windows, usage_signal,
 };
 
