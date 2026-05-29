@@ -100,6 +100,9 @@ pub struct AgentUsage {
     pub total_input_30d: u64,
     #[serde(default)]
     pub total_output_30d: u64,
+    /// Net USD prompt caching saved over the 30-day window vs paying full input.
+    #[serde(default)]
+    pub cache_savings_30d: f64,
     #[serde(default)]
     pub by_day: Vec<TimeBucket>,
     #[serde(default)]

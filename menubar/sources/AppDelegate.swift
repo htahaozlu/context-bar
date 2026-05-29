@@ -45,6 +45,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         if let screenshotPath = ProcessInfo.processInfo.environment["CONTEXTBAR_SCREENSHOT_PATH"] {
             openDetail()
+            // Optional WxH override so marketing captures can show a taller
+            // window (e.g. the full Cost tab). Capture-only; no effect in use.
+            if let raw = ProcessInfo.processInfo.environment["CONTEXTBAR_SCREENSHOT_SIZE"] {
+                let parts = raw.lowercased().split(separator: "x")
+                if parts.count == 2, let w = Double(parts[0]), let h = Double(parts[1]),
+                   let win = detailWindow?.window {
+                    win.setContentSize(NSSize(width: w, height: h))
+                    win.center()
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 self?.detailWindow?.capture(to: screenshotPath)
                 NSApp.terminate(nil)

@@ -93,7 +93,11 @@ FALLBACK_PRICING = {
     "claude-opus-4-5": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
     "claude-opus-4-1": {"in": 15e-6, "out": 75e-6, "cw": 18.75e-6, "cr": 1.5e-6},
     "claude-opus-4": {"in": 15e-6, "out": 75e-6, "cw": 18.75e-6, "cr": 1.5e-6},
-    # Sonnet 4.6 bills flat; Sonnet 4.5 / 4.0 carry the >200K tier.
+    # Sonnet 4.6 bills flat. Sonnet 4.5 / 4.0 carry a >200K tier in the LiteLLM
+    # dataset (ccusage's source) so we keep it here for parity and as a
+    # conservative estimate. Note: Anthropic's live pricing page (2026-05) shows
+    # Sonnet 4.5 at flat $3/$15 with no >200K row, so the tier may be historical;
+    # online runs follow whatever LiteLLM currently publishes.
     "claude-sonnet-4-6": {"in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6},
     "claude-sonnet-4-5": {
         "in": 3e-6, "out": 15e-6, "cw": 3.75e-6, "cr": 0.3e-6,
@@ -361,6 +365,25 @@ def turn_cost(rate, inp, cache_create, cache_read, outp):
     )
 
 
+def turn_cache_savings(rate, cache_create, cache_read):
+    """USD that prompt caching saved on this turn — the NET benefit, not a gross
+    figure. Without caching, the cache_creation + cache_read tokens would each
+    be billed as fresh input; with caching we instead pay the write premium on
+    creates plus the cheap (0.1x) reads. savings = (no-cache cost) − (actual
+    cache cost). Can be slightly negative on a turn that writes more cache than
+    it reuses, but is strongly positive once a cached prefix is re-read."""
+    if not rate:
+        return 0.0
+    in_rate = rate.get("in")
+    if in_rate is None:
+        return 0.0
+    in_200k = rate.get("in_200k")
+    no_cache = _tiered(cache_create, in_rate, in_200k) + _tiered(cache_read, in_rate, in_200k)
+    actual = (_tiered(cache_create, rate.get("cw"), rate.get("cw_200k"))
+              + _tiered(cache_read, rate.get("cr"), rate.get("cr_200k")))
+    return no_cache - actual
+
+
 def empty_metrics():
     return {
         "total": 0, "cache_read": 0, "input": 0, "output": 0,
@@ -417,6 +440,8 @@ def empty_block():
         "total_cost_30d": 0.0,
         "total_input_30d": 0,
         "total_output_30d": 0,
+        # Net USD prompt caching saved over the 30d window (differentiator).
+        "cache_savings_30d": 0.0,
         "by_day": [],
         "by_week": [],
         "by_month": [],
@@ -913,7 +938,11 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24,
     """Roll a list of session records into time buckets.
 
     Bucketing uses the LOCAL timezone so "most active day" and streaks line up
-    with what a human reading their calendar would see. `by_day` is padded
+    with what a human reading their calendar would see. A logical session is
+    attributed to its END day (last_ts) — the same convention the token stats
+    have always used, so a row's tokens and cost agree. 30-day/all-time TOTALS
+    are exact; only single-day attribution can differ from a strict per-turn
+    split (ccusage) for a session that crosses local midnight. `by_day` is padded
     with zero-token entries for every calendar day inside the history window
     so consumers can compute streaks by walking the array without first
     filling in missing dates themselves. Each bucket also carries the cost +
@@ -1193,14 +1222,13 @@ def collect_claude():
                     # precomputed costUSD on the row when present (ccusage "auto"
                     # mode); otherwise price the four token buckets by model.
                     turn_model = msg.get("model")
+                    rate = match_pricing(turn_model, pricing_table)
                     precomputed = obj.get("costUSD")
                     if isinstance(precomputed, (int, float)):
                         cost = float(precomputed)
                     else:
-                        cost = turn_cost(
-                            match_pricing(turn_model, pricing_table),
-                            fresh_in, cache_create, cache_read, outp,
-                        )
+                        cost = turn_cost(rate, fresh_in, cache_create, cache_read, outp)
+                    cache_saved = turn_cache_savings(rate, cache_create, cache_read)
                     metrics = {
                         "total": total, "cache_read": cache_read,
                         "input": fresh_in, "output": outp,
@@ -1253,6 +1281,7 @@ def collect_claude():
                             session_5h_oldest = ts
                     if age <= WIN_30D:
                         out["cache_read_tokens_30d"] += cache_read
+                        out["cache_savings_30d"] += cache_saved
 
                     # Subagent transcripts (Task tool) link to a parent and
                     # often carry huge cache_read totals that don't reflect
@@ -1358,6 +1387,7 @@ def collect_claude():
         out["week_7d_resets_at"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
     out["cost_5h"] = round(out["cost_5h"], 6)
     out["cost_7d"] = round(out["cost_7d"], 6)
+    out["cache_savings_30d"] = round(out["cache_savings_30d"], 6)
     out = apply_claude_statusline_snapshot(out)
     return apply_claude_usage_api(out)
 
@@ -1430,10 +1460,9 @@ def collect_codex():
                     total = fresh_in + billed_out  # consumed view
                     # OpenAI has no cache-write charge; cached input bills at the
                     # read rate, reasoning at the output rate.
-                    cost = turn_cost(
-                        match_pricing(current_model, pricing_table),
-                        fresh_in, 0, cached, billed_out,
-                    )
+                    rate = match_pricing(current_model, pricing_table)
+                    cost = turn_cost(rate, fresh_in, 0, cached, billed_out)
+                    cache_saved = turn_cache_savings(rate, 0, cached)
                     metrics = {
                         "total": total, "cache_read": cached,
                         "input": fresh_in, "output": billed_out,
@@ -1479,6 +1508,7 @@ def collect_codex():
                             session_5h_oldest = ts
                     if age <= WIN_30D:
                         out["cache_read_tokens_30d"] += cached
+                        out["cache_savings_30d"] += cache_saved
 
                     if ts > last_ts:
                         last_ts = ts
@@ -1515,6 +1545,7 @@ def collect_codex():
         out["week_7d_resets_at"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
     out["cost_5h"] = round(out["cost_5h"], 6)
     out["cost_7d"] = round(out["cost_7d"], 6)
+    out["cache_savings_30d"] = round(out["cache_savings_30d"], 6)
     out = apply_codex_rate_limits(out, latest_rate_limits)
     out = apply_codex_rate_limits(out, fetch_codex_rate_limits_app_server())
     return out

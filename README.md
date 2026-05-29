@@ -88,6 +88,12 @@ Native macOS usage window with rolling session visibility for Claude Code and Co
 
 Compact menubar status item showing active agent, project, and context usage. Clicking it opens a native popover with the active session, context window, rolling 5h/7d limits, parallel sessions, and a live theme picker.
 
+<p align="center">
+  <img src="docs/images/context-bar-cost.png" alt="ContextBar Cost tab — estimated API-equivalent cost per day per project" width="100%">
+</p>
+
+The **Cost** tab estimates what your subscription usage would cost on the metered API — per day, per project, for Claude and Codex — and projects it against your plan price (e.g. *"~41× your Max 20× plan"*). It replicates `better-ccusage daily --instances` natively, then adds a monthly projection and a cost trend that a CLI can't show passively. Numbers are estimates priced from the LiteLLM rate table (the same source ccusage uses), not bills.
+
 ## What it does
 
 ContextBar solves two persistent problems in agent-driven development:
@@ -103,6 +109,7 @@ It addresses both through a local pipeline that continuously produces stable pro
 - Stable `AGENT.md` and `CLAUDE.md`
 - CLI for refresh, watch, and global views
 - Native AppKit menubar companion
+- Estimated API-equivalent cost per day per project (Claude + Codex)
 - Markdown and JSON artifacts for tooling
 
 ## Key capabilities
@@ -137,8 +144,19 @@ The companion app reads `~/.context-bar/context.json` (`hud.json` before v0.3.13
   detected AI tools
 - a theme picker with inline color swatches and live preview — hover a
   theme and the menubar title repaints in that palette before you commit
-- a full Settings window with Usage, Appearance, Menubar, and About tabs
+- a full Settings window with Usage, Stats, Cost, Appearance, Menubar, and About tabs
 - per-session context percentage for parallel Claude / Codex sessions
+
+### Estimated cost & plan value
+
+The **Cost** tab answers a question subscription users increasingly ask — *"what would this cost if I were forced onto the metered API?"*
+
+- per-day, per-project cost breakdown (the native equivalent of `better-ccusage daily --instances`), for both Claude and Codex
+- estimated cost for today / last 7 days / last 30 days, plus 30-day input vs. output token totals
+- a **monthly projection** compared to your actual plan price (e.g. *"≈ $8,268/mo — about 41× your Max 20× plan"*)
+- a 30-day cost-trend sparkline with peak/day
+- priced **per turn by model** from the LiteLLM rate table (the same canonical source ccusage uses), fetched live with a 24h on-disk cache and a bundled offline fallback; Anthropic's prompt-cache and >200K long-context rules are honored
+- everything is clearly labelled an **estimate** — subscription plans are not billed per token. Set `CONTEXTBAR_PRICING_OFFLINE=1` to skip the live rate fetch.
 
 ### Desktop & Notification Center widget
 

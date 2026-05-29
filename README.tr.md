@@ -81,6 +81,12 @@ Claude Code ve Codex için sürekli oturum görünürlüğüne sahip yerel macOS
 
 Aktif ajan, proje ve bağlam kullanımını gösteren kompakt menubar durum öğesi. Tıklandığında aktif oturum, bağlam penceresi, 5sa/7g limitleri, paralel oturumlar ve canlı tema seçici içeren yerel bir popover açılır.
 
+<p align="center">
+  <img src="docs/images/context-bar-cost.png" alt="ContextBar Maliyet sekmesi — proje başına günlük tahmini API-eşdeğeri maliyet" width="100%">
+</p>
+
+**Maliyet** sekmesi, abonelik kullanımınızın ölçümlü API'de ne kadara mal olacağını tahmin eder — gün gün, proje proje, Claude ve Codex için — ve bunu plan fiyatınızla karşılaştırır (örn. *"~41× Max 20× planınız"*). `better-ccusage daily --instances`'i native olarak çoğaltır, üstüne bir CLI'nin pasif gösteremeyeceği aylık projeksiyon ve maliyet trendi ekler. Sayılar, LiteLLM oran tablosundan (ccusage ile aynı kaynak) fiyatlanan tahminlerdir, fatura değildir.
+
 ## Ne işe yarar
 
 ContextBar, ajan destekli geliştirmede sürekli tekrar eden iki sorunu hedefler:
@@ -96,6 +102,7 @@ Bu iki problemi, sürekli kararlı proje özetleri üreten yerel bir işlem hatt
 - Kararlı `AGENT.md` ve `CLAUDE.md`
 - refresh, watch ve global görünümler için CLI
 - Yerel AppKit menubar yardımcı uygulaması
+- Proje başına günlük tahmini API-eşdeğeri maliyet (Claude + Codex)
 - Araçlar için Markdown ve JSON çıktıları
 
 ## Temel yetenekler
@@ -129,8 +136,19 @@ Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) d
   limitleri, paralel oturumlar ve tespit edilen diğer AI araçları için kartlar
 - inline renk swatch'leri ve canlı önizlemeli tema seçici — bir temanın
   üzerinde gezinirken menubar başlığı o paletle yeniden çizilir
-- Kullanım, Görünüm, Menubar ve Hakkında sekmeleri olan tam Ayarlar penceresi
+- Kullanım, İstatistik, Maliyet, Görünüm, Menubar ve Hakkında sekmeleri olan tam Ayarlar penceresi
 - paralel Claude / Codex oturumları için per-session bağlam yüzdesi
+
+### Tahmini maliyet ve plan değeri
+
+**Maliyet** sekmesi, abonelik kullanıcılarının giderek daha çok sorduğu soruyu yanıtlar — *"ölçümlü API'ye zorlanırsam bu bana ne kadara mal olur?"*
+
+- gün başına, proje başına maliyet kırılımı (`better-ccusage daily --instances`'in native karşılığı), hem Claude hem Codex için
+- bugün / son 7 gün / son 30 gün için tahmini maliyet, artı 30 günlük girdi/çıktı token toplamları
+- gerçek plan fiyatınızla karşılaştırmalı **aylık projeksiyon** (örn. *"≈ $8.268/ay — Max 20× planınızın ~41 katı"*)
+- zirve/gün etiketli 30 günlük maliyet trend sparkline'ı
+- **model bazında turn turn** fiyatlama, LiteLLM oran tablosundan (ccusage ile aynı kanonik kaynak) — 24s disk cache + gömülü offline fallback ile canlı çekilir; Anthropic'in prompt-cache ve >200K uzun-bağlam kuralları gözetilir
+- her şey açıkça **tahmin** olarak etiketli — abonelik planları token başına faturalandırılmaz. Canlı oran çekimini atlamak için `CONTEXTBAR_PRICING_OFFLINE=1`.
 
 ### Masaüstü ve Bildirim Merkezi widget'ı
 

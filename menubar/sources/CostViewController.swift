@@ -23,6 +23,10 @@ final class CostViewController: PreferencePaneViewController {
     private let providerControl = NSSegmentedControl()
     private let rangeControl = NSSegmentedControl()
     private let tilesStack = NSStackView()
+    private let projectionLabel = NSTextField(labelWithString: "")
+    private let savingsLabel = NSTextField(labelWithString: "")
+    private let sparkHost = NSView()
+    private var sparkView: SparklineView?
     private let instancesStack = NSStackView()
     private let footnote = NSTextField(labelWithString: "")
 
@@ -68,13 +72,43 @@ final class CostViewController: PreferencePaneViewController {
         tilesStack.alignment = .leading
         tilesStack.spacing = 10
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
+
+        // Projection line — the headline for a subscription user weighing a
+        // forced move to the metered API. Bold run-rate + plain-language sub.
+        projectionLabel.maximumNumberOfLines = 0
+        projectionLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        savingsLabel.font = NSFont.systemFont(ofSize: 11)
+        savingsLabel.textColor = .secondaryLabelColor
+        savingsLabel.maximumNumberOfLines = 0
+        savingsLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let costStack = NSStackView(views: [tilesStack, projectionLabel, savingsLabel])
+        costStack.orientation = .vertical
+        costStack.alignment = .leading
+        costStack.spacing = 10
+        costStack.translatesAutoresizingMaskIntoConstraints = false
         addSection(
             title: L10n.text("Estimated cost", "Tahmini maliyet"),
             subtitle: L10n.text(
                 "What this usage would cost on the metered API. You're on a subscription — these are estimates, not charges.",
                 "Bu kullanımın ölçümlü API'de tutacağı tahmini maliyet. Abonelik kullandığınız için bunlar tahmindir, fatura değildir."
             ),
-            body: tilesStack
+            body: costStack
+        )
+        tilesStack.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
+        projectionLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
+        savingsLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
+
+        sparkHost.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.heightAnchor.constraint(equalToConstant: 64).isActive = true
+        addSection(
+            title: L10n.text("Cost trend (30 days)", "Maliyet trendi (30 gün)"),
+            subtitle: L10n.text(
+                "Estimated daily cost. Each point is one day.",
+                "Tahmini günlük maliyet. Her nokta bir gün."
+            ),
+            body: sparkHost
         )
 
         instancesStack.orientation = .vertical
@@ -121,13 +155,17 @@ final class CostViewController: PreferencePaneViewController {
 
     private struct CostData {
         var instances: [Instance] = []
+        var dailyCosts: [Double] = []      // last 30 days, oldest → newest
         var costToday: Double = 0
         var cost7d: Double = 0
         var cost30d: Double = 0
         var input30d: UInt64 = 0
         var output30d: UInt64 = 0
+        var cacheSavings30d: Double = 0
         var pricingSource: String?
         var isEstimate: Bool = true
+        var planType: String?              // "pro", "max", "free"
+        var planTier: String?              // raw rate_limit_tier (max_20x …)
     }
 
     private func loadData() -> CostData {
@@ -158,6 +196,7 @@ final class CostViewController: PreferencePaneViewController {
         out.cost30d = dbl(c["total_cost_30d"])
         out.input30d = u64(c["total_input_30d"])
         out.output30d = u64(c["total_output_30d"])
+        out.cacheSavings30d = dbl(c["cache_savings_30d"])
         out.pricingSource = root["pricing_source"] as? String
         out.isEstimate = (root["pricing_is_estimate"] as? Bool) ?? true
         out.instances = ((c["by_day_project"] as? [[String: Any]]) ?? []).compactMap { o in
@@ -173,6 +212,17 @@ final class CostViewController: PreferencePaneViewController {
                 cost: dbl(o["cost"])
             )
         }
+        // by_day arrives newest-first (padded to the history window). Take the
+        // last 30 calendar days and flip to oldest→newest for the sparkline.
+        let byDay = (c["by_day"] as? [[String: Any]]) ?? []
+        out.dailyCosts = byDay.prefix(30).reversed().map { dbl($0["cost"]) }
+
+        // Active subscription (for the API-vs-plan projection). Accounts live at
+        // the snapshot root; prefer the active one, else the first.
+        let accounts = (root["accounts"] as? [[String: Any]]) ?? []
+        let active = accounts.first(where: { ($0["is_active"] as? Bool) ?? false }) ?? accounts.first
+        out.planType = active?["subscription_type"] as? String
+        out.planTier = active?["rate_limit_tier"] as? String
         return out
     }
 
@@ -183,6 +233,8 @@ final class CostViewController: PreferencePaneViewController {
         let data = loadData()
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         instancesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        sparkView?.removeFromSuperview()
+        sparkView = nil
 
         // The 7-day cost_7d is a precise rolling-window value from the engine;
         // for the 7-day range we also scope the instance list to the last 7
@@ -221,6 +273,9 @@ final class CostViewController: PreferencePaneViewController {
         tilesStack.addArrangedSubview(row)
         row.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
 
+        renderProjection(data)
+        renderSavings(data)
+        renderSparkline(data.dailyCosts)
         renderInstances(visible)
 
         let src = data.pricingSource.map { srcLabel($0) } ?? "—"
@@ -228,6 +283,140 @@ final class CostViewController: PreferencePaneViewController {
             "Rates: \(src). Estimated API-equivalent cost — not billed amounts.",
             "Oranlar: \(src). Tahmini API-eşdeğeri maliyet — faturalandırılan tutar değildir."
         )
+    }
+
+    /// Headline for a subscription user weighing a forced move to the metered
+    /// API: monthly run-rate (last 30 days) and, for Claude, how it compares to
+    /// the active plan's price.
+    private func renderProjection(_ data: CostData) {
+        let monthly = data.cost30d
+        guard monthly > 0 else {
+            projectionLabel.stringValue = ""
+            projectionLabel.isHidden = true
+            return
+        }
+        projectionLabel.isHidden = false
+        let big = "≈ \(formatUSD(monthly)) / \(L10n.text("month", "ay"))"
+        let result = NSMutableAttributedString(string: big, attributes: [
+            .font: Typography.displayMono(18, weight: .semibold),
+            .foregroundColor: ThemeStore.current.accent,
+            .kern: -0.2,
+        ])
+
+        var sub = L10n.text(
+            "On the metered API, projected from the last 30 days.",
+            "Ölçümlü API'de, son 30 güne göre öngörü."
+        )
+        if provider == .claude, let price = planMonthlyPrice(data.planType, data.planTier) {
+            let mult = monthly / price
+            let multStr = mult >= 10 ? String(format: "%.0f×", mult) : String(format: "%.1f×", mult)
+            let plan = planName(data.planType, data.planTier)
+            sub = L10n.text(
+                "Projected from the last 30 days — about \(multStr) your \(plan) plan (\(formatUSD(price))/mo).",
+                "Son 30 güne göre öngörü — \(plan) planınızın (\(formatUSD(price))/ay) yaklaşık \(multStr) katı."
+            )
+        }
+        result.append(NSAttributedString(string: "\n" + sub, attributes: [
+            .font: NSFont.systemFont(ofSize: 11),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        let para = NSMutableParagraphStyle()
+        para.lineSpacing = 3
+        result.addAttribute(.paragraphStyle, value: para, range: NSRange(location: 0, length: result.length))
+        projectionLabel.attributedStringValue = result
+    }
+
+    /// Cache-savings insight: the net USD prompt caching saved vs paying full
+    /// input. A genuine "you're winning" line no CLI surfaces.
+    private func renderSavings(_ data: CostData) {
+        guard data.cacheSavings30d > 0 else {
+            savingsLabel.isHidden = true
+            savingsLabel.stringValue = ""
+            return
+        }
+        savingsLabel.isHidden = false
+        let saved = formatUSD(data.cacheSavings30d)
+        let (pre, post) = L10n.lang == .tr
+            ? ("Prompt caching son 30 günde ", " tasarruf ettirdi (tam girdi fiyatına kıyasla).")
+            : ("Prompt caching saved ", " in the last 30 days vs. paying full input price.")
+        let result = NSMutableAttributedString(string: pre, attributes: [
+            .font: NSFont.systemFont(ofSize: 11),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ])
+        result.append(NSAttributedString(string: saved, attributes: [
+            .font: Typography.bodyMono(11, weight: .semibold),
+            .foregroundColor: NSColor.labelColor,
+        ]))
+        result.append(NSAttributedString(string: post, attributes: [
+            .font: NSFont.systemFont(ofSize: 11),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        savingsLabel.attributedStringValue = result
+    }
+
+    private func renderSparkline(_ costs: [Double]) {
+        let nonZero = costs.contains { $0 > 0 }
+        guard costs.count >= 2, nonZero else {
+            let empty = NSTextField(labelWithString: L10n.text("No cost trend yet.", "Henüz maliyet trendi yok."))
+            empty.font = NSFont.systemFont(ofSize: 11)
+            empty.textColor = .tertiaryLabelColor
+            empty.translatesAutoresizingMaskIntoConstraints = false
+            sparkHost.addSubview(empty)
+            NSLayoutConstraint.activate([
+                empty.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
+                empty.centerYAnchor.constraint(equalTo: sparkHost.centerYAnchor),
+            ])
+            return
+        }
+        let spark = SparklineView()
+        spark.values = costs
+        spark.tint = ThemeStore.current.accent
+        spark.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.addSubview(spark)
+
+        let peak = costs.max() ?? 0
+        let peakLbl = NSTextField(labelWithString: L10n.text("peak \(formatUSD(peak))/day", "zirve \(formatUSD(peak))/gün"))
+        peakLbl.font = Typography.bodyMono(10, weight: .regular)
+        peakLbl.textColor = .tertiaryLabelColor
+        peakLbl.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.addSubview(peakLbl)
+
+        NSLayoutConstraint.activate([
+            spark.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
+            spark.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
+            spark.topAnchor.constraint(equalTo: sparkHost.topAnchor),
+            spark.heightAnchor.constraint(equalToConstant: 48),
+            peakLbl.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
+            peakLbl.topAnchor.constraint(equalTo: spark.bottomAnchor, constant: 2),
+        ])
+        sparkView = spark
+    }
+
+    /// Monthly USD price of the active Anthropic plan (for the API comparison).
+    /// Confirmed list prices; nil when unknown (free / no account).
+    private func planMonthlyPrice(_ type: String?, _ tier: String?) -> Double? {
+        guard let type else { return nil }
+        switch type {
+        case "pro": return 20
+        case "max":
+            let t = tier ?? ""
+            if t.contains("20x") { return 200 }
+            if t.contains("5x") { return 100 }
+            return 100
+        default: return nil
+        }
+    }
+
+    private func planName(_ type: String?, _ tier: String?) -> String {
+        switch type {
+        case "pro": return "Pro"
+        case "max":
+            let t = tier ?? ""
+            if t.contains("20x") { return "Max 20×" }
+            if t.contains("5x") { return "Max 5×" }
+            return "Max"
+        default: return type ?? "—"
+        }
     }
 
     private func renderInstances(_ items: [Instance]) {

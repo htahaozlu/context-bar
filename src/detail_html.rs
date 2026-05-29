@@ -114,8 +114,8 @@ fn render_cost(snap: &UsageSnapshot, lang: Language) -> String {
 }
 
 fn cost_agent(name: &str, usage: &AgentUsage, lang: Language) -> String {
-    let tiles = format!(
-        r#"<div class="metric-grid cost-tiles">{}{}{}{}</div>"#,
+    let mut tiles_inner = format!(
+        "{}{}{}{}",
         metric(lang.text("Today", "Bugün"), &format_usd(usage.cost_today)),
         metric(lang.text("Last 7 days", "Son 7 gün"), &format_usd(usage.cost_7d)),
         metric(lang.text("Last 30 days", "Son 30 gün"), &format_usd(usage.total_cost_30d)),
@@ -124,6 +124,13 @@ fn cost_agent(name: &str, usage: &AgentUsage, lang: Language) -> String {
             &format!("{} / {}", format_tokens(usage.total_input_30d), format_tokens(usage.total_output_30d)),
         ),
     );
+    if usage.cache_savings_30d > 0.0 {
+        tiles_inner.push_str(&metric(
+            lang.text("30d cache saved", "30g önbellek tasarrufu"),
+            &format_usd(usage.cache_savings_30d),
+        ));
+    }
+    let tiles = format!(r#"<div class="metric-grid cost-tiles">{tiles_inner}</div>"#);
     format!(
         r#"<section class="agent-section"><h2>{}</h2>{tiles}{}</section>"#,
         html_escape(name),
