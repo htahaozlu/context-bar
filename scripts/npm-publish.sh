@@ -25,9 +25,20 @@ TARGETS=(
 )
 
 publish_dir() {
-  ( cd "$1" && npm publish --access public ) || {
-    echo "npm publish skipped/failed for $1 (already published this version?)"
-  }
+  local out
+  if out="$( cd "$1" && npm publish --access public 2>&1 )"; then
+    echo "$out"
+    return 0
+  fi
+  echo "$out"
+  # Tolerate ONLY "this exact version is already published" so re-runs are
+  # idempotent; any other error (auth, scope, network) fails the release.
+  if echo "$out" | grep -qiE 'cannot publish over|previously published|already published|E409|409 Conflict'; then
+    echo "  ($1 already published at this version — tolerated)"
+    return 0
+  fi
+  echo "::error::npm publish failed for $1" >&2
+  return 1
 }
 
 # 1. Platform packages FIRST, so the meta's optionalDependencies resolve.
@@ -46,7 +57,7 @@ for entry in "${TARGETS[@]}"; do
   [[ -f "$ROOT/LICENSE" ]] && cp "$ROOT/LICENSE" "$pkg/LICENSE"
   cat > "$pkg/package.json" <<JSON
 {
-  "name": "@context-bar/context-bar-$os-$cpu",
+  "name": "context-bar-$os-$cpu",
   "version": "$VERSION",
   "description": "context-bar prebuilt binary ($os $cpu).",
   "license": "Apache-2.0",
@@ -78,12 +89,12 @@ cat > "$meta/package.json" <<JSON
   "bin": { "context-bar": "dist/cli.js" },
   "files": ["dist", "LICENSE", "README.md"],
   "optionalDependencies": {
-    "@context-bar/context-bar-darwin-arm64": "$VERSION",
-    "@context-bar/context-bar-darwin-x64": "$VERSION",
-    "@context-bar/context-bar-linux-arm64": "$VERSION",
-    "@context-bar/context-bar-linux-x64": "$VERSION",
-    "@context-bar/context-bar-win32-arm64": "$VERSION",
-    "@context-bar/context-bar-win32-x64": "$VERSION"
+    "context-bar-darwin-arm64": "$VERSION",
+    "context-bar-darwin-x64": "$VERSION",
+    "context-bar-linux-arm64": "$VERSION",
+    "context-bar-linux-x64": "$VERSION",
+    "context-bar-win32-arm64": "$VERSION",
+    "context-bar-win32-x64": "$VERSION"
   }
 }
 JSON

@@ -12,14 +12,14 @@ const require = createRequire(import.meta.url)
 
 function platformPackage(p = process.platform, a = process.arch) {
   if (p === 'darwin') {
-    if (a === 'arm64') return '@context-bar/context-bar-darwin-arm64'
-    if (a === 'x64') return '@context-bar/context-bar-darwin-x64'
+    if (a === 'arm64') return 'context-bar-darwin-arm64'
+    if (a === 'x64') return 'context-bar-darwin-x64'
   } else if (p === 'linux') {
-    if (a === 'arm64') return '@context-bar/context-bar-linux-arm64'
-    if (a === 'x64') return '@context-bar/context-bar-linux-x64'
+    if (a === 'arm64') return 'context-bar-linux-arm64'
+    if (a === 'x64') return 'context-bar-linux-x64'
   } else if (p === 'win32') {
-    if (a === 'arm64') return '@context-bar/context-bar-win32-arm64'
-    if (a === 'x64') return '@context-bar/context-bar-win32-x64'
+    if (a === 'arm64') return 'context-bar-win32-arm64'
+    if (a === 'x64') return 'context-bar-win32-x64'
   }
   return undefined
 }
