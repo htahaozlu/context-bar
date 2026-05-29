@@ -16,6 +16,7 @@
 //! Example: `context-bar watch 30 .` (or set up launchd to keep this alive).
 
 mod cli_report;
+mod live_tui;
 
 use std::env;
 use std::io::IsTerminal;
@@ -51,6 +52,7 @@ fn main() {
         "monthly" => run_report(ReportSpec::Time(Period::Monthly), &args),
         "session" | "sessions" => run_report(ReportSpec::Session, &args),
         "blocks" => run_blocks(&args),
+        "live" => run_live(&args),
         "--version" | "-V" | "version" => {
             println!("context-bar {}", env!("CARGO_PKG_VERSION"));
             0
@@ -93,7 +95,8 @@ fn print_help() {
          \x20   context-bar weekly     [flags]   per-ISO-week table\n\
          \x20   context-bar monthly    [flags]   per-month table\n\
          \x20   context-bar session    [flags]   recent sessions table\n\
-         \x20   context-bar blocks     [flags]   active 5h block: usage %, burn rate, ETA-to-limit, projected\n\n\
+         \x20   context-bar blocks     [flags]   active 5h block: usage %, burn rate, ETA-to-limit, projected\n\
+         \x20   context-bar live       [flags]   auto-refresh 5h-block TUI dashboard (--interval N, q to quit)\n\n\
          REPORT FLAGS:\n\
          \x20   --instances            split the daily table by project (per day x project)\n\
          \x20   --breakdown, -b        also print a per-model breakdown table\n\
@@ -132,6 +135,8 @@ struct CliFlags {
     offline: bool,
     no_color: bool,
     lang: Option<Language>,
+    /// Refresh seconds for `live` (default 3).
+    interval: Option<u64>,
 }
 
 impl CliFlags {
@@ -146,6 +151,7 @@ impl CliFlags {
             offline: false,
             no_color: false,
             lang: None,
+            interval: None,
         };
         // Resolve a flag's value from either `--flag=value` or `--flag value`.
         let value_of = |inline: Option<&str>, args: &[String], i: &mut usize| -> Result<String, String> {
@@ -201,6 +207,13 @@ impl CliFlags {
                         "tr" => Some(Language::Tr),
                         other => return Err(format!("invalid --lang: {other} (en|tr)")),
                     };
+                }
+                "--interval" => {
+                    let v = value_of(inline, args, &mut i)?;
+                    f.interval = Some(
+                        v.parse::<u64>()
+                            .map_err(|_| format!("invalid --interval: {v} (seconds)"))?,
+                    );
                 }
                 other => return Err(format!("unknown flag: {other}")),
             }
@@ -324,6 +337,31 @@ fn run_blocks(args: &[String]) -> i32 {
         render_blocks(&snapshot, now, RenderCtx { lang, color }, flags.agent)
     );
     0
+}
+
+fn run_live(args: &[String]) -> i32 {
+    let flags = match CliFlags::parse(&args[1..]) {
+        Ok(f) => f,
+        Err(error) => {
+            eprintln!("context-bar: {error}");
+            return 2;
+        }
+    };
+    if flags.offline {
+        // SAFETY: single-threaded here, before the first collection.
+        unsafe {
+            std::env::set_var("CONTEXTBAR_PRICING_OFFLINE", "1");
+        }
+    }
+    let interval = Duration::from_secs(flags.interval.unwrap_or(3).max(1));
+    let lang = flags.lang.unwrap_or_else(Language::detect);
+    match live_tui::run(interval, flags.agent, lang) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("context-bar live: {error}");
+            1
+        }
+    }
 }
 
 fn run_hud(root: Option<PathBuf>) -> i32 {
