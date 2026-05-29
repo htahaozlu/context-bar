@@ -27,6 +27,8 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          set +e  # GitHub injects `bash -e`; turn it off so a tolerated
+                  # "already published" (rc=2) doesn't abort before the bin loop.
           # 0 = published, 2 = already at this version (tolerate), 1 = other.
           publish_crate() {
             local out
