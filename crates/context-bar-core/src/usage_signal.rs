@@ -258,6 +258,7 @@ pub struct AccountInfo {
     pub is_active: bool,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl AccountInfo {
     fn from_tier(name: String, subscription_type: String, rate_limit_tier: String) -> Self {
         let (limit_5h_messages, limit_7d_messages) = match rate_limit_tier.as_str() {
@@ -462,6 +463,7 @@ fn save_snapshot_cache(snapshot: &UsageSnapshot) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn collect_native() -> UsageSnapshot {
     use std::process::Command;
 

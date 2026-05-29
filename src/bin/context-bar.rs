@@ -15,7 +15,10 @@
 //!
 //! Example: `context-bar watch 30 .` (or set up launchd to keep this alive).
 
+mod cli_report;
+
 use std::env;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -25,10 +28,13 @@ use std::time::Duration;
 
 use serde_json;
 
+use cli_report::{RenderCtx, render_report};
 use context_bar::claude_statusline;
 use context_bar::context_engine::{self, ContextSnapshot};
 use context_bar::git_signal::{self, ChangeSummary, CommitSummary, GitSignals};
 use context_bar::hud;
+use context_bar::i18n::Language;
+use context_bar::report::{self, AgentFilter, Period, ReportOptions};
 use context_bar::state_writer;
 use context_bar::usage_signal;
 
@@ -40,6 +46,15 @@ fn main() {
         "hud" => run_hud(args.get(1).map(PathBuf::from)),
         "snapshot" => run_snapshot(args.get(1).map(PathBuf::from)),
         "global" => run_global(),
+        "daily" => run_report(ReportSpec::Time(Period::Daily), &args),
+        "weekly" => run_report(ReportSpec::Time(Period::Weekly), &args),
+        "monthly" => run_report(ReportSpec::Time(Period::Monthly), &args),
+        "session" | "sessions" => run_report(ReportSpec::Session, &args),
+        "blocks" => run_blocks(&args),
+        "--version" | "-V" | "version" => {
+            println!("context-bar {}", env!("CARGO_PKG_VERSION"));
+            0
+        }
         "claude-statusline" => run_claude_statusline(args.get(1).map(PathBuf::from)),
         "watch" => {
             let secs: u64 = args
@@ -72,16 +87,206 @@ fn main() {
 
 fn print_help() {
     eprintln!(
-        "context-bar — Claude Code + Codex CLI usage HUD for any repo\n\n\
-         USAGE:\n\
+        "context-bar — usage + API-equivalent cost for AI coding agents (Claude Code, Codex CLI)\n\n\
+         REPORTS:\n\
+         \x20   context-bar daily      [flags]   per-day usage + cost table (Claude + Codex)\n\
+         \x20   context-bar weekly     [flags]   per-ISO-week table\n\
+         \x20   context-bar monthly    [flags]   per-month table\n\
+         \x20   context-bar session    [flags]   recent sessions table\n\
+         \x20   context-bar blocks               5h rolling-window view (live dashboard: see roadmap)\n\n\
+         REPORT FLAGS:\n\
+         \x20   --instances            split the daily table by project (per day x project)\n\
+         \x20   --breakdown, -b        also print a per-model breakdown table\n\
+         \x20   --agent <claude|codex|all>   restrict to one agent (default: all)\n\
+         \x20   --since <YYYYMMDD>     inclusive start date\n\
+         \x20   --until <YYYYMMDD>     inclusive end date\n\
+         \x20   --json                 emit the report as JSON (for piping)\n\
+         \x20   --offline              skip the live pricing fetch (use cached/bundled rates)\n\
+         \x20   --lang <en|tr>         force UI language (default: locale)\n\
+         \x20   --no-color             disable ANSI color\n\n\
+         ENGINE / HUD:\n\
          \x20   context-bar hud          [worktree_root]   refresh repo .context-bar/hud.md\n\
          \x20   context-bar snapshot     [worktree_root]   refresh full repo artifacts\n\
-         \x20   context-bar global                         write ~/.context-bar/hud.md\n\
+         \x20   context-bar global                         write ~/.context-bar/ (context.json, hud.md, detail.html)\n\
          \x20   context-bar claude-statusline [path]       read Claude Code stdin and write a native snapshot\n\
          \x20   context-bar watch        [secs] [root]     loop per-repo (default 30s)\n\
-         \x20   context-bar watch-global [secs]            loop ~/.context-bar/hud.md\n\n\
-         Pin `~/.context-bar/hud.md` in Zed for an always-visible cross-project HUD.\n"
+         \x20   context-bar watch-global [secs]            loop ~/.context-bar/hud.md\n\
+         \x20   context-bar --version                      print version\n\n\
+         Costs are estimates of what the metered API would charge — not a bill.\n"
     );
+}
+
+enum ReportSpec {
+    Time(Period),
+    Session,
+}
+
+/// Parsed report-verb flags.
+struct CliFlags {
+    json: bool,
+    breakdown: bool,
+    instances: bool,
+    since: Option<String>,
+    until: Option<String>,
+    agent: AgentFilter,
+    offline: bool,
+    no_color: bool,
+    lang: Option<Language>,
+}
+
+impl CliFlags {
+    fn parse(args: &[String]) -> Result<Self, String> {
+        let mut f = CliFlags {
+            json: false,
+            breakdown: false,
+            instances: false,
+            since: None,
+            until: None,
+            agent: AgentFilter::All,
+            offline: false,
+            no_color: false,
+            lang: None,
+        };
+        // Resolve a flag's value from either `--flag=value` or `--flag value`.
+        let value_of = |inline: Option<&str>, args: &[String], i: &mut usize| -> Result<String, String> {
+            if let Some(v) = inline {
+                return Ok(v.to_string());
+            }
+            *i += 1;
+            args.get(*i)
+                .cloned()
+                .ok_or_else(|| "missing value for flag".to_string())
+        };
+
+        let mut i = 0;
+        while i < args.len() {
+            let arg = args[i].clone();
+            let (name, inline) = match arg.split_once('=') {
+                Some((n, v)) => (n, Some(v)),
+                None => (arg.as_str(), None),
+            };
+            match name {
+                "--json" => f.json = true,
+                "--breakdown" | "-b" => f.breakdown = true,
+                "--instances" | "-i" => f.instances = true,
+                "--offline" => f.offline = true,
+                "--no-color" => f.no_color = true,
+                "--since" => {
+                    let v = value_of(inline, args, &mut i)?;
+                    f.since = Some(
+                        report::normalize_date_arg(&v)
+                            .ok_or_else(|| format!("invalid --since date: {v} (use YYYYMMDD)"))?,
+                    );
+                }
+                "--until" => {
+                    let v = value_of(inline, args, &mut i)?;
+                    f.until = Some(
+                        report::normalize_date_arg(&v)
+                            .ok_or_else(|| format!("invalid --until date: {v} (use YYYYMMDD)"))?,
+                    );
+                }
+                "--agent" => {
+                    let v = value_of(inline, args, &mut i)?;
+                    f.agent = match v.to_ascii_lowercase().as_str() {
+                        "all" => AgentFilter::All,
+                        "claude" => AgentFilter::Claude,
+                        "codex" => AgentFilter::Codex,
+                        other => return Err(format!("invalid --agent: {other} (claude|codex|all)")),
+                    };
+                }
+                "--lang" => {
+                    let v = value_of(inline, args, &mut i)?;
+                    f.lang = match v.to_ascii_lowercase().as_str() {
+                        "en" => Some(Language::En),
+                        "tr" => Some(Language::Tr),
+                        other => return Err(format!("invalid --lang: {other} (en|tr)")),
+                    };
+                }
+                other => return Err(format!("unknown flag: {other}")),
+            }
+            i += 1;
+        }
+        Ok(f)
+    }
+}
+
+fn run_report(spec: ReportSpec, args: &[String]) -> i32 {
+    let flags = match CliFlags::parse(&args[1..]) {
+        Ok(f) => f,
+        Err(error) => {
+            eprintln!("context-bar: {error}");
+            return 2;
+        }
+    };
+
+    if flags.offline {
+        // SAFETY: single-threaded here, set before we spawn python3 (which
+        // reads CONTEXTBAR_PRICING_OFFLINE to skip the live LiteLLM fetch).
+        unsafe {
+            std::env::set_var("CONTEXTBAR_PRICING_OFFLINE", "1");
+        }
+    }
+
+    let snapshot = usage_signal::collect_native();
+    if snapshot.source != "python3" {
+        eprintln!("context-bar: usage unavailable: {}", snapshot.source);
+    }
+
+    let opts = ReportOptions {
+        since: flags.since.clone(),
+        until: flags.until.clone(),
+        agent: flags.agent,
+    };
+    let report = match spec {
+        ReportSpec::Time(period) => {
+            if flags.instances {
+                report::instances_report(&snapshot, &opts)
+            } else {
+                report::time_report(&snapshot, period, &opts)
+            }
+        }
+        ReportSpec::Session => report::session_report(&snapshot, &opts),
+    };
+
+    if flags.json {
+        match serde_json::to_string_pretty(&report) {
+            Ok(text) => {
+                println!("{text}");
+                return 0;
+            }
+            Err(error) => {
+                eprintln!("context-bar: json serialize failed: {error}");
+                return 1;
+            }
+        }
+    }
+
+    let lang = flags.lang.unwrap_or_else(Language::detect);
+    let color = !flags.no_color
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::io::stdout().is_terminal();
+    let ctx = RenderCtx { lang, color };
+
+    print!("{}", render_report(&report, ctx));
+    if flags.breakdown {
+        let by_model = report::model_report(&snapshot, &opts);
+        print!("\n{}", render_report(&by_model, ctx));
+    }
+    0
+}
+
+fn run_blocks(_args: &[String]) -> i32 {
+    let lang = Language::detect();
+    eprintln!(
+        "{}",
+        lang.text(
+            "context-bar blocks: the live 5h-window dashboard ships in a later release \
+             (see docs/ai/ROADMAP.md, EPIC B2). For now use `context-bar daily`.",
+            "context-bar blocks: canlı 5s pencere panosu sonraki bir sürümde gelecek \
+             (bkz. docs/ai/ROADMAP.md, EPIC B2). Şimdilik `context-bar daily` kullanın.",
+        )
+    );
+    0
 }
 
 fn run_hud(root: Option<PathBuf>) -> i32 {

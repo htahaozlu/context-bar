@@ -45,34 +45,7 @@ pub fn render(snap: &UsageSnapshot) -> String {
     html
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Language {
-    En,
-    Tr,
-}
-
-impl Language {
-    fn detect() -> Self {
-        for key in ["LC_ALL", "LC_MESSAGES", "LANG"] {
-            if let Ok(value) = std::env::var(key) {
-                if value.to_ascii_lowercase().starts_with("tr") {
-                    return Self::Tr;
-                }
-                if !value.is_empty() {
-                    return Self::En;
-                }
-            }
-        }
-        Self::En
-    }
-
-    fn text(self, en: &'static str, tr: &'static str) -> &'static str {
-        match self {
-            Self::En => en,
-            Self::Tr => tr,
-        }
-    }
-}
+use crate::i18n::Language;
 
 fn panel(id: &str, active: bool, body: &str) -> String {
     let class = if active {

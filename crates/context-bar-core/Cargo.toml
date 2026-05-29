@@ -1,0 +1,26 @@
+[package]
+name = "context-bar-core"
+version = "0.4.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Engine for context-bar: AI coding-agent usage, rolling quota windows, and API-equivalent cost estimation from local transcripts."
+repository = "https://github.com/htahaozlu/context-bar"
+keywords = ["claude", "codex", "usage", "cost", "tokens"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
+
+# Native hosts (CLI, menubar engine): real serde_json + filesystem/process access.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+serde_json = "1.0"
+
+# Wasm host (Zed extension): zed_extension_api re-exports serde_json and provides
+# the Worktree-backed collectors. Keeps the engine usable from the extension
+# without a second serde_json copy in the wasm binary.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+zed_extension_api = "0.7.0"

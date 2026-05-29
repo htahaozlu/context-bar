@@ -1,10 +1,10 @@
-//! ContextBar extension entry point.
+//! ContextBar — Zed extension entry point + engine re-exports.
 //!
-//! The product surface is an always-on context system, not slash commands.
-//! Slash commands are kept only as debug/fallback surfaces. Modules below are
-//! intentionally `pub` so a future integration layer (Zed HUD primitive when
-//! one ships, an ACP bridge, or an MCP server) can drive the engine without
-//! redesigning anything.
+//! The reusable engine now lives in the `context-bar-core` crate. This crate
+//! is the thin host layer: it re-exports the engine modules under their
+//! historical paths (so `context_bar::usage_signal`, `crate::context_engine`,
+//! … keep resolving for the CLI binary, the example, and the wasm glue below)
+//! and adds the Zed extension surface.
 //!
 //! ## Verified
 //! - Extension loads in Zed Preview.
@@ -28,15 +28,17 @@
 //! - The seam for both cases is [`context_engine::assemble`], which takes
 //!   pre-collected signals and is decoupled from `zed::Worktree`.
 
-pub mod agent_context;
-pub mod claude_statusline;
-pub mod context_engine;
-pub mod detail_html;
-pub mod git_signal;
-pub mod hud;
-pub mod state_writer;
-pub mod time_windows;
-pub mod usage_signal;
+// Engine, re-exported under the historical module paths so existing consumers
+// (`context_bar::<mod>` in the bin/example, `crate::<mod>` in the wasm glue)
+// need no import changes after the workspace split.
+pub use context_bar_core::{
+    agent_context, context_engine, detail_html, git_signal, hud, i18n, report, state_writer,
+    time_windows, usage_signal,
+};
+
+// CLI-only engine module (see context-bar-core); excluded from the wasm extension.
+#[cfg(not(target_arch = "wasm32"))]
+pub use context_bar_core::claude_statusline;
 
 #[cfg(target_arch = "wasm32")]
 pub mod auto_refresh;
