@@ -27,10 +27,8 @@ final class CostViewController: PreferencePaneViewController {
     private let savingsLabel = NSTextField(labelWithString: "")
     private let sparkHost = NSView()
     private let instancesStack = NSStackView()
+    private let instancesView = CostInstancesView()
     private let footnote = NSTextField(labelWithString: "")
-    /// Generation token so a deferred instances render is dropped if a newer
-    /// reload superseded it (rapid range/provider switches or daemon refreshes).
-    private var instancesGen = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -286,18 +284,7 @@ final class CostViewController: PreferencePaneViewController {
         renderProjection(data)
         renderSavings(data)
         renderTrend(data.dailyPoints)
-        // The per-project instances table is the heavy part (up to ~30 day
-        // cards × several rows × cells, all Auto-Layout). Build it AFTER the
-        // first paint so the Cost tab opens instantly and the table fills a
-        // frame later (staged load). The instancesStack was already cleared
-        // above, so the gap shows nothing rather than stale rows.
-        instancesGen &+= 1
-        let gen = instancesGen
-        let pending = visible
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.instancesGen == gen else { return }
-            self.renderInstances(pending)
-        }
+        renderInstances(visible)
 
         let src = data.pricingSource.map { srcLabel($0) } ?? "—"
         footnote.stringValue = L10n.text(
@@ -446,10 +433,6 @@ final class CostViewController: PreferencePaneViewController {
         }
     }
 
-    private let numColW: CGFloat = 58
-    private let costColW: CGFloat = 78
-    private enum RowStyle { case header, day, data, total }
-
     private func renderInstances(_ items: [Instance]) {
         guard !items.isEmpty else {
             let empty = NSTextField(labelWithString: L10n.text(
@@ -462,10 +445,10 @@ final class CostViewController: PreferencePaneViewController {
             return
         }
 
-        // One native table, ccusage-style: a column header, then per-day group
-        // rows (the day's aggregate) each followed by indented per-project
-        // sub-rows, and a grand Total. Fixed-width numeric columns keep every
-        // row aligned without an NSTableView's chrome.
+        // Build a flat row model (header → per-day aggregate + indented project
+        // sub-rows → grand Total) and hand it to a single custom view that draws
+        // only the rows intersecting the dirty rect — no per-cell NSViews or
+        // constraints, so the tab opens instantly regardless of row count.
         var order: [String] = []
         var byDay: [String: [Instance]] = [:]
         for it in items {
@@ -473,153 +456,58 @@ final class CostViewController: PreferencePaneViewController {
             byDay[it.date, default: []].append(it)
         }
 
-        let card = NSView()
-        Surface.applyCard(card)
-        card.translatesAutoresizingMaskIntoConstraints = false
-        let col = NSStackView()
-        col.orientation = .vertical
-        col.alignment = .leading
-        col.spacing = 1
-        col.translatesAutoresizingMaskIntoConstraints = false
-
-        func add(_ v: NSView) {
-            col.addArrangedSubview(v)
-            v.widthAnchor.constraint(equalTo: col.widthAnchor).isActive = true
-        }
-
-        add(gridRow(
-            leading: gridLabel(L10n.text("Project", "Proje"), size: 9.5, weight: .semibold, color: .secondaryLabelColor),
-            values: [L10n.text("Input", "Girdi"), L10n.text("Output", "Çıktı"),
-                     L10n.text("Cache+", "Önbel+"), L10n.text("Cache↻", "Önbel↻"),
-                     L10n.text("Total", "Toplam"), L10n.text("Cost", "Maliyet")],
-            style: .header))
-        addSep(add)
-
+        var modelRows: [CostRow] = [
+            CostRow(kind: .header, leading: L10n.text("Project", "Proje"), sub: "",
+                    values: [L10n.text("Input", "Girdi"), L10n.text("Output", "Çıktı"),
+                             L10n.text("Cache+", "Önbel+"), L10n.text("Cache↻", "Önbel↻"),
+                             L10n.text("Total", "Toplam"), L10n.text("Cost", "Maliyet")]),
+        ]
         var gIn: UInt64 = 0, gOut: UInt64 = 0, gCw: UInt64 = 0, gCr: UInt64 = 0
         var gCost = 0.0
         for (di, day) in order.enumerated() {
-            let rows = (byDay[day] ?? []).sorted { $0.cost > $1.cost }
-            let dIn = rows.reduce(UInt64(0)) { $0 + $1.input }
-            let dOut = rows.reduce(UInt64(0)) { $0 + $1.output }
-            let dCw = rows.reduce(UInt64(0)) { $0 + $1.cacheCreate }
-            let dCr = rows.reduce(UInt64(0)) { $0 + $1.cacheRead }
-            let dCost = rows.reduce(0.0) { $0 + $1.cost }
+            let dayRows = (byDay[day] ?? []).sorted { $0.cost > $1.cost }
+            let dIn = dayRows.reduce(UInt64(0)) { $0 + $1.input }
+            let dOut = dayRows.reduce(UInt64(0)) { $0 + $1.output }
+            let dCw = dayRows.reduce(UInt64(0)) { $0 + $1.cacheCreate }
+            let dCr = dayRows.reduce(UInt64(0)) { $0 + $1.cacheRead }
+            let dCost = dayRows.reduce(0.0) { $0 + $1.cost }
             gIn += dIn; gOut += dOut; gCw += dCw; gCr += dCr; gCost += dCost
-
-            add(gridRow(
-                leading: gridLabel(formatDay(day), size: 12, weight: .semibold, color: .labelColor),
-                values: [tk(dIn), tk(dOut), tk(dCw), tk(dCr), tk(dIn + dOut + dCw + dCr), formatUSD(dCost)],
-                style: .day))
-            for it in rows {
-                // Total column = all four token buckets, matching ccusage's
-                // "Total Tokens" (input + output + cache create + cache read) —
-                // distinct from the Stats tab's fresh-work `tokens` total.
+            modelRows.append(CostRow(kind: .day, leading: formatDay(day), sub: "",
+                values: [tk(dIn), tk(dOut), tk(dCw), tk(dCr), tk(dIn + dOut + dCw + dCr), formatUSD(dCost)]))
+            for it in dayRows {
+                // Total = all four token buckets (ccusage "Total Tokens"),
+                // distinct from the Stats tab's fresh-work total.
                 let rowTotal = it.input + it.output + it.cacheCreate + it.cacheRead
-                add(gridRow(leading: projectLeading(it),
-                            values: [tk(it.input), tk(it.output), tk(it.cacheCreate),
-                                     tk(it.cacheRead), tk(rowTotal), formatUSD(it.cost)],
-                            style: .data))
+                modelRows.append(CostRow(kind: .data, leading: it.project,
+                    sub: it.models.map(prettyModel).joined(separator: ", "),
+                    values: [tk(it.input), tk(it.output), tk(it.cacheCreate), tk(it.cacheRead), tk(rowTotal), formatUSD(it.cost)]))
             }
-            if di < order.count - 1 { addSep(add) }
+            if di < order.count - 1 {
+                modelRows.append(CostRow(kind: .separator, leading: "", sub: "", values: []))
+            }
         }
+        modelRows.append(CostRow(kind: .separatorStrong, leading: "", sub: "", values: []))
+        modelRows.append(CostRow(kind: .total, leading: L10n.text("Total", "Toplam"), sub: "",
+            values: [tk(gIn), tk(gOut), tk(gCw), tk(gCr), tk(gIn + gOut + gCw + gCr), formatUSD(gCost)]))
 
-        addSep(add, strong: true)
-        add(gridRow(
-            leading: gridLabel(L10n.text("Total", "Toplam"), size: 12, weight: .bold, color: .labelColor),
-            values: [tk(gIn), tk(gOut), tk(gCw), tk(gCr), tk(gIn + gOut + gCw + gCr), formatUSD(gCost)],
-            style: .total))
+        instancesView.rows = modelRows
 
-        card.addSubview(col)
+        let card = NSView()
+        Surface.applyCard(card)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        instancesView.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(instancesView)
         NSLayoutConstraint.activate([
-            col.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
-            col.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
-            col.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
-            col.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+            instancesView.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
+            instancesView.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            instancesView.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            instancesView.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
         ])
         instancesStack.addArrangedSubview(card)
         card.widthAnchor.constraint(equalTo: instancesStack.widthAnchor).isActive = true
     }
 
     private func tk(_ v: UInt64) -> String { ContextSnapshot.formatTokens(v) }
-
-    private func gridLabel(_ s: String, size: CGFloat, weight: NSFont.Weight, color: NSColor) -> NSView {
-        let l = NSTextField(labelWithString: s)
-        l.font = NSFont.systemFont(ofSize: size, weight: weight)
-        l.textColor = color
-        l.lineBreakMode = .byTruncatingTail
-        return l
-    }
-
-    /// Indented project name + model subtitle for a data sub-row.
-    private func projectLeading(_ it: Instance) -> NSView {
-        let name = NSTextField(labelWithString: it.project)
-        name.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        name.textColor = .labelColor
-        name.lineBreakMode = .byTruncatingMiddle
-        let models = it.models.map(prettyModel).joined(separator: ", ")
-        let sub = NSTextField(labelWithString: models)
-        sub.font = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .regular)
-        sub.textColor = .tertiaryLabelColor
-        sub.lineBreakMode = .byTruncatingTail
-        let vs = NSStackView(views: models.isEmpty ? [name] : [name, sub])
-        vs.orientation = .vertical
-        vs.alignment = .leading
-        vs.spacing = 1
-        let indent = NSView()
-        indent.translatesAutoresizingMaskIntoConstraints = false
-        indent.widthAnchor.constraint(equalToConstant: 12).isActive = true
-        let h = NSStackView(views: [indent, vs])
-        h.orientation = .horizontal
-        h.alignment = .firstBaseline
-        h.spacing = 0
-        return h
-    }
-
-    private func addSep(_ add: (NSView) -> Void, strong: Bool = false) {
-        let sep = NSBox()
-        sep.boxType = .separator
-        sep.alphaValue = strong ? 1.0 : 0.5
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        add(sep)
-    }
-
-    private func gridRow(leading: NSView, values: [String], style: RowStyle) -> NSView {
-        leading.translatesAutoresizingMaskIntoConstraints = false
-        leading.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        leading.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        var cells: [NSView] = [leading]
-        for (i, v) in values.enumerated() {
-            let isCost = (i == values.count - 1)
-            let lbl = NSTextField(labelWithString: v)
-            lbl.alignment = .right
-            lbl.lineBreakMode = .byClipping
-            lbl.translatesAutoresizingMaskIntoConstraints = false
-            switch style {
-            case .header:
-                lbl.font = NSFont.systemFont(ofSize: 9.5, weight: .semibold)
-                lbl.textColor = .secondaryLabelColor
-            case .total:
-                lbl.font = Typography.bodyMono(11, weight: isCost ? .bold : .semibold)
-                lbl.textColor = isCost ? .labelColor : .secondaryLabelColor
-            case .day:
-                lbl.font = Typography.bodyMono(11, weight: isCost ? .semibold : .regular)
-                lbl.textColor = isCost ? .labelColor : .secondaryLabelColor
-            case .data:
-                lbl.font = Typography.bodyMono(11, weight: isCost ? .semibold : .regular)
-                lbl.textColor = isCost ? .secondaryLabelColor : .tertiaryLabelColor
-                if isCost { lbl.textColor = .labelColor }
-            }
-            lbl.widthAnchor.constraint(equalToConstant: isCost ? costColW : numColW).isActive = true
-            cells.append(lbl)
-        }
-        let r = NSStackView(views: cells)
-        r.orientation = .horizontal
-        r.alignment = .firstBaseline
-        r.spacing = 6
-        r.edgeInsets = NSEdgeInsets(top: style == .header ? 0 : 5, left: 0, bottom: 5, right: 0)
-        r.translatesAutoresizingMaskIntoConstraints = false
-        return r
-    }
 
     // MARK: - Formatting
 
@@ -847,5 +735,147 @@ final class CostTrendChartView: NSView {
         path.lineWidth = 0.5
         path.stroke()
         (text as NSString).draw(at: CGPoint(x: bx + 6, y: by + 3), withAttributes: attrs)
+    }
+}
+
+/// One row in the cost-by-project table.
+private struct CostRow {
+    enum Kind { case header, day, data, total, separator, separatorStrong }
+    let kind: Kind
+    let leading: String
+    let sub: String          // model list, for `.data` rows
+    let values: [String]     // [input, output, cache+, cache↻, total, cost]
+}
+
+/// Draws the per-day-per-project cost table in a single view. Only the rows
+/// intersecting the dirty rect are drawn, so even a full 30-day breakdown
+/// renders in microseconds and scrolls smoothly — no per-cell NSViews or
+/// Auto-Layout constraints (the previous NSStackView approach built ~1.8k
+/// views and stalled the Cost tab on open).
+private final class CostInstancesView: NSView {
+    var rows: [CostRow] = [] {
+        didSet { invalidateIntrinsicContentSize(); needsDisplay = true }
+    }
+
+    override var isFlipped: Bool { true }
+
+    private let numColW: CGFloat = 58
+    private let costColW: CGFloat = 78
+    private let colGap: CGFloat = 6
+    private var colWidths: [CGFloat] { [numColW, numColW, numColW, numColW, numColW, costColW] }
+
+    private func rowHeight(_ k: CostRow.Kind) -> CGFloat {
+        switch k {
+        case .header: return 20
+        case .day: return 24
+        case .data: return 34
+        case .total: return 26
+        case .separator, .separatorStrong: return 9
+        }
+    }
+
+    private var totalHeight: CGFloat { rows.reduce(0) { $0 + rowHeight($1.kind) } }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: ceil(totalHeight))
+    }
+
+    override func layout() {
+        super.layout()
+        // Width changes (window resize) shift the right-aligned columns.
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let widths = colWidths
+        let valsBlock = widths.reduce(0, +) + colGap * CGFloat(widths.count)
+        let valsLeft = max(0, bounds.width - valsBlock)
+        var y: CGFloat = 0
+        for row in rows {
+            let h = rowHeight(row.kind)
+            let rect = NSRect(x: 0, y: y, width: bounds.width, height: h)
+            if rect.intersects(dirtyRect) {
+                drawRow(row, rect: rect, widths: widths, valsLeft: valsLeft)
+            }
+            y += h
+        }
+    }
+
+    private func drawRow(_ row: CostRow, rect: NSRect, widths: [CGFloat], valsLeft: CGFloat) {
+        if row.kind == .separator || row.kind == .separatorStrong {
+            let line = NSBezierPath()
+            line.move(to: NSPoint(x: rect.minX, y: rect.midY))
+            line.line(to: NSPoint(x: rect.maxX, y: rect.midY))
+            NSColor.separatorColor
+                .withAlphaComponent(row.kind == .separatorStrong ? 1.0 : 0.5)
+                .setStroke()
+            line.lineWidth = 1
+            line.stroke()
+            return
+        }
+
+        let leadFont: NSFont
+        let leadColor: NSColor
+        let valFont: NSFont
+        let valColor: NSColor
+        let costColor: NSColor
+        switch row.kind {
+        case .header:
+            leadFont = .systemFont(ofSize: 9.5, weight: .semibold); leadColor = .secondaryLabelColor
+            valFont = .systemFont(ofSize: 9.5, weight: .semibold); valColor = .secondaryLabelColor; costColor = .secondaryLabelColor
+        case .day:
+            leadFont = .systemFont(ofSize: 12, weight: .semibold); leadColor = .labelColor
+            valFont = Typography.bodyMono(11, weight: .regular); valColor = .secondaryLabelColor; costColor = .labelColor
+        case .total:
+            leadFont = .systemFont(ofSize: 12, weight: .bold); leadColor = .labelColor
+            valFont = Typography.bodyMono(11, weight: .semibold); valColor = .secondaryLabelColor; costColor = .labelColor
+        default: // .data
+            leadFont = .systemFont(ofSize: 12, weight: .medium); leadColor = .labelColor
+            valFont = Typography.bodyMono(11, weight: .regular); valColor = .tertiaryLabelColor; costColor = .labelColor
+        }
+
+        let indent: CGFloat = row.kind == .data ? 12 : 0
+        let leadWidth = max(0, valsLeft - indent - 4)
+        if row.kind == .data && !row.sub.isEmpty {
+            drawText(row.leading,
+                     in: NSRect(x: rect.minX + indent, y: rect.minY + 3, width: leadWidth, height: 16),
+                     font: leadFont, color: leadColor, align: .left, mode: .byTruncatingMiddle)
+            drawText(row.sub,
+                     in: NSRect(x: rect.minX + indent, y: rect.minY + 18, width: leadWidth, height: 13),
+                     font: .monospacedSystemFont(ofSize: 9.5, weight: .regular),
+                     color: .tertiaryLabelColor, align: .left, mode: .byTruncatingTail)
+        } else {
+            drawText(row.leading,
+                     in: vCenter(NSRect(x: rect.minX + indent, y: rect.minY, width: leadWidth, height: rect.height), lineH: 15),
+                     font: leadFont, color: leadColor, align: .left, mode: .byTruncatingTail)
+        }
+
+        var x = valsLeft
+        for (i, val) in row.values.enumerated() {
+            x += colGap
+            let cw = widths[i]
+            let isCost = (i == row.values.count - 1)
+            drawText(val,
+                     in: vCenter(NSRect(x: x, y: rect.minY, width: cw, height: rect.height), lineH: 15),
+                     font: valFont, color: isCost ? costColor : valColor, align: .right, mode: .byClipping)
+            x += cw
+        }
+    }
+
+    private func vCenter(_ r: NSRect, lineH: CGFloat) -> NSRect {
+        NSRect(x: r.minX, y: r.minY + (r.height - lineH) / 2, width: r.width, height: lineH)
+    }
+
+    private func drawText(_ s: String, in rect: NSRect, font: NSFont, color: NSColor,
+                          align: NSTextAlignment, mode: NSLineBreakMode) {
+        guard !s.isEmpty, rect.width > 0 else { return }
+        let p = NSMutableParagraphStyle()
+        p.alignment = align
+        p.lineBreakMode = mode
+        (s as NSString).draw(in: rect, withAttributes: [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: p,
+        ])
     }
 }
