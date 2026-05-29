@@ -759,18 +759,24 @@ private final class CostInstancesView: NSView {
 
     override var isFlipped: Bool { true }
 
-    private let numColW: CGFloat = 58
-    private let costColW: CGFloat = 78
-    private let colGap: CGFloat = 6
-    private var colWidths: [CGFloat] { [numColW, numColW, numColW, numColW, numColW, costColW] }
+    // Fixed numeric grid: [input, output, cache+, cache↻, TOTAL, COST]. Columns
+    // are LEFT-anchored to the end of the project column (NOT to bounds.width),
+    // so the grid hugs the leading edge and any extra width is harmless trailing
+    // margin — never an internal gap. Same colX shared by every row kind so the
+    // digits stack vertically.
+    private let colGap: CGFloat = 14
+    private let numW: [CGFloat] = [60, 60, 60, 60, 66, 92]
+    private let projMin: CGFloat = 130
+    private let projMax: CGFloat = 300
+    private var numericBlock: CGFloat { numW.reduce(0, +) + colGap * CGFloat(numW.count) }
 
     private func rowHeight(_ k: CostRow.Kind) -> CGFloat {
         switch k {
-        case .header: return 20
-        case .day: return 24
-        case .data: return 34
-        case .total: return 26
-        case .separator, .separatorStrong: return 9
+        case .header: return 22
+        case .day: return 26
+        case .data: return 36
+        case .total: return 28
+        case .separator, .separatorStrong: return 10
         }
     }
 
@@ -787,78 +793,110 @@ private final class CostInstancesView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let widths = colWidths
-        let valsBlock = widths.reduce(0, +) + colGap * CGFloat(widths.count)
-        let valsLeft = max(0, bounds.width - valsBlock)
+        // Project column flexes between projMin..projMax; the numeric block is
+        // fixed. Numerics start at the project column's right edge — leftover
+        // width becomes trailing margin, so wide windows never open an internal gap.
+        let projectColW = min(projMax, max(projMin, bounds.width - numericBlock))
+        let tableW = projectColW + numericBlock
+        var gx = projectColW
+        var colX: [CGFloat] = []
+        for w in numW { gx += colGap; colX.append(gx); gx += w }
         var y: CGFloat = 0
         for row in rows {
             let h = rowHeight(row.kind)
             let rect = NSRect(x: 0, y: y, width: bounds.width, height: h)
             if rect.intersects(dirtyRect) {
-                drawRow(row, rect: rect, widths: widths, valsLeft: valsLeft)
+                drawRow(row, rect: rect, projectColW: projectColW, colX: colX, tableW: tableW)
             }
             y += h
         }
     }
 
-    private func drawRow(_ row: CostRow, rect: NSRect, widths: [CGFloat], valsLeft: CGFloat) {
+    private func drawRow(_ row: CostRow, rect: NSRect, projectColW: CGFloat, colX: [CGFloat], tableW: CGFloat) {
         if row.kind == .separator || row.kind == .separatorStrong {
             let line = NSBezierPath()
-            line.move(to: NSPoint(x: rect.minX, y: rect.midY))
-            line.line(to: NSPoint(x: rect.maxX, y: rect.midY))
+            line.move(to: NSPoint(x: 0, y: rect.midY))
+            line.line(to: NSPoint(x: tableW, y: rect.midY))
             NSColor.separatorColor
-                .withAlphaComponent(row.kind == .separatorStrong ? 1.0 : 0.5)
+                .withAlphaComponent(row.kind == .separatorStrong ? 1.0 : 0.45)
                 .setStroke()
             line.lineWidth = 1
             line.stroke()
             return
         }
 
+        let accent = ThemeStore.current.accent
         let leadFont: NSFont
         let leadColor: NSColor
-        let valFont: NSFont
+        let valFont: NSFont        // four component columns: input/output/cache+/cache↻
         let valColor: NSColor
+        let totalFont: NSFont      // TOTAL column (index 4)
+        let totalColor: NSColor
+        let costFont: NSFont       // COST column (index 5) — the figure users scan
         let costColor: NSColor
         switch row.kind {
         case .header:
-            leadFont = .systemFont(ofSize: 9.5, weight: .semibold); leadColor = .secondaryLabelColor
-            valFont = .systemFont(ofSize: 9.5, weight: .semibold); valColor = .secondaryLabelColor; costColor = .secondaryLabelColor
+            leadFont = .systemFont(ofSize: 9.5, weight: .semibold); leadColor = .tertiaryLabelColor
+            valFont = leadFont; valColor = .tertiaryLabelColor
+            totalFont = leadFont; totalColor = .tertiaryLabelColor
+            costFont = leadFont; costColor = .tertiaryLabelColor
         case .day:
-            leadFont = .systemFont(ofSize: 12, weight: .semibold); leadColor = .labelColor
-            valFont = Typography.bodyMono(11, weight: .regular); valColor = .secondaryLabelColor; costColor = .labelColor
+            leadFont = .systemFont(ofSize: 12.5, weight: .semibold); leadColor = .labelColor
+            valFont = Typography.bodyMono(11.5, weight: .semibold); valColor = .secondaryLabelColor
+            totalFont = valFont; totalColor = .labelColor
+            costFont = valFont; costColor = accent
         case .total:
-            leadFont = .systemFont(ofSize: 12, weight: .bold); leadColor = .labelColor
-            valFont = Typography.bodyMono(11, weight: .semibold); valColor = .secondaryLabelColor; costColor = .labelColor
+            leadFont = .systemFont(ofSize: 12.5, weight: .bold); leadColor = .labelColor
+            valFont = Typography.bodyMono(11.5, weight: .semibold); valColor = .secondaryLabelColor
+            totalFont = valFont; totalColor = .labelColor
+            costFont = valFont; costColor = accent
         default: // .data
-            leadFont = .systemFont(ofSize: 12, weight: .medium); leadColor = .labelColor
-            valFont = Typography.bodyMono(11, weight: .regular); valColor = .tertiaryLabelColor; costColor = .labelColor
+            leadFont = .systemFont(ofSize: 12, weight: .regular); leadColor = .labelColor
+            valFont = Typography.bodyMono(11, weight: .regular); valColor = .tertiaryLabelColor
+            totalFont = Typography.bodyMono(11, weight: .medium); totalColor = .secondaryLabelColor
+            costFont = Typography.bodyMono(11, weight: .semibold); costColor = .labelColor
         }
 
-        let indent: CGFloat = row.kind == .data ? 12 : 0
-        let leadWidth = max(0, valsLeft - indent - 4)
+        // Leading (PROJECT) column — left edge, indented for data rows.
+        let indent: CGFloat = row.kind == .data ? 16 : 0
+        let leadWidth = max(0, projectColW - indent - 4)
         if row.kind == .data && !row.sub.isEmpty {
             drawText(row.leading,
                      in: NSRect(x: rect.minX + indent, y: rect.minY + 3, width: leadWidth, height: 16),
                      font: leadFont, color: leadColor, align: .left, mode: .byTruncatingMiddle)
             drawText(row.sub,
-                     in: NSRect(x: rect.minX + indent, y: rect.minY + 18, width: leadWidth, height: 13),
+                     in: NSRect(x: rect.minX + indent, y: rect.minY + 19, width: leadWidth, height: 13),
                      font: .monospacedSystemFont(ofSize: 9.5, weight: .regular),
                      color: .tertiaryLabelColor, align: .left, mode: .byTruncatingTail)
         } else {
-            drawText(row.leading,
+            let lead = row.kind == .header ? row.leading.uppercased() : row.leading
+            drawText(lead,
                      in: vCenter(NSRect(x: rect.minX + indent, y: rect.minY, width: leadWidth, height: rect.height), lineH: 15),
-                     font: leadFont, color: leadColor, align: .left, mode: .byTruncatingTail)
+                     font: leadFont, color: leadColor, align: .left,
+                     mode: .byTruncatingTail, kern: row.kind == .header ? 0.6 : 0)
         }
 
-        var x = valsLeft
-        for (i, val) in row.values.enumerated() {
-            x += colGap
-            let cw = widths[i]
-            let isCost = (i == row.values.count - 1)
-            drawText(val,
-                     in: vCenter(NSRect(x: x, y: rect.minY, width: cw, height: rect.height), lineH: 15),
-                     font: valFont, color: isCost ? costColor : valColor, align: .right, mode: .byClipping)
-            x += cw
+        // Numeric columns — shared colX/numW, identical across every row kind so
+        // the digits stack vertically. TOTAL + COST styled distinctly.
+        for (i, val) in row.values.enumerated() where i < colX.count {
+            let isTotal = (i == 4), isCost = (i == 5)
+            let f = isCost ? costFont : (isTotal ? totalFont : valFont)
+            let c = isCost ? costColor : (isTotal ? totalColor : valColor)
+            let s = row.kind == .header ? val.uppercased() : val
+            drawText(s,
+                     in: vCenter(NSRect(x: colX[i], y: rect.minY, width: numW[i], height: rect.height), lineH: 15),
+                     font: f, color: c, align: .right,
+                     mode: .byClipping, kern: row.kind == .header ? 0.6 : 0)
+        }
+
+        // Hairline seating the header grid; ends at the table edge, not bounds.
+        if row.kind == .header {
+            let line = NSBezierPath()
+            line.move(to: NSPoint(x: 0, y: rect.maxY - 0.5))
+            line.line(to: NSPoint(x: tableW, y: rect.maxY - 0.5))
+            NSColor.separatorColor.withAlphaComponent(0.6).setStroke()
+            line.lineWidth = 1
+            line.stroke()
         }
     }
 
@@ -867,15 +905,17 @@ private final class CostInstancesView: NSView {
     }
 
     private func drawText(_ s: String, in rect: NSRect, font: NSFont, color: NSColor,
-                          align: NSTextAlignment, mode: NSLineBreakMode) {
+                          align: NSTextAlignment, mode: NSLineBreakMode, kern: CGFloat = 0) {
         guard !s.isEmpty, rect.width > 0 else { return }
         let p = NSMutableParagraphStyle()
         p.alignment = align
         p.lineBreakMode = mode
-        (s as NSString).draw(in: rect, withAttributes: [
+        var attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: color,
             .paragraphStyle: p,
-        ])
+        ]
+        if kern != 0 { attrs[.kern] = kern }
+        (s as NSString).draw(in: rect, withAttributes: attrs)
     }
 }
