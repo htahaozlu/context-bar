@@ -19,6 +19,7 @@ fn main() {
 
     let claude = context_bar_core::collect::collect_claude(&home, now);
     let codex = context_bar_core::collect::collect_codex(&home, now);
-    let out = serde_json::json!({ "claude": claude, "codex": codex });
+    let others = context_bar_core::others::collect_others(&home, now);
+    let out = serde_json::json!({ "claude": claude, "codex": codex, "others": others });
     println!("{}", serde_json::to_string(&out).unwrap());
 }
