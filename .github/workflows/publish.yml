@@ -11,24 +11,29 @@ on:
         description: "Release tag whose prebuilt binaries to package for npm"
         required: true
         default: "v0.6.0"
+      registry:
+        description: "Which registry to publish to"
+        type: choice
+        default: both
+        options: [both, crates, npm]
 
 permissions:
   contents: read
 
 jobs:
   crates:
+    if: ${{ inputs.registry != 'npm' }}
     runs-on: ubuntu-latest
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Publish core then bin (idempotent)
+      - name: Publish core then bin (single attempt, idempotent)
         if: env.CARGO_REGISTRY_TOKEN != ''
         shell: bash
         run: |
           set -uo pipefail
-          set +e  # GitHub injects `bash -e`; turn it off so a tolerated
-                  # "already published" (rc=2) doesn't abort before the bin loop.
+          set +e  # GitHub injects `bash -e`; keep tolerated "already published" non-fatal.
           # 0 = published, 2 = already at this version (tolerate), 1 = other.
           publish_crate() {
             local out
@@ -41,17 +46,19 @@ jobs:
           }
           publish_crate context-bar-core; rc=$?
           if [[ $rc -eq 1 ]]; then echo "::error::core publish failed"; exit 1; fi
-          # The bin can lag behind core's index, or hit the new-crate rate limit;
-          # retry generously (20 × 45s = 15 min).
-          for i in $(seq 1 20); do
-            publish_crate context-bar; rc=$?
-            if [[ $rc -eq 0 || $rc -eq 2 ]]; then echo "bin ok (rc=$rc)"; exit 0; fi
-            echo "bin not yet published; retry $i/20 in 45s"
-            sleep 45
-          done
-          echo "::error::bin publish failed after retries"; exit 1
+          # ONE attempt only. crates.io's new-crate rate limit ADVANCES its
+          # window on each attempt, so retry-hammering keeps it perpetually
+          # blocked. If this 429s, wait quietly (no dispatches) until past the
+          # reported reset, then dispatch once more.
+          publish_crate context-bar; rc=$?
+          case $rc in
+            0) echo "bin published" ;;
+            2) echo "bin already published" ;;
+            *) echo "::error::bin publish failed — likely the crates.io new-crate rate limit. Wait past the reported reset (do NOT re-run repeatedly), then dispatch registry=crates once."; exit 1 ;;
+          esac
 
   npm:
+    if: ${{ inputs.registry != 'crates' }}
     runs-on: ubuntu-latest
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
