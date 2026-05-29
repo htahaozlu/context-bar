@@ -90,6 +90,7 @@ func agentInlineLabel(name: String, font: NSFont, color: NSColor, iconScale: CGF
 struct ActiveSession {
     let id: String
     let tokens: UInt64
+    let cost: Double
     let project: String
     let model: String?
     let lastTurn: Date?
@@ -104,6 +105,7 @@ struct Agent {
     let week7d: UInt64
     let week7dPercent: Double?
     let activeSession: UInt64
+    let activeSessionCost: Double
     let model: String?
     let cwd: String?
     let ctxPct: Double?

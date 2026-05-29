@@ -25,6 +25,8 @@ pub struct ActiveSession {
     #[serde(default)]
     pub tokens: u64,
     #[serde(default)]
+    pub cost: f64,
+    #[serde(default)]
     pub started_at: Option<String>,
     #[serde(default)]
     pub last_turn_at: Option<String>,
@@ -60,6 +62,8 @@ pub struct AgentUsage {
     pub cache_read_tokens_30d: u64,
     #[serde(default)]
     pub active_session_tokens: u64,
+    #[serde(default)]
+    pub active_session_cost: f64,
     #[serde(default)]
     pub active_session_file: Option<String>,
     #[serde(default)]

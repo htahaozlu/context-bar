@@ -154,7 +154,7 @@ The **Cost** tab answers a question subscription users increasingly ask — *"wh
 - per-day, per-project cost breakdown (the native equivalent of `better-ccusage daily --instances`), for both Claude and Codex
 - estimated cost for today / last 7 days / last 30 days, plus 30-day input vs. output token totals
 - a **monthly projection** compared to your actual plan price (e.g. *"≈ $8,268/mo — about 41× your Max 20× plan"*)
-- a 30-day cost-trend sparkline with peak/day
+- an interactive 30-day cost-trend chart — hover any day for its date, estimated cost, and tokens
 - priced **per turn by model** from the LiteLLM rate table (the same canonical source ccusage uses), fetched live with a 24h on-disk cache and a bundled offline fallback; Anthropic's prompt-cache and >200K long-context rules are honored
 - everything is clearly labelled an **estimate** — subscription plans are not billed per token. Set `CONTEXTBAR_PRICING_OFFLINE=1` to skip the live rate fetch.
 

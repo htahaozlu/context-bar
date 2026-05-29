@@ -381,13 +381,18 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // about context usage. Prior UI showed only "621.1k / 200k" with no
         // label, leaving users confused about what 27% measured.
         let ctxLabel = L10n.text("Context", "Bağlam")
-        let detailText: String
+        var detailText: String
         if let w = a.ctxWindow {
             detailText = "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
         } else if used > 0 {
             detailText = "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) " + L10n.text("session", "oturum")
         } else {
             detailText = L10n.text("Context unknown", "Bağlam bilinmiyor")
+        }
+        // Estimated API-equivalent cost of this session — answers "how much did
+        // this session cost?" at a glance. "~" keeps it clearly an estimate.
+        if a.activeSessionCost > 0 {
+            detailText += "  ·  ~\(ContextSnapshot.formatUSD(a.activeSessionCost)) " + L10n.text("est.", "tahmini")
         }
         let detail = NSTextField(labelWithString: detailText)
         detail.font = Typography.bodyMono(11, weight: .regular)

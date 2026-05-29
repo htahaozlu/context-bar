@@ -26,7 +26,6 @@ final class CostViewController: PreferencePaneViewController {
     private let projectionLabel = NSTextField(labelWithString: "")
     private let savingsLabel = NSTextField(labelWithString: "")
     private let sparkHost = NSView()
-    private var sparkView: SparklineView?
     private let instancesStack = NSStackView()
     private let footnote = NSTextField(labelWithString: "")
 
@@ -101,12 +100,12 @@ final class CostViewController: PreferencePaneViewController {
         savingsLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
 
         sparkHost.translatesAutoresizingMaskIntoConstraints = false
-        sparkHost.heightAnchor.constraint(equalToConstant: 64).isActive = true
+        sparkHost.heightAnchor.constraint(equalToConstant: 150).isActive = true
         addSection(
             title: L10n.text("Cost trend (30 days)", "Maliyet trendi (30 gün)"),
             subtitle: L10n.text(
-                "Estimated daily cost. Each point is one day.",
-                "Tahmini günlük maliyet. Her nokta bir gün."
+                "Estimated daily cost. Hover any day for its date, cost, and tokens.",
+                "Tahmini günlük maliyet. Tarih, maliyet ve token için bir günün üzerine gelin."
             ),
             body: sparkHost
         )
@@ -153,9 +152,10 @@ final class CostViewController: PreferencePaneViewController {
         let cost: Double
     }
 
+    private struct DailyPoint { let date: String; let cost: Double; let tokens: UInt64 }
     private struct CostData {
         var instances: [Instance] = []
-        var dailyCosts: [Double] = []      // last 30 days, oldest → newest
+        var dailyPoints: [DailyPoint] = []   // last 30 days, oldest → newest
         var costToday: Double = 0
         var cost7d: Double = 0
         var cost30d: Double = 0
@@ -213,9 +213,11 @@ final class CostViewController: PreferencePaneViewController {
             )
         }
         // by_day arrives newest-first (padded to the history window). Take the
-        // last 30 calendar days and flip to oldest→newest for the sparkline.
+        // last 30 calendar days and flip to oldest→newest for the trend chart.
         let byDay = (c["by_day"] as? [[String: Any]]) ?? []
-        out.dailyCosts = byDay.prefix(30).reversed().map { dbl($0["cost"]) }
+        out.dailyPoints = byDay.prefix(30).reversed().map {
+            DailyPoint(date: ($0["date"] as? String) ?? "", cost: dbl($0["cost"]), tokens: u64($0["tokens"]))
+        }
 
         // Active subscription (for the API-vs-plan projection). Accounts live at
         // the snapshot root; prefer the active one, else the first.
@@ -233,8 +235,9 @@ final class CostViewController: PreferencePaneViewController {
         let data = loadData()
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         instancesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        sparkView?.removeFromSuperview()
-        sparkView = nil
+        // Clear EVERY trend-host subview (chart, caption, empty label) so
+        // repeated reloads don't stack overlapping views/text.
+        sparkHost.subviews.forEach { $0.removeFromSuperview() }
 
         // The 7-day cost_7d is a precise rolling-window value from the engine;
         // for the 7-day range we also scope the instance list to the last 7
@@ -275,13 +278,13 @@ final class CostViewController: PreferencePaneViewController {
 
         renderProjection(data)
         renderSavings(data)
-        renderSparkline(data.dailyCosts)
+        renderTrend(data.dailyPoints)
         renderInstances(visible)
 
         let src = data.pricingSource.map { srcLabel($0) } ?? "—"
         footnote.stringValue = L10n.text(
-            "Rates: \(src). Estimated API-equivalent cost — not billed amounts.",
-            "Oranlar: \(src). Tahmini API-eşdeğeri maliyet — faturalandırılan tutar değildir."
+            "Rates: \(src). Estimated as if metered. Subscription usage isn't billed per token; API-key usage is — the transcripts don't record which mode a session used, so all of it is shown as an estimate.",
+            "Oranlar: \(src). Ölçümlüymüş gibi tahmin. Abonelik kullanımı token başına faturalanmaz; API-key kullanımı faturalanır — transkriptler bir oturumun hangi modda olduğunu kaydetmediği için hepsi tahmin olarak gösterilir."
         )
     }
 
@@ -354,9 +357,9 @@ final class CostViewController: PreferencePaneViewController {
         savingsLabel.attributedStringValue = result
     }
 
-    private func renderSparkline(_ costs: [Double]) {
-        let nonZero = costs.contains { $0 > 0 }
-        guard costs.count >= 2, nonZero else {
+    private func renderTrend(_ points: [DailyPoint]) {
+        let nonZero = points.contains { $0.cost > 0 }
+        guard points.count >= 2, nonZero else {
             let empty = NSTextField(labelWithString: L10n.text("No cost trend yet.", "Henüz maliyet trendi yok."))
             empty.font = NSFont.systemFont(ofSize: 11)
             empty.textColor = .tertiaryLabelColor
@@ -368,28 +371,34 @@ final class CostViewController: PreferencePaneViewController {
             ])
             return
         }
-        let spark = SparklineView()
-        spark.values = costs
-        spark.tint = ThemeStore.current.accent
-        spark.translatesAutoresizingMaskIntoConstraints = false
-        sparkHost.addSubview(spark)
+        let total = points.reduce(0.0) { $0 + $1.cost }
+        let peak = points.map(\.cost).max() ?? 0
+        let caption = NSTextField(labelWithString: L10n.text(
+            "30d total \(formatUSD(total))  ·  peak \(formatUSD(peak))/day  ·  hover for a day",
+            "30g toplam \(formatUSD(total))  ·  zirve \(formatUSD(peak))/gün  ·  gün için üzerine gel"
+        ))
+        caption.font = Typography.bodyMono(10, weight: .regular)
+        caption.textColor = .tertiaryLabelColor
+        caption.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.addSubview(caption)
 
-        let peak = costs.max() ?? 0
-        let peakLbl = NSTextField(labelWithString: L10n.text("peak \(formatUSD(peak))/day", "zirve \(formatUSD(peak))/gün"))
-        peakLbl.font = Typography.bodyMono(10, weight: .regular)
-        peakLbl.textColor = .tertiaryLabelColor
-        peakLbl.translatesAutoresizingMaskIntoConstraints = false
-        sparkHost.addSubview(peakLbl)
+        let chart = CostTrendChartView()
+        chart.tint = ThemeStore.current.accent
+        chart.points = points.map { (date: $0.date, cost: $0.cost, tokens: $0.tokens) }
+        chart.usd = { ContextSnapshot.formatUSD($0) }
+        chart.tokensFmt = { ContextSnapshot.formatTokens($0) }
+        chart.dayLabel = { [weak self] in self?.formatDay($0) ?? $0 }
+        chart.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.addSubview(chart)
 
         NSLayoutConstraint.activate([
-            spark.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
-            spark.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
-            spark.topAnchor.constraint(equalTo: sparkHost.topAnchor),
-            spark.heightAnchor.constraint(equalToConstant: 48),
-            peakLbl.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
-            peakLbl.topAnchor.constraint(equalTo: spark.bottomAnchor, constant: 2),
+            caption.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
+            caption.topAnchor.constraint(equalTo: sparkHost.topAnchor),
+            chart.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
+            chart.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
+            chart.topAnchor.constraint(equalTo: caption.bottomAnchor, constant: 6),
+            chart.bottomAnchor.constraint(equalTo: sparkHost.bottomAnchor),
         ])
-        sparkView = spark
     }
 
     /// Monthly USD price of the active Anthropic plan (for the API comparison).
@@ -605,5 +614,155 @@ final class CostViewController: PreferencePaneViewController {
         }
         let codex = m.contains("codex") ? " codex" : ""
         return base + codex + suffix
+    }
+}
+
+/// Interactive 30-day cost trend. Gradient area + line like the sparkline, but
+/// with mouse tracking: hover snaps to the nearest day and draws a crosshair,
+/// a highlighted dot, and a tooltip with that day's date, cost, and tokens.
+final class CostTrendChartView: NSView {
+    var points: [(date: String, cost: Double, tokens: UInt64)] = [] { didSet { needsDisplay = true } }
+    var tint: NSColor = .controlAccentColor { didSet { needsDisplay = true } }
+    var usd: (Double) -> String = { String(format: "$%.2f", $0) }
+    var tokensFmt: (UInt64) -> String = { "\($0)" }
+    var dayLabel: (String) -> String = { $0 }
+
+    private var hoverIndex: Int?
+    private var trackingArea: NSTrackingArea?
+    private let padX: CGFloat = 6
+    private let padTop: CGFloat = 20   // reserve a band for the tooltip
+    private let padBottom: CGFloat = 4
+
+    override var isFlipped: Bool { false }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setAccessibilityRole(.image)
+        setAccessibilityLabel("Daily cost trend")
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // Capture-only: lets marketing/verification screenshots render the hover
+        // tooltip without a live cursor. No effect in normal use.
+        if let raw = ProcessInfo.processInfo.environment["CONTEXTBAR_DEBUG_HOVER"],
+           let i = Int(raw), points.count >= 2 {
+            hoverIndex = min(max(0, i), points.count - 1)
+            needsDisplay = true
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = trackingArea { removeTrackingArea(t) }
+        let t = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp],
+            owner: self, userInfo: nil
+        )
+        addTrackingArea(t)
+        trackingArea = t
+    }
+
+    private func point(at i: Int, maxV: Double) -> CGPoint {
+        let n = points.count
+        let usableW = bounds.width - padX * 2
+        let x = n <= 1 ? bounds.width / 2 : padX + CGFloat(i) * (usableW / CGFloat(n - 1))
+        let usableH = bounds.height - padTop - padBottom
+        let norm = maxV > 0 ? CGFloat(points[i].cost / maxV) : 0
+        return CGPoint(x: x, y: padBottom + norm * usableH)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        guard points.count >= 2 else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        let n = points.count
+        let usableW = max(1, bounds.width - padX * 2)
+        let rel = (p.x - padX) / usableW
+        let idx = max(0, min(n - 1, Int((rel * CGFloat(n - 1)).rounded())))
+        if idx != hoverIndex { hoverIndex = idx; needsDisplay = true }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if hoverIndex != nil { hoverIndex = nil; needsDisplay = true }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard points.count >= 2, let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let maxV = max(points.map(\.cost).max() ?? 1, 1e-9)
+        let n = points.count
+
+        let line = CGMutablePath()
+        line.move(to: point(at: 0, maxV: maxV))
+        for i in 1..<n { line.addLine(to: point(at: i, maxV: maxV)) }
+
+        let area = CGMutablePath()
+        area.move(to: CGPoint(x: point(at: 0, maxV: maxV).x, y: padBottom))
+        for i in 0..<n { area.addLine(to: point(at: i, maxV: maxV)) }
+        area.addLine(to: CGPoint(x: point(at: n - 1, maxV: maxV).x, y: padBottom))
+        area.closeSubpath()
+
+        ctx.saveGState()
+        ctx.addPath(area)
+        ctx.clip()
+        let grad = CGGradient(
+            colorsSpace: nil,
+            colors: [tint.withAlphaComponent(0.22).cgColor, tint.withAlphaComponent(0.0).cgColor] as CFArray,
+            locations: [0, 1]
+        )!
+        ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: padBottom),
+                               end: CGPoint(x: 0, y: bounds.height), options: [])
+        ctx.restoreGState()
+
+        ctx.saveGState()
+        ctx.setStrokeColor(tint.cgColor)
+        ctx.setLineWidth(1.5)
+        ctx.setLineJoin(.round)
+        ctx.setLineCap(.round)
+        ctx.addPath(line)
+        ctx.strokePath()
+        ctx.restoreGState()
+
+        if let i = hoverIndex {
+            let pt = point(at: i, maxV: maxV)
+            ctx.saveGState()
+            ctx.setStrokeColor(NSColor.secondaryLabelColor.withAlphaComponent(0.45).cgColor)
+            ctx.setLineWidth(1)
+            ctx.move(to: CGPoint(x: pt.x, y: padBottom))
+            ctx.addLine(to: CGPoint(x: pt.x, y: bounds.height - padTop + 8))
+            ctx.strokePath()
+            ctx.setFillColor(tint.cgColor)
+            ctx.fillEllipse(in: CGRect(x: pt.x - 3, y: pt.y - 3, width: 6, height: 6))
+            ctx.restoreGState()
+            drawTooltip(for: i)
+        } else {
+            let last = point(at: n - 1, maxV: maxV)
+            ctx.setFillColor(tint.cgColor)
+            ctx.fillEllipse(in: CGRect(x: last.x - 2.5, y: last.y - 2.5, width: 5, height: 5))
+        }
+    }
+
+    private func drawTooltip(for i: Int) {
+        let p = points[i]
+        let text = "\(dayLabel(p.date))   \(usd(p.cost))   \(tokensFmt(p.tokens))"
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium),
+            .foregroundColor: NSColor.labelColor,
+        ]
+        let size = (text as NSString).size(withAttributes: attrs)
+        let boxW = size.width + 12, boxH = size.height + 6
+        let maxV = max(points.map(\.cost).max() ?? 1, 1e-9)
+        var bx = point(at: i, maxV: maxV).x - boxW / 2
+        bx = max(0, min(bounds.width - boxW, bx))
+        let by = bounds.height - boxH
+        let box = NSRect(x: bx, y: by, width: boxW, height: boxH)
+        let path = NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5)
+        NSColor.windowBackgroundColor.withAlphaComponent(0.97).setFill()
+        path.fill()
+        NSColor.separatorColor.setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
+        (text as NSString).draw(at: CGPoint(x: bx + 6, y: by + 3), withAttributes: attrs)
     }
 }

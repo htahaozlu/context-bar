@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.24] - 2026-05-29
+
+### Fixed
+
+- Cost trend "peak" label no longer stacks into overlapping text on repeated reloads — every trend-host subview is cleared before re-rendering, not just the chart.
+
+### Added
+
+- **Interactive cost trend chart** — hover any day in the 30-day trend to see its date, estimated cost, and token count (crosshair + tooltip). Replaces the static sparkline.
+- **Session cost in the menubar popover** — the active-session hero now shows that session's estimated API-equivalent cost alongside its context usage.
+
+### Changed
+
+- Cost footnote now states the API-key vs. subscription caveat precisely: transcripts don't record which billing mode a session used, so everything is shown as an estimate. Subscription usage isn't billed per token; API-key usage is, and the two can't be separated from the logs. Added `active_session_cost` to the snapshot and `cost` to `active_sessions`.
+
 ## [0.3.23] - 2026-05-29
 
 ### Added

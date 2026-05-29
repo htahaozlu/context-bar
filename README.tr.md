@@ -146,7 +146,7 @@ Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) d
 - gün başına, proje başına maliyet kırılımı (`better-ccusage daily --instances`'in native karşılığı), hem Claude hem Codex için
 - bugün / son 7 gün / son 30 gün için tahmini maliyet, artı 30 günlük girdi/çıktı token toplamları
 - gerçek plan fiyatınızla karşılaştırmalı **aylık projeksiyon** (örn. *"≈ $8.268/ay — Max 20× planınızın ~41 katı"*)
-- zirve/gün etiketli 30 günlük maliyet trend sparkline'ı
+- interaktif 30 günlük maliyet trend grafiği — herhangi bir günün üzerine gelince tarih, tahmini maliyet ve token
 - **model bazında turn turn** fiyatlama, LiteLLM oran tablosundan (ccusage ile aynı kanonik kaynak) — 24s disk cache + gömülü offline fallback ile canlı çekilir; Anthropic'in prompt-cache ve >200K uzun-bağlam kuralları gözetilir
 - her şey açıkça **tahmin** olarak etiketli — abonelik planları token başına faturalandırılmaz. Canlı oran çekimini atlamak için `CONTEXTBAR_PRICING_OFFLINE=1`.
 

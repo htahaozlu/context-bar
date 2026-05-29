@@ -139,6 +139,7 @@ final class ContextSnapshot {
             return ActiveSession(
                 id: id,
                 tokens: u64(obj["tokens"]),
+                cost: dbl(obj["cost"]) ?? 0,
                 project: (obj["project"] as? String) ?? "—",
                 model: obj["model"] as? String,
                 lastTurn: last,
@@ -177,6 +178,7 @@ final class ContextSnapshot {
                 ?? dbl(sevenDayOverlay?["utilization"])
                 ?? dbl(sevenDayOverlay?["used_percentage"]),
             activeSession: u64(raw["active_session_tokens"]),
+            activeSessionCost: dbl(raw["active_session_cost"]) ?? 0,
             model: raw["last_model"] as? String,
             cwd: resolvedCwd,
             ctxPct: resolvedCtxPct,
@@ -291,6 +293,20 @@ final class ContextSnapshot {
         if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000.0) }
         if value >= 1_000 { return String(format: "%.1fk", Double(value) / 1_000.0) }
         return "\(value)"
+    }
+
+    /// USD with comma grouping + 2 decimals; `<$0.01` for tiny non-zero values.
+    /// Shared by the Cost tab and the popover so money reads consistently.
+    static func formatUSD(_ value: Double) -> String {
+        if value <= 0 { return "$0.00" }
+        if value < 0.01 { return "<$0.01" }
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.minimumFractionDigits = 2
+        f.maximumFractionDigits = 2
+        f.groupingSeparator = ","
+        f.decimalSeparator = "."
+        return "$" + (f.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value))
     }
 
     static func formatUsageValue(percent: Double?, tokens: UInt64) -> String {

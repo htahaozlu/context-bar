@@ -420,6 +420,7 @@ def empty_block():
         "cache_read_tokens_7d": 0,
         "cache_read_tokens_30d": 0,
         "active_session_tokens": 0,
+        "active_session_cost": 0.0,
         "active_session_file": None,
         "active_session_started_at": None,
         "last_turn_input_tokens": 0,
@@ -775,6 +776,7 @@ def build_active_sessions(per_session):
         actives.append({
             "id": os.path.basename(path).rsplit(".", 1)[0],
             "tokens": s["tokens"],
+            "cost": round(s.get("cost", 0.0) or 0.0, 6),
             "started_at": datetime.fromtimestamp(s["first_ts"], tz=timezone.utc).isoformat().replace("+00:00", "Z"),
             "last_turn_at": datetime.fromtimestamp(s["last_ts"], tz=timezone.utc).isoformat().replace("+00:00", "Z"),
             "model": s["model"],
@@ -1323,6 +1325,7 @@ def collect_claude():
         s = per_session.get(out["active_session_file"])
         if s:
             out["active_session_tokens"] = s["tokens"]
+            out["active_session_cost"] = round(s.get("cost", 0.0) or 0.0, 6)
             out["active_session_started_at"] = datetime.fromtimestamp(
                 s["first_ts"], tz=timezone.utc
             ).isoformat().replace("+00:00", "Z")
@@ -1528,6 +1531,7 @@ def collect_codex():
         s = per_session.get(out["active_session_file"])
         if s:
             out["active_session_tokens"] = s["tokens"]
+            out["active_session_cost"] = round(s.get("cost", 0.0) or 0.0, 6)
             out["active_session_started_at"] = datetime.fromtimestamp(
                 s["first_ts"], tz=timezone.utc
             ).isoformat().replace("+00:00", "Z")
