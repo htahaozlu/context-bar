@@ -61,11 +61,24 @@ macOS uygulamayı "hasarlı" olarak gösterirse quarantine işaretini kaldırın
 xattr -dr com.apple.quarantine /Applications/ContextBar.app
 ```
 
-### CLI
+### Terminal CLI
+
+Terminal CLI'yi kaynaktan derleyin:
 
 ```bash
-cargo install --path .
+git clone https://github.com/htahaozlu/context-bar.git
+cd context-bar
+cargo build --release
+# ikili dosya: target/release/context-bar
 ```
+
+Veya crates.io'da yayımlandığında:
+
+```bash
+cargo install context-bar
+```
+
+Çapraz platform önceden derlenmiş ikili dosyalar ve `npx context-bar` 0.5.0 ile geliyor.
 
 ## Önizleme
 
@@ -238,6 +251,55 @@ context-bar watch-global 30
 ```
 
 Global HUD `~/.context-bar/hud.md` konumuna yazılır.
+
+## Terminal CLI
+
+context-bar 0.4.0, birinci sınıf bir **TERMINAL CLI** ile geliyor (macOS menubar uygulaması değişmedi ve premium yüzey olmaya devam ediyor). Aynı maliyet motoru üzerine inşa edilen yeni rapor fiilleri, ccusage tarzı tablolar üretir:
+
+### Fiiller
+
+- `daily` — gün başına kullanım + maliyet tablosu (Claude + Codex); bir "All" satırı, ajan başına alt satırlar ve bir Total satırıyla gruplanır
+- `weekly` — ISO-hafta başına tablo
+- `monthly` — ay başına tablo
+- `session` — son oturumlar tablosu
+- `blocks` — (yer tutucu) canlı 5sa-pencere yanma panosu 0.5.0'da geliyor (EPIC B2)
+
+### Rapor bayrakları
+
+- `--instances` — günlük tabloyu proje bazında böler (gün × proje)
+- `--breakdown`, `-b` — ayrıca model bazında bir kırılım tablosu basar
+- `--agent <claude|codex|all>` — tek bir ajanla sınırlar (varsayılan all)
+- `--since <YYYYMMDD>` / `--until <YYYYMMDD>` — dahil edici tarih filtresi
+- `--json` — raporu JSON olarak verir (boru hattı / jq için)
+- `--offline` — canlı fiyat çekimini atlar (önbellekli/gömülü oranlar)
+- `--lang <en|tr>` — arayüz dilini zorlar (varsayılan: locale; tablolar + başlıklar tamamen iki dilli EN/TR)
+- `--no-color` — ANSI rengini devre dışı bırakır (boru hattına yönlendirildiğinde veya `NO_COLOR` ayarlıyken otomatik kapanır)
+
+### Değişmeyen motor fiilleri
+
+`hud`, `snapshot`, `global`, `claude-statusline`, `watch`, `watch-global`, `--version`.
+
+### Sütunlar
+
+ccusage günlük tablosuyla eşleşir: Tarih · Ajan · Modeller · Girdi · Çıktı · Önbellek Oluşturma · Önbellek Okuma · Toplam · Maliyet (USD). "Toplam", ccusage'ın Total Tokens değeridir = girdi + çıktı + önbellek oluşturma + önbellek okuma. Maliyetler, ölçümlü API'nin ne ücretlendireceğine dair **tahminlerdir** — fatura değil (abonelik kullanıcıları token başına faturalandırılmaz).
+
+### Çalışma zamanı notu
+
+Motor şu an `python3` başlatır (artık ikili dosyaya gömülü olan `usage_signal.py` toplayıcısı). Bu nedenle CLI'nin PATH üzerinde `python3` olması gerekir. Saf Rust bir motor (`python3` olmadan) + çapraz platform ikili dosyalar + `npx` + Windows desteği 0.5.0'da geliyor (bkz. `docs/ai/ROADMAP.md`).
+
+### Örnek
+
+Coding Agent Usage Report — Daily
+
+```
+| Tarih      | Ajan       | Modeller          | Girdi   | Çıktı     | Önbellek Oluşturma | Önbellek Okuma | Toplam        | Maliyet (USD) |
+| 2026-05-29 | All        | opus-4-8, gpt-5.5 | 937,053 | 5,372,832 | 17,259,276         | 997,890,608    | 1,021,459,769 | $746.00       |
+|            |   - Claude | opus-4-8          | 652,442 | 5,336,901 | 17,259,276         | 995,772,208    | 1,019,020,827 | $742.44       |
+|            |   - Codex  | gpt-5.5           | 284,611 | 35,931    | 0                  | 2,118,400      | 2,438,942     | $3.56         |
+| Total      |            |                   | ...     | ...       | ...                | ...            | ...           | $1,682.65     |
+```
+
+(Gerçek terminalde bunlar comfy-table aracılığıyla Unicode kutu-çizim tablolarıdır.)
 
 ## Artifact düzeni
 

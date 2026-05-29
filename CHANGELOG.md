@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.4.0] - 2026-05-29
+
+### Added
+
+- **Terminal CLI — daily / weekly / monthly / session.** New `context-bar` subcommands print ccusage-style tables straight to your shell: columns are **Date · Agent · Models · Input · Output · Cache Create · Cache Read · Total · Cost**, grouped per period. Flags: `--instances` (split by project, per day × project), `--breakdown` (append a per-model table), `--agent` (filter to one agent), `--since` / `--until` (date range), `--json` (machine-readable output), `--offline` (skip the live pricing fetch), `--lang en|tr` (bilingual headers and labels), and `--no-color`. It reuses the exact same cost engine as the menubar app — **Total** is ccusage's "Total Tokens" (all four buckets), distinct from the Stats tab's fresh-work total.
+
+### Changed
+
+- **Workspace split — `context-bar-core` crate.** Extracted a cross-platform `context-bar-core` crate that owns the engine, the cost/token logic, the shared bilingual i18n, and the new report module. The root `context-bar` is now a thin CLI binary plus Zed extension that re-exports core. Fixes a latent wasm32 (Zed extension) build break uncovered by the split.
+- **Engine self-contained for `cargo install`.** `usage_signal.py` is embedded in the binary and materialized to `~/.context-bar` on first run as a fallback, so `cargo install` works without a separate engine checkout.
+- Cost-model fidelity is preserved end to end — figures remain API-equivalent estimates, not a bill. Cross-platform prebuilt binaries, `npx` distribution, and a pure-Rust (no-`python3`) engine are deferred to **0.5.0**.
+
 ## [0.3.25] - 2026-05-29
 
 ### Changed

@@ -74,6 +74,21 @@ xattr -dr com.apple.quarantine /Applications/ContextBar.app
 cargo install --path .
 ```
 
+#### Terminal CLI
+
+Build from source or install from crates.io once published:
+
+```bash
+git clone https://github.com/htahaozlu/context-bar.git
+cd context-bar
+cargo build --release   # binary at target/release/context-bar
+
+# or, once published:
+cargo install context-bar
+```
+
+The terminal CLI currently spawns `python3` for usage aggregation, so it needs `python3` on `PATH`. Cross-platform prebuilt binaries, a pure-Rust engine (no `python3`), `npx context-bar`, and Windows support are rolling out in 0.5.0 — see `docs/ai/ROADMAP.md`.
+
 ## Preview
 
 <p align="center">
@@ -246,6 +261,44 @@ context-bar watch-global 30
 ```
 
 The global HUD is written to `~/.context-bar/hud.md`.
+
+## Terminal CLI
+
+`context-bar 0.4.0` adds a first-class terminal CLI built on the same cost engine that powers the macOS app (which remains the premium surface and is unchanged). New report verbs render `ccusage`-style tables for Claude Code and Codex usage.
+
+### Report verbs
+
+- `context-bar daily` — per-day usage + cost table (Claude + Codex), grouped with an "All" row, per-agent sub-rows, and a Total row
+- `context-bar weekly` — per-ISO-week table
+- `context-bar monthly` — per-month table
+- `context-bar session` — recent sessions table
+- `context-bar blocks` — the live 5h-window burn dashboard (placeholder; ships in 0.5.0)
+
+### Report flags
+
+- `--instances` — split the daily table by project (per day × project)
+- `--breakdown`, `-b` — also print a per-model breakdown table
+- `--agent <claude|codex|all>` — restrict to one agent (default: `all`)
+- `--since <YYYYMMDD>` / `--until <YYYYMMDD>` — inclusive date filter
+- `--json` — emit the report as JSON (for piping / `jq`)
+- `--offline` — skip the live pricing fetch (cached / bundled rates)
+- `--lang <en|tr>` — force UI language (default: locale; tables and headers are fully bilingual EN/TR)
+- `--no-color` — disable ANSI color (also auto-off when piped or `NO_COLOR` is set)
+
+The engine verbs `hud`, `snapshot`, `global`, `claude-statusline`, `watch`, `watch-global`, and `--version` are unchanged.
+
+### Example
+
+```
+Coding Agent Usage Report — Daily
+| Date       | Agent      | Models            | Input   | Output    | Cache Create | Cache Read    | Total         | Cost (USD) |
+| 2026-05-29 | All        | opus-4-8, gpt-5.5 | 937,053 | 5,372,832 | 17,259,276   | 997,890,608   | 1,021,459,769 | $746.00    |
+|            |   - Claude | opus-4-8          | 652,442 | 5,336,901 | 17,259,276   | 995,772,208   | 1,019,020,827 | $742.44    |
+|            |   - Codex  | gpt-5.5           | 284,611 | 35,931    | 0            | 2,118,400     | 2,438,942     | $3.56      |
+| Total      |            |                   | ...     | ...       | ...          | ...           | ...           | $1,682.65  |
+```
+
+In the real terminal these are Unicode box-drawing tables via `comfy-table`. `Total` follows `ccusage`'s Total Tokens — `input + output + cache_creation + cache_read`. Costs are **estimates** of what the metered API would charge, not a bill — subscription users aren't billed per token.
 
 ## Artifact layout
 

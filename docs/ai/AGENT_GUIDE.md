@@ -6,23 +6,30 @@ High-signal brief for an AI coding agent working on this repo. Read this + `COST
 
 `context-bar` (app brand: **ContextBar**, repo `htahaozlu/context-bar`, Apache-2.0) is a local-first usage HUD for AI coding agents (Claude Code + Codex CLI, extensible to more). It reads transcript files on disk and surfaces token usage, rolling quota windows, and **estimated API-equivalent cost** — without any external service for the core.
 
-Two product surfaces today:
-- **Rust engine** (`src/`) — produces artifacts under `~/.context-bar/` and a repo's `.context-bar/`. Cross-platform core.
+**Cargo workspace (since 0.4.0):**
+- **`context-bar-core`** (`crates/context-bar-core/`) — the cross-platform engine rlib: transcript reading, the cost/token model, session/window bucketing, the agent-context assembler, HUD/HTML/`report` renderers, shared `i18n`. Platform-coupled bits (process spawn, macOS keychain, snapshot cache, wasm32 `Worktree` collectors) sit behind `cfg(target_arch)` gates inside their modules.
+- **`context-bar`** (root crate) — a thin layer that re-exports the engine (`pub use context_bar_core::*` so historical `context_bar::<mod>` paths still resolve) and adds two surfaces: the **`[[bin]] context-bar`** terminal CLI (`src/bin/`) and the **Zed extension** (`[lib] crate-type=["cdylib","rlib"]`, `src/lib.rs` + `src/{slash_commands,auto_refresh}.rs`, wasm32). The root crate is the workspace root (keeps `[profile.release]` + the `version` literal here; `extension.toml` must stay adjacent for Zed to compile the cdylib).
+
+Product surfaces:
+- **Terminal CLI** (`context-bar daily|weekly|monthly|session …`, since 0.4.0) — ccusage-style tables built from `context_bar_core::report` on top of the same cost engine. Bilingual, color-aware. The CLI is self-contained for `cargo install` (the python aggregator is embedded; see below).
 - **Native macOS menubar app** (`menubar/sources/`, AppKit/Swift) — reads `~/.context-bar/context.json` and renders the popover + a detail window (Usage / Stats / Cost / General / Appearance / Privacy / About).
 
-Distributed via a Homebrew cask + GitHub Releases (DMG, notarized). Current version: **0.3.25** (see `CHANGELOG.md`).
+Distributed via a Homebrew cask + GitHub Releases (DMG, notarized); the CLI also via crates.io (`cargo install context-bar`, see `docs/PUBLISHING.md`). Current version: **0.4.0** (see `CHANGELOG.md`).
 
 ## Architecture & data flow
 
 ```
-~/.claude/projects/**/*.jsonl   ┐
-~/.codex/sessions/**/*.jsonl     ├─►  src/usage_signal.py  ──► JSON on stdout
+~/.claude/projects/**/*.jsonl   ┐   crates/context-bar-core/src/
+~/.codex/sessions/**/*.jsonl     ├─►  usage_signal.py  ──────► JSON on stdout
 (transcripts, per assistant turn)┘     (Python aggregator)        │
                                                                    ▼
-   src/usage_signal.rs (collect_native) spawns python3, parses JSON into
+   usage_signal.rs (collect_native) spawns python3, parses JSON into
    typed structs (UsageSnapshot), adds `accounts` (reads ~/.claude/auth-*.json
    + keychain), caches to ~/.context-bar/usage.cache.json (300s TTL, also
-   invalidated when any transcript is newer).
+   invalidated when any transcript is newer). resolve_usage_script() finds the
+   .py via env override / exe-sibling / app Resources / dev source tree, else
+   materializes the embedded copy to ~/.context-bar/usage_signal.py (so a
+   `cargo install`ed binary is self-contained — still needs python3 on PATH).
                                                                    │
    src/bin/context-bar.rs `global` ──► writes:                     ▼
        ~/.context-bar/context.json   (serialized UsageSnapshot — the menubar reads this)
@@ -35,13 +42,16 @@ Distributed via a Homebrew cask + GitHub Releases (DMG, notarized). Current vers
        + DetailWindowController (tabbed window) render it.
 ```
 
-**CRITICAL invariant (memory `rust_struct_mirror`):** the Python emits a JSON object; the Rust structs in `src/usage_signal.rs` (`UsageSnapshot`, `AgentUsage`, `TimeBucket`, `NamedBucket`, `SessionRecord`, `DailyInstance`, `ActiveSession`) must mirror the Python field names or fields are silently dropped from `context.json`. Every Rust field uses `#[serde(default)]`. When you add a field in Python, add it to the Rust struct AND (if the menubar shows it) parse it in `ContextSnapshot.swift` / the relevant Swift VC.
+**CRITICAL invariant (memory `rust_struct_mirror`):** the Python emits a JSON object; the Rust structs in `crates/context-bar-core/src/usage_signal.rs` (`UsageSnapshot`, `AgentUsage`, `TimeBucket`, `NamedBucket`, `SessionRecord`, `DailyInstance`, `ActiveSession`) must mirror the Python field names or fields are silently dropped from `context.json`. Every Rust field uses `#[serde(default)]`. When you add a field in Python, add it to the Rust struct AND (if the menubar shows it) parse it in `ContextSnapshot.swift` / the relevant Swift VC. (0.5.0 will fold the Python aggregator INTO Rust to retire this drift risk — see `ROADMAP.md` E1.)
 
-### Key files
-- `src/usage_signal.py` (~1450 lines) — the aggregator. Scans transcripts, sessionizes (5h idle-gap splits), buckets by day/week/month/model/project, computes per-turn estimated cost (see `COST_MODEL.md`), emits `by_day`, `by_day_project`, `recent_sessions`, window totals, pricing meta.
-- `src/usage_signal.rs` — Rust mirror structs + `collect_native()` (spawns python, caches snapshot) + `collect_accounts()`.
-- `src/bin/context-bar.rs` — CLI: `hud` / `snapshot` / `global` / `watch` / `watch-global` / `claude-statusline`. `global` writes the `~/.context-bar/` artifacts + `detail.html`.
-- `src/detail_html.rs` — self-contained dark-theme HTML export (Today / Cost / History / Sessions / Breakdown tabs). Bilingual EN/TR via `Language::detect()`.
+### Key files (engine in `crates/context-bar-core/src/` unless noted)
+- `usage_signal.py` (~1450 lines) — the aggregator. Scans transcripts, sessionizes (5h idle-gap splits), buckets by day/week/month/model/project, computes per-turn estimated cost (see `COST_MODEL.md`), emits `by_day`, `by_day_project`, `recent_sessions`, window totals, pricing meta. **Embedded** into the bin via `include_str!` for `cargo install`.
+- `usage_signal.rs` — Rust mirror structs + `collect_native()` (native; spawns python, caches snapshot) + `collect_accounts()` (macOS keychain) + the wasm32 `collect(worktree)`.
+- `report.rs` — pure aggregation behind the CLI verbs: `time_report` (daily/weekly/monthly), `instances_report`, `session_report`, `model_report` → serde-`Serialize` `Report`/`ReportRow`/`Metrics`. `Metrics::total_tokens()` = the ccusage 4-bucket Total. No terminal deps (reusable by future surfaces). Unit-tested for agent sums, filters, ISO-week labels.
+- `i18n.rs` — shared `Language` (EN/TR) + `detect()` (honors `CONTEXTBAR_LANG`, then locale). Used by `detail_html` and the CLI; every user-facing string goes through `lang.text(en, tr)`.
+- `detail_html.rs` — self-contained dark-theme HTML export (Today / Cost / History / Sessions / Breakdown tabs). Bilingual EN/TR via `i18n::Language`.
+- `src/bin/context-bar.rs` (root crate) — CLI dispatch: report verbs `daily`/`weekly`/`monthly`/`session`/`blocks` (+ flags `--instances`/`--breakdown`/`--agent`/`--since`/`--until`/`--json`/`--offline`/`--lang`/`--no-color`) and engine verbs `hud`/`snapshot`/`global`/`watch`/`watch-global`/`claude-statusline`/`--version`. `autobins = false` (CLI is one explicit bin; `cli_report.rs` is its module).
+- `src/bin/cli_report.rs` (root crate) — comfy-table rendering of a `Report`: ccusage-style tables, right-aligned thousands-grouped numbers, `$` cost, color gated on a tty + `NO_COLOR`/`--no-color`.
 - `menubar/sources/` — AppKit app. Notable: `PopoverViewController` (menubar popover), `DetailWindowController` (tab window), `CostViewController` (Cost tab), `UsageViewController`, `StatsViewController`, `SettingsPanes.swift` (`GeneralSettingsViewController`, `AppearanceSettingsViewController`, `PrivacySettingsViewController`, `AboutViewController`), `ContextSnapshot.swift` (JSON→typed + formatters incl. `formatTokens`/`formatUSD`), `Models.swift`, `CommonViews.swift` (StatTileView/SparklineView/etc), `DesignTokens.swift` (Spacing/Radius/Typography/Surface), `Localization.swift` (`L10n.text(en, tr)`, `L10n.lang`).
 - `Cargo.toml` — `[[bin]] context-bar`, `[lib] crate-type=["cdylib","rlib"]`, wasm32 target (`zed_extension_api`), release profile (`lto="thin"`, `strip="symbols"`). Version is the source of truth.
 - `scripts/build-menubar-app.sh` — builds the universal `.app` (swiftc -O arm64+x64 lipo + cargo release engine + resources + sign). Widget is opt-in (`WIDGET_BUILD=1`).
@@ -49,11 +59,13 @@ Distributed via a Homebrew cask + GitHub Releases (DMG, notarized). Current vers
 
 ## Build & verify
 
-- Rust: `cargo build`, `cargo test` (6 tests), `cargo build --release`.
+- Rust: `cargo build`, `cargo test --workspace` (**use `--workspace`** — the engine tests live in `context-bar-core`; a bare `cargo test` only runs the root crate and reports 0). `cargo build --release`.
+- Zed extension (wasm32): `cargo build --target wasm32-wasip2 -p context-bar --lib` — the extension is gated `cfg(target_arch="wasm32")`; native-only items (`collect_native`, `claude_statusline`, keychain) must stay behind `cfg(not(wasm32))` or the wasm build breaks.
+- Terminal CLI smoke: `./target/debug/context-bar daily --since <YYYYMMDD>` (and `--json`, `--lang tr`). Reports build from `collect_native()`, not the daemon's `context.json`, so no daemon race.
 - Swift type-check (fast, no bundle): `xcrun --sdk macosx swiftc -typecheck -target arm64-apple-macos13.0 menubar/sources/*.swift`.
 - Swift single-arch binary: same with `-O ... -o /tmp/bin` (no `-typecheck`).
 - Run the engine: `./target/debug/context-bar global` writes `~/.context-bar/`.
-- Python: `python3 -m py_compile src/usage_signal.py`; run with `CONTEXTBAR_PRICING_OFFLINE=1 python3 src/usage_signal.py` (skips the live LiteLLM fetch — fast, deterministic).
+- Python: `python3 -m py_compile crates/context-bar-core/src/usage_signal.py`; run with `CONTEXTBAR_PRICING_OFFLINE=1 python3 crates/context-bar-core/src/usage_signal.py` (skips the live LiteLLM fetch — fast, deterministic).
 
 ### Headless screenshot verification (no human needed)
 The Swift app honors env vars to render + capture a tab to PNG, then quit:
@@ -81,7 +93,10 @@ Pattern: build binary → run with these envs via `subprocess` → `Read` the PN
 - **Secrets**: `AuthKey_*.p8` and `dist/` are gitignored; never commit them. Verify `git status` before committing; add specific files, not `-A`.
 - **Use codex** (`codex:codex-rescue` agent) for deep correctness/analysis passes when useful; it confirmed the cost formula. Note it can hang — don't hard-block on it; extract its substantive finding and proceed.
 
-## Current state (as of 0.3.25)
+## Current state (as of 0.4.0)
+- **Workspace split (E1, done):** engine extracted to `context-bar-core`; root crate is a thin CLI bin + Zed extension re-exporting core. Native + `wasm32-wasip2` + `cargo test --workspace` (15 tests) all green; a latent wasm-build break was fixed. Menubar build/cask flow preserved (`build-menubar-app.sh` copies the .py from the new path).
+- **Terminal CLI (B1, done):** `daily`/`weekly`/`monthly`/`session` ccusage-style tables from `context_bar_core::report`, bilingual, `--json`/`--instances`/`--breakdown`/`--agent`/`--since`/`--until`/`--offline`/`--lang`/`--no-color`. Engine self-contained for `cargo install` (embedded `usage_signal.py`).
+- **Deferred to 0.5.0 (verified blocker):** cross-platform prebuilt binaries (A1) + `npx` (A2) + Windows wait on the Python→Rust port — the engine spawns python3 and reads the macOS-only `security` keychain, so a musl/Windows binary is non-functional today. 0.4.0 reaches the dev audience via `cargo install` (has toolchain + python3). See `ROADMAP.md`.
 - Cost feature complete: per-turn LiteLLM-priced estimate, `by_day_project` daily×project breakdown, full ccusage-parity column table in the Cost tab (Input/Output/Cache+/Cache↻/Total/Cost, grouped by day, Total row), monthly plan-value projection, cache-savings line, interactive 30-day trend chart (hover tooltip), active-session cost in the popover.
 - Settings IA consolidated to Apple-style: Usage·Stats·Cost (data) + General·Appearance·Privacy (settings) + About.
 - See `ROADMAP.md` for what's next (distribution, TUI, terminal CLI, blocks-live dashboard, more providers).

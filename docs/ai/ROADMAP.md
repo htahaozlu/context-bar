@@ -7,6 +7,8 @@ Verified facts that shape strategy:
 - Names are **free**: `context-bar` on crates.io AND npm (+ `@context-bar` scope). Reserve early.
 - ccusage's most-screenshotted feature, **`blocks --live`** (5h-window real-time dashboard), was REMOVED in ccusage v18 but lives in the `better-ccusage` fork. A native menubar + a TUI are the right homes for it.
 
+> **VERIFIED BLOCKER (2026-05-29, reshapes A1/A2 sequencing):** our engine currently (a) spawns `python3` on `usage_signal.py` and (b) reads the macOS-only `security` keychain for accounts. So a Linux-musl / Windows prebuilt binary is **non-functional out of the box** (stock Windows has no `python3`; keychain is darwin-only). Shipping npm/cross-platform binaries before the **Python→Rust port (E1)** + a **cross-platform credential source** would be a broken first impression — the opposite of ccusage's "single static binary" promise. Therefore **A1 (release matrix) + A2 (npx) move to 0.5.0, after the port.** 0.4.0 still reaches the cross-platform *developer* audience via `cargo install context-bar` (they have a Rust toolchain + python3) with the aggregator embedded in the binary, and **reserves** the crates.io/npm names (A0) so they aren't squatted (`docs/PUBLISHING.md`).
+
 ## EPIC A — Broad distribution (highest reach; the ccusage growth channel)
 
 Engine is cross-platform Rust; ship it everywhere. Use the **optionalDependencies + per-platform sub-package** pattern (esbuild/biome/ccusage), NOT cargo-dist's npm fetch-on-install (breaks under `--ignore-scripts`/corporate CI).
@@ -40,13 +42,19 @@ ccusage auto-detects Claude Code, Codex, OpenCode, Amp, Droid, Gemini CLI, Copil
 - **E1 — Workspace split** (med): `context-bar-core` crate (engine + cost/token logic, the reusable Anthropic-spec math) + thin `context-bar` bin. Enables crates.io publish + clean CLI/TUI. Long-term, fold `usage_signal.py` INTO the Rust core to kill the Python↔Rust struct-mirror drift risk (memory `rust_struct_mirror`) and drop the python3 runtime dependency. Big but high-value; do incrementally (Rust core can read transcripts directly — the logic is straightforward).
 - **E2 — Docs & polish for OSS quality**: README with npx/brew/cargo install matrix + GIFs/screenshots of the TUI and Cost tab; CONTRIBUTING quickstart; a docs site (the `detail.html` styling is a good base); JSON schema for `context.json`; tests for the cost math (Rust core).
 
-## Suggested execution order (for the long-haul session)
-1. A0 reserve names (cheap, unblocks A2/A4).
-2. E1 workspace split (unblocks clean CLI/TUI + crates.io).
-3. B1 CLI reporting commands (immediate terminal value; reuses cost logic).
-4. A1+A2 release matrix + npx (the reach unlock).
-5. B2 ratatui live dashboard (the crown-jewel feature).
-6. C1 native popover live gauge + budgets.
-7. A4 cargo install, C2/C3/C4 polish, D providers, E2 docs.
+## Execution order (revised after the verified blocker above)
 
-Batch into a few meaningful releases (e.g. "0.4.0 — terminal CLI + cross-platform + npx", "0.5.0 — live dashboard"), not per-change. Keep the macOS app + cask as the premium path throughout. Don't compromise standards in `AGENT_GUIDE.md`.
+**0.4.0 — engine foundation + terminal CLI (DONE, in `main`):**
+1. ✅ **E1 (structural half)** — workspace split: `context-bar-core` rlib + thin `context-bar` bin/extension. (The Python→Rust *fold* is the 0.5.0 half.)
+2. ✅ **B1** — `daily`/`weekly`/`monthly`/`session` CLI reports (reuses the cost engine; ccusage column layout; `--json`/`--instances`/`--breakdown`/filters/bilingual).
+3. ✅ self-contained binary for `cargo install` (embedded `usage_signal.py`).
+4. ⏳ **A0** — reserve crates.io (`context-bar-core` + `context-bar`) + npm (`context-bar` + `@context-bar`) names. Prep + metadata done; the maintainer runs the publish per `docs/PUBLISHING.md` (needs creds; irreversible).
+
+**0.5.0 — pure-Rust engine + real cross-platform reach (the unlock):**
+5. **E1 (port half)** — fold `usage_signal.py` into `context-bar-core` (incremental, golden-test-pinned cost fidelity: cost kernel → transformation core → JSONL parse → online/host probes). Replace the macOS `security` keychain with a cross-platform credential source. Retires the Python↔Rust struct-mirror drift + the python3 runtime dep.
+6. **A1 + A2** — taiki-e release matrix (6 targets, musl Linux) + `npx context-bar` via cargo-npm/optionalDependencies. Now legitimate (self-contained static binary).
+7. **B2** — `ratatui` `context-bar live` 5h-block burn dashboard (the crown jewel).
+
+**0.6.0+:** C1 native popover live gauge + budgets; A4 polish; C2/C3/C4; D providers (OpenCode, Gemini CLI); E2 docs site.
+
+Keep the macOS app + cask as the premium path throughout. Don't compromise standards in `AGENT_GUIDE.md`.

@@ -52,7 +52,7 @@ Per-turn metrics (`{total, cache_read, input, output, cache_creation, cost}`) ac
 
 **Day-attribution convention:** day/week/month buckets attribute a sessionized chunk to its END day (`last_ts`) — the same convention the token stats use, so a row's tokens and cost agree. 30-day/all-time TOTALS are exact; only single-day attribution can differ from a strict per-turn split (ccusage) for a session crossing local midnight. codex confirmed the per-token formula is correct and this is the only aggregation nuance.
 
-**Total Tokens semantics:** the Cost tab's "Total" column = input + output + cache_creation + cache_read (ccusage's "Total Tokens"). This is DISTINCT from the Stats/HUD `tokens` total (= fresh_in + output only, memory invariant). Keep both, labeled.
+**Total Tokens semantics:** the Cost tab's "Total" column = input + output + cache_creation + cache_read (ccusage's "Total Tokens"). This is DISTINCT from the Stats/HUD `tokens` total (= fresh_in + output only, memory invariant). Keep both, labeled. The **terminal CLI** (`context-bar daily|weekly|monthly|session`) uses the same 4-bucket Total — `context_bar_core::report::Metrics::total_tokens()` — and never re-prices: it sums the engine's per-bucket `cost`. So the CLI, the Cost tab, and ccusage agree column-for-column.
 
 ## Differentiators we compute (no other tracker does these)
 - **Cache savings** (`cache_savings_30d`, `turn_cache_savings`): NET USD prompt caching saved vs paying full input price = `(cache_create+cache_read priced at input rate) − (actual cache write + cache read cost)`. Strongly positive for heavy reuse. Honest (can be slightly negative on a write-heavy turn).
