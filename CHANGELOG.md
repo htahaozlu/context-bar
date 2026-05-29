@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.6.1] - 2026-05-29
+
+### Fixed
+
+- **Popover no longer leaves a blank band.** When a card disappeared on a refresh tick (a parallel session or other tool aging past the 30-minute window, an agent's secondary data dropping), the popover kept its tallest frame and showed an empty gap below the footer. It now measures its true content height by summing the cards — not `view.fittingSize`, which returns the window-imposed height once the popover is shown — and drives `popover.contentSize` so the panel contracts as well as grows. Validated headlessly in both directions.
+- **Cost tab — table no longer has a dead horizontal gap (#4).** The per-day-per-project table anchored its numeric columns to the window's right edge, so at wide widths the project name sat far left and the figures far right with a large empty band between. Columns are now a compact left-anchored fixed grid sharing the same positions across the header, per-day, project, and grand-total rows (digits align vertically), capped so wide windows show clean trailing margin instead of stretched or scattered columns. The Cost figure is accent-colored, and the header is uppercased/kerned with a seating underline.
+
+### Changed
+
+- **Cost tab opens instantly.** The instances table is drawn in a single custom view (only the rows intersecting the dirty rect), replacing the previous ~1,800-view `NSStackView` that stalled the tab on open. Renders in microseconds and scrolls smoothly regardless of row count.
+
 ## [0.6.0] - 2026-05-29
 
 ### Added
