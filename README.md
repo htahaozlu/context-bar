@@ -272,7 +272,8 @@ The global HUD is written to `~/.context-bar/hud.md`.
 - `context-bar weekly` — per-ISO-week table
 - `context-bar monthly` — per-month table
 - `context-bar session` — recent sessions table
-- `context-bar blocks` — the live 5h-window burn dashboard (placeholder; ships in 0.5.0)
+- `context-bar blocks` — active 5h block per agent: usage % of limit, burn rate ($/hr · tok/min), projected total, reset countdown, ETA-to-limit
+- `context-bar live` — the same 5h-block burn metrics as an auto-refreshing terminal dashboard (`ratatui`): a color-tiered gauge per agent, refreshing every `--interval` seconds; `q` to quit, `r` to refresh now. Works over SSH and on Linux/Windows.
 
 ### Report flags
 

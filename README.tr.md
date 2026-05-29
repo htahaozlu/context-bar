@@ -262,7 +262,8 @@ context-bar 0.4.0, birinci sınıf bir **TERMINAL CLI** ile geliyor (macOS menub
 - `weekly` — ISO-hafta başına tablo
 - `monthly` — ay başına tablo
 - `session` — son oturumlar tablosu
-- `blocks` — (yer tutucu) canlı 5sa-pencere yanma panosu 0.5.0'da geliyor (EPIC B2)
+- `blocks` — ajan başına aktif 5sa blok: limitin %'si, yakım hızı ($/sa · tok/dk), öngörülen toplam, sıfırlanma geri sayımı, limite tahmini süre
+- `context-bar live` — aynı 5sa blok yakım metrikleri, otomatik yenilenen bir terminal panosu olarak (`ratatui`): ajan başına renk-katmanlı bir gösterge, `--interval` saniyede bir yenilenir; çıkmak için `q`, hemen yenilemek için `r`. SSH üzerinden ve Linux/Windows'ta çalışır.
 
 ### Rapor bayrakları
 
