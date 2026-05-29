@@ -332,6 +332,9 @@ fn models_join(models: &[String]) -> String {
 
 /// Strip provider prefixes + the `claude-` family prefix for a compact label.
 pub fn short_model(model: &str) -> String {
+    if model == "<synthetic>" {
+        return "(unknown)".to_string();
+    }
     let mut m = model.trim();
     for p in [
         "anthropic/",
