@@ -59,7 +59,11 @@ ccusage auto-detects Claude Code, Codex, OpenCode, Amp, Droid, Gemini CLI, Copil
 6. ✅ **A1 — release matrix** (DONE): `release.yml` `upload-binaries` job, 6 targets (mac/linux-musl/windows), `taiki-e/upload-rust-binary-action`, on tag. **A2** — `npx context-bar` via cargo-npm: packaging + publish steps documented in `docs/PUBLISHING.md` (needs maintainer npm creds).
 7. ✅ **B2 — 5h-block burn dashboard (DONE):** `core::live` (`block_status`: burn $/hr + tok/min, % of limit, ETA-to-limit, projected, reset countdown, `Tier` color) — pure + unit-tested, reusable by C1; `context-bar blocks` (one-shot per-agent panel + `--json`/`--agent`); and `context-bar live` — the `ratatui`+`crossterm` auto-refresh TUI (panic-hook terminal restore, non-tty graceful exit, `--interval`, `q`/`r` keys; render unit-tested via `TestBackend`). Not yet in a tagged release — accumulating for 0.6.0.
 
-**Next (0.6.0):** C1 — bring the live block gauge + a user budget into the macOS popover/menubar (reuses `core::live::block_status`). Then A4 `cargo install` polish, C2/C3/C4 native, D providers (OpenCode/Gemini CLI), E2 docs site.
+**Next (0.6.0) — needs maintainer direction / UX input, lower autonomous-fit:**
+- **C1** — the popover ALREADY surfaces burn-rate + ETA + 5h%/limit + reset countdown (`PopoverViewController.buildHero`/`buildAgentLimits` via `ContextSnapshot.burnRate`). What's LEFT is a **user-set token/cost budget** (new setting + persistence — a UX decision) and a **menubar-title color shift** (green→yellow→red as the budget nears) — the menubar color isn't headless-screenshot-validatable, so it wants a human eye. The block math is ready in `core::live::block_status` if any native surface wants the projected-total too.
+- **C2** trends — the Cost tab already has the 30-day trend chart + per-day table; remaining is weekly/monthly native charts + a per-model stacked breakdown (incremental).
+- **D** providers (OpenCode, Gemini-CLI, …) — Gemini probe exists (`others.rs`); OpenCode needs its transcript format researched before a reliable probe.
+- **A4** `cargo install` polish (works today); **E2** docs site + a `context.json` JSON schema; **A2** the npm publish (maintainer creds, `docs/PUBLISHING.md`); long-term move the wasm Zed extension off `usage_signal.py`.
 
 **0.6.0+:** B2 live dashboard; C1 native popover live gauge + budgets; A4 polish; C2/C3/C4; D providers (OpenCode, Gemini CLI); E2 docs site. Long-term: move the wasm Zed extension off `usage_signal.py` too (shell out to the `context-bar` binary) to retire Python entirely.
 
