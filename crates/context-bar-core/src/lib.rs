@@ -19,6 +19,7 @@
 //! [`context_engine::assemble`], which takes pre-collected signals.
 
 pub mod agent_context;
+pub mod aggregate;
 // CLI-only: reads Claude Code's statusline payload from stdin. Not built for
 // the wasm Zed extension, which has no statusline hook.
 #[cfg(not(target_arch = "wasm32"))]
