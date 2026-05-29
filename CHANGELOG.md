@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.5.0] - 2026-05-29
+
+### Changed
+
+- **Native engine is now pure Rust — no `python3`.** The Python aggregator (`usage_signal.py`) was fully ported to Rust (`pricing`, `aggregate`, `collect`, `online`, others); `collect_native()` no longer spawns `python3`. The port was validated against golden fixtures (the 488-row pricing table byte-for-byte; aggregate output field-for-field), two independent codex parity reviews, and a real-data differential — Python vs. Rust run against the same frozen `~/.claude` + `~/.codex` matched field-for-field. The `.py` survives only for the wasm Zed extension. For users the macOS menubar app and Homebrew cask are unchanged (same UI); the bundled engine is just faster and self-contained.
+- **Live pricing in Rust.** `pricing.rs` fetches the LiteLLM rate table over HTTP (`ureq`) with a 24h on-disk cache and a bundled offline fallback — the same strategy as before. Cost-model fidelity is preserved end to end; figures remain API-equivalent estimates, not a bill.
+- **Online overlays ported.** The statusline snapshot, the Anthropic usage API (account 5h / 7d percentages), and Codex transcript rate-limits are now read natively, including cross-platform credential reads (`~/.claude/.credentials.json`; macOS keychain).
+
+### Added
+
+- **Cross-platform prebuilt binaries.** `release.yml` now builds six targets — macOS arm64 / x64, Linux musl arm64 / x64, and Windows arm64 / x64 — via `taiki-e/upload-rust-binary-action`, attached to every GitHub release. The pure-Rust engine made musl and Windows viable, since there is no longer a `python3` dependency.
+- **`cargo install context-bar`** produces a self-contained binary. `npx context-bar` packaging is documented; the actual npm publish needs the maintainer's npm credentials.
+
 ## [0.4.0] - 2026-05-29
 
 ### Added

@@ -58,9 +58,79 @@ npm publish --access public
 ```
 
 The **full** npm distribution — `optionalDependencies` fan-out, per-platform prebuilt
-binaries via `cargo-npm`, and the `taiki-e` cross-compile release matrix — is **deferred
-to 0.5.0**. The engine needs `python3` at runtime, which is broken on stock Windows, so a
-real `npx context-bar` install can't ship cleanly yet. **0.4.0 only RESERVES the names.**
+binaries via `cargo-npm`, and the `taiki-e` cross-compile release matrix — is documented
+in the next section. **0.4.0 only RESERVES the names**; real `npx context-bar`
+distribution lands once you run the flow below.
+
+## npm distribution — npx context-bar (A2)
+
+Now that the engine is **pure-Rust + a self-contained cross-platform binary** (no
+`python3` runtime), `npx context-bar` can ship cleanly on all three OSes. This section is
+the runbook for the full distribution.
+
+### What the release produces
+
+Each GitHub release (cut on a `v*` tag) runs the `upload-binaries` job in `release.yml`,
+which uses **`taiki-e/upload-rust-binary-action`** to cross-compile and attach **6
+prebuilt binaries** as release archives:
+
+| OS | arch | target triple |
+| --- | --- | --- |
+| macOS | arm64 | `aarch64-apple-darwin` |
+| macOS | x64 | `x86_64-apple-darwin` |
+| Linux | arm64 | `aarch64-unknown-linux-musl` |
+| Linux | x64 | `x86_64-unknown-linux-musl` |
+| Windows | arm64 | `aarch64-pc-windows-msvc` |
+| Windows | x64 | `x86_64-pc-windows-msvc` |
+
+(Linux uses **musl** for a fully static binary that runs on any distro.)
+
+### Packaging with cargo-npm
+
+Use **`abemedia/cargo-npm`** to generate and publish the meta package `context-bar`
+plus a per-platform `@context-bar/context-bar-<os>-<arch>` subpackage for each triple.
+The layout is **no postinstall** — the meta package lists the subpackages as
+`optionalDependencies`, each subpackage gates itself with `os` / `cpu` fields so npm only
+installs the one matching the host, and a tiny JS launcher in the meta package execs the
+resolved native binary.
+
+```bash
+# 0. One-time: install the cargo subcommand.
+cargo install cargo-npm
+
+# 1. Download the 6 release archives from the v* GitHub release and unpack each
+#    binary into target/<triple>/release/ (the path cargo-npm reads from).
+#    e.g. target/aarch64-apple-darwin/release/context-bar
+#         target/x86_64-apple-darwin/release/context-bar
+#         target/aarch64-unknown-linux-musl/release/context-bar
+#         target/x86_64-unknown-linux-musl/release/context-bar
+#         target/aarch64-pc-windows-msvc/release/context-bar.exe
+#         target/x86_64-pc-windows-msvc/release/context-bar.exe
+
+# 2. Generate the meta package + per-platform subpackages.
+#    Pin each optionalDependency to the EXACT version (no ^/~ ranges) so a
+#    meta install can only resolve its matching prebuilt subpackage.
+cargo npm generate
+
+# 3. Publish. cargo-npm publishes the platform packages FIRST, then the meta
+#    package last (so the meta's optionalDependencies already exist on the
+#    registry). Scoped packages need --access public.
+NODE_AUTH_TOKEN=<your-npm-token> cargo npm publish -- --access public
+```
+
+After this lands, anyone can run:
+
+```bash
+npx context-bar
+```
+
+### Platform notes
+
+- This needs **the maintainer's own npm credentials** (`NODE_AUTH_TOKEN`), the same
+  account that holds the reserved `context-bar` name and `@context-bar` scope.
+- macOS-only features **degrade gracefully** on Linux/Windows: keychain account
+  detection is macOS-specific, so on other platforms the binary reads
+  `~/.claude/.credentials.json` directly instead.
 
 ## Security
 
