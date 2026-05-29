@@ -24,6 +24,9 @@ pub mod aggregate;
 // the wasm Zed extension, which has no statusline hook.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod claude_statusline;
+// Native-only pure-Rust transcript collector (reads ~/.claude, ~/.codex).
+#[cfg(not(target_arch = "wasm32"))]
+pub mod collect;
 pub mod context_engine;
 pub mod detail_html;
 pub mod git_signal;

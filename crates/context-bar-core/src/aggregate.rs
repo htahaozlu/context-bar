@@ -94,18 +94,20 @@ fn session_base_id(path: &str) -> String {
     }
 }
 
+// Python's round() is banker's rounding (ties to even); mirror it so the
+// rounded cost/duration values are byte-identical.
 fn round6(x: f64) -> f64 {
-    (x * 1e6).round() / 1e6
+    (x * 1e6).round_ties_even() / 1e6
 }
 
 fn round1(x: f64) -> f64 {
-    (x * 10.0).round() / 10.0
+    (x * 10.0).round_ties_even() / 10.0
 }
 
 /// Format an epoch-seconds value as a UTC ISO8601 string ending in `Z`.
 /// Subsecond is emitted as 6 digits only when nonzero (mirrors Python's
 /// `datetime.fromtimestamp(ts, tz=utc).isoformat().replace("+00:00","Z")`).
-fn iso_utc(ts: f64) -> String {
+pub fn iso_utc(ts: f64) -> String {
     let whole = ts.floor() as i64;
     let micros = ((ts - ts.floor()) * 1_000_000.0).round() as i64;
     let (whole, micros) = if micros >= 1_000_000 {
