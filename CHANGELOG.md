@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.3.25] - 2026-05-29
+
+### Changed
+
+- **Cost tab — full ccusage-parity table.** The per-day breakdown is now a native, column-aligned table with the complete token split — Input, Output, Cache+ (create), Cache↻ (read), Total, and Cost — grouped by day with per-project sub-rows and a grand Total row, mirroring `ccusage daily`. Tabular figures, right-aligned numbers, native padding/colors. The Total column counts all four token buckets (ccusage's "Total Tokens"), distinct from the Stats tab's fresh-work total.
+- **Settings information architecture, Apple-style.** The settings window collapsed from nine tabs to a clean set: the three data views (Usage · Stats · Cost) plus three consolidated preference panes — **General** (menu-bar title, display behavior, notifications — formerly the separate Menubar, Display, and Alerts tabs), **Appearance**, and **Privacy** — and About. Removes the overlapping/ambiguous tab names per Apple's HIG guidance to "minimize the number of settings."
+
 ## [0.3.24] - 2026-05-29
 
 ### Fixed

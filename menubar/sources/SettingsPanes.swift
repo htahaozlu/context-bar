@@ -76,8 +76,12 @@ final class AppearanceSettingsViewController: PreferencePaneViewController {
     }
 }
 
-final class MenubarSettingsViewController: PreferencePaneViewController {
+/// General settings — merges the former Menubar, Display, and Notifications
+/// tabs into one pane so the settings window holds just General · Appearance ·
+/// Privacy (Apple-style IA; the 3 data views live on their own tabs).
+final class GeneralSettingsViewController: PreferencePaneViewController {
     var onThemeChange: ((String) -> Void)?
+    var onChange: (() -> Void)?
     private let displayChips = HorizontalDisplayController()
     private let preview = TitlePreviewView()
 
@@ -127,96 +131,55 @@ final class MenubarSettingsViewController: PreferencePaneViewController {
             ),
             body: preview
         )
-    }
 
-    private func refreshPreview() {
-        preview.update(
-            items: displayChips.currentItems,
-            agent: "Claude",
-            project: L10n.text("my-project", "projem"),
-            pct: 27
-        )
-    }
-
-    @objc private func separatorChanged(_ sender: NSSegmentedControl) {
-        let value = SeparatorStore.options[sender.selectedSegment].value
-        SeparatorStore.set(value)
-        refreshPreview()
-        onThemeChange?(ThemeStore.current.id)
-    }
-}
-
-// MARK: - Display preferences pane
-
-/// Surfaces the display-side toggles that don't fit on the existing
-/// Appearance / Menubar panes: reset-style, threshold tick marks,
-/// burn-rate forecast, critical-background indicator.
-final class DisplaySettingsViewController: PreferencePaneViewController {
-    var onChange: (() -> Void)?
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        buildUI()
-    }
-
-    private func buildUI() {
+        // ── Behavior (was the Display tab) ──
         let resetCtrl = NSSegmentedControl(
             labels: [L10n.text("Relative", "Göreli"), L10n.text("Absolute", "Mutlak")],
-            trackingMode: .selectOne,
-            target: self,
-            action: #selector(resetStyleChanged(_:))
-        )
+            trackingMode: .selectOne, target: self, action: #selector(resetStyleChanged(_:)))
         resetCtrl.selectedSegment = DisplayPrefs.resetStyle == .relative ? 0 : 1
         addSection(
             title: L10n.text("Reset time", "Sıfırlama zamanı"),
             subtitle: L10n.text(
                 "Show window resets as a relative duration (\"in 1h 47m\") or an absolute clock time (\"14:32\").",
-                "Pencere sıfırlamalarını göreli süre (\"1sa 47dk\") veya saat olarak (\"14:32\") göster."
-            ),
-            body: resetCtrl
-        )
-
-        let ticks = makeToggle(
-            title: L10n.text("Warning marks on bars", "Çubuklarda uyarı işaretleri"),
-            on: DisplayPrefs.tickMarks,
-            action: #selector(ticksChanged(_:))
-        )
+                "Pencere sıfırlamalarını göreli süre (\"1sa 47dk\") veya saat olarak (\"14:32\") göster."),
+            body: resetCtrl)
         addSection(
             title: L10n.text("Bar marks", "Çubuk işaretleri"),
             subtitle: L10n.text(
                 "Adds thin tick marks at 70% and 90% on every context bar. Off by default for a cleaner look.",
-                "Her bağlam çubuğunda %70 ve %90'a ince çizgiler ekler. Daha sade görünüm için varsayılan kapalıdır."
-            ),
-            body: ticks
-        )
-
-        let burn = makeToggle(
-            title: L10n.text("Burn-rate forecast", "Tüketim tahmini"),
-            on: DisplayPrefs.burnRate,
-            action: #selector(burnChanged(_:))
-        )
+                "Her bağlam çubuğunda %70 ve %90'a ince çizgiler ekler. Daha sade görünüm için varsayılan kapalıdır."),
+            body: makeToggle(title: L10n.text("Warning marks on bars", "Çubuklarda uyarı işaretleri"),
+                             on: DisplayPrefs.tickMarks, action: #selector(ticksChanged(_:))))
         addSection(
             title: L10n.text("Forecast", "Tahmin"),
             subtitle: L10n.text(
                 "Adds an \"on pace to fill in X\" line under the context bar when usage trends predictively.",
-                "Kullanım eğilim gösterdiğinde bağlam çubuğunun altına \"X içinde dolacak\" satırı ekler."
-            ),
-            body: burn
-        )
-
-        let crit = makeToggle(
-            title: L10n.text("Surface critical background sessions", "Kritik arka plan oturumlarını göster"),
-            on: DisplayPrefs.criticalBackground,
-            action: #selector(criticalChanged(_:))
-        )
+                "Kullanım eğilim gösterdiğinde bağlam çubuğunun altına \"X içinde dolacak\" satırı ekler."),
+            body: makeToggle(title: L10n.text("Burn-rate forecast", "Tüketim tahmini"),
+                             on: DisplayPrefs.burnRate, action: #selector(burnChanged(_:))))
         addSection(
-            title: L10n.text("Menubar", "Menubar"),
+            title: L10n.text("Background sessions", "Arka plan oturumları"),
             subtitle: L10n.text(
                 "When the foreground session is calm and a background session exceeds 80%, append a warning chip to the menubar title.",
-                "Aktif oturum sakinken arka plan oturumu %80'i geçerse menubar başlığına uyarı eklenir."
-            ),
-            body: crit
-        )
+                "Aktif oturum sakinken arka plan oturumu %80'i geçerse menubar başlığına uyarı eklenir."),
+            body: makeToggle(title: L10n.text("Surface critical background sessions", "Kritik arka plan oturumlarını göster"),
+                             on: DisplayPrefs.criticalBackground, action: #selector(criticalChanged(_:))))
+
+        // ── Notifications (was the Alerts tab) ──
+        addSection(
+            title: L10n.text("Provider status", "Sağlayıcı durumu"),
+            subtitle: L10n.text(
+                "Polls Anthropic and OpenAI status pages every 5 minutes. Adds a colored dot to the menubar title and an incident card to the popover when an incident is active.",
+                "Anthropic ve OpenAI durum sayfaları 5 dakikada bir kontrol edilir. Olay olduğunda menubar başlığında renkli nokta ve popover'da kart görünür."),
+            body: makeToggle(title: L10n.text("Show upstream incident overlay", "Üst kaynak olay göstergesi"),
+                             on: DisplayPrefs.incidents, action: #selector(incidentsChanged(_:))))
+        addSection(
+            title: L10n.text("Delight", "İnce dokunuş"),
+            subtitle: L10n.text(
+                "Plays a brief particle burst in the popover when a 5-hour or weekly quota window resets. Respects reduce-motion.",
+                "5 saatlik veya haftalık kota penceresi sıfırlandığında popover'da kısa bir parçacık animasyonu oynatır. Hareketi azalt ayarına uyar."),
+            body: makeToggle(title: L10n.text("Celebrate quota window resets", "Pencere sıfırlamada kutlama"),
+                             on: DisplayPrefs.confetti, action: #selector(confettiChanged(_:))))
     }
 
     private func makeToggle(title: String, on: Bool, action: Selector) -> NSView {
@@ -241,66 +204,30 @@ final class DisplaySettingsViewController: PreferencePaneViewController {
         DisplayPrefs.criticalBackground = sender.state == .on
         onChange?()
     }
-}
-
-// MARK: - Notifications pane
-
-final class NotificationSettingsViewController: PreferencePaneViewController {
-    var onChange: (() -> Void)?
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        buildUI()
-    }
-
-    private func buildUI() {
-        let incidents = makeToggle(
-            title: L10n.text("Show upstream incident overlay", "Üst kaynak olay göstergesi"),
-            on: DisplayPrefs.incidents,
-            action: #selector(incidentsChanged(_:))
-        )
-        addSection(
-            title: L10n.text("Provider status", "Sağlayıcı durumu"),
-            subtitle: L10n.text(
-                "Polls Anthropic and OpenAI status pages every 5 minutes. Adds a colored dot to the menubar title and an incident card to the popover when an incident is active.",
-                "Anthropic ve OpenAI durum sayfaları 5 dakikada bir kontrol edilir. Olay olduğunda menubar başlığında renkli nokta ve popover'da kart görünür."
-            ),
-            body: incidents
-        )
-
-        let confetti = makeToggle(
-            title: L10n.text("Celebrate quota window resets", "Pencere sıfırlamada kutlama"),
-            on: DisplayPrefs.confetti,
-            action: #selector(confettiChanged(_:))
-        )
-        addSection(
-            title: L10n.text("Delight", "İnce dokunuş"),
-            subtitle: L10n.text(
-                "Plays a brief particle burst in the popover when a 5-hour or weekly quota window resets. Respects reduce-motion.",
-                "5 saatlik veya haftalık kota penceresi sıfırlandığında popover'da kısa bir parçacık animasyonu oynatır. Hareketi azalt ayarına uyar."
-            ),
-            body: confetti
-        )
-    }
-
-    private func makeToggle(title: String, on: Bool, action: Selector) -> NSView {
-        let btn = NSButton(checkboxWithTitle: title, target: self, action: action)
-        btn.state = on ? .on : .off
-        return btn
-    }
-
     @objc private func incidentsChanged(_ sender: NSButton) {
         DisplayPrefs.incidents = sender.state == .on
-        if sender.state == .on {
-            IncidentPoller.shared.start()
-        } else {
-            IncidentPoller.shared.stop()
-        }
+        if sender.state == .on { IncidentPoller.shared.start() } else { IncidentPoller.shared.stop() }
         onChange?()
     }
     @objc private func confettiChanged(_ sender: NSButton) {
         DisplayPrefs.confetti = sender.state == .on
         onChange?()
+    }
+
+    private func refreshPreview() {
+        preview.update(
+            items: displayChips.currentItems,
+            agent: "Claude",
+            project: L10n.text("my-project", "projem"),
+            pct: 27
+        )
+    }
+
+    @objc private func separatorChanged(_ sender: NSSegmentedControl) {
+        let value = SeparatorStore.options[sender.selectedSegment].value
+        SeparatorStore.set(value)
+        refreshPreview()
+        onThemeChange?(ThemeStore.current.id)
     }
 }
 

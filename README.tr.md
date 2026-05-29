@@ -136,7 +136,7 @@ Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) d
   limitleri, paralel oturumlar ve tespit edilen diğer AI araçları için kartlar
 - inline renk swatch'leri ve canlı önizlemeli tema seçici — bir temanın
   üzerinde gezinirken menubar başlığı o paletle yeniden çizilir
-- Kullanım, İstatistik, Maliyet, Görünüm, Menubar ve Hakkında sekmeleri olan tam Ayarlar penceresi
+- üç veri görünümü (Kullanım, İstatistik, Maliyet) artı sade, Apple-tarzı ayar seti (Genel · Görünüm · Gizlilik) ve Hakkında
 - paralel Claude / Codex oturumları için per-session bağlam yüzdesi
 
 ### Tahmini maliyet ve plan değeri

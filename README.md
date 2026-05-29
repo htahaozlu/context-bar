@@ -144,7 +144,7 @@ The companion app reads `~/.context-bar/context.json` (`hud.json` before v0.3.13
   detected AI tools
 - a theme picker with inline color swatches and live preview — hover a
   theme and the menubar title repaints in that palette before you commit
-- a full Settings window with Usage, Stats, Cost, Appearance, Menubar, and About tabs
+- three data views (Usage, Stats, Cost) plus a clean, Apple-style settings set (General · Appearance · Privacy) and About
 - per-session context percentage for parallel Claude / Codex sessions
 
 ### Estimated cost & plan value

@@ -6,10 +6,8 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
     let usageVC = UsageViewController()
     let statsVC = StatsViewController()
     let costVC = CostViewController()
+    private let generalVC = GeneralSettingsViewController()
     private let appearanceVC = AppearanceSettingsViewController()
-    private let menubarVC = MenubarSettingsViewController()
-    private let displayVC = DisplaySettingsViewController()
-    private let notificationsVC = NotificationSettingsViewController()
     private let privacyVC = PrivacySettingsViewController()
     private let aboutVC = AboutViewController()
 
@@ -30,21 +28,14 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         costItem.label = L10n.text("Cost", "Maliyet")
         costItem.image = NSImage(systemSymbolName: "dollarsign.circle", accessibilityDescription: costItem.label)
 
+        // Settings panes (Apple-style IA): General · Appearance · Privacy.
+        let generalItem = NSTabViewItem(viewController: generalVC)
+        generalItem.label = L10n.text("General", "Genel")
+        generalItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: generalItem.label)
+
         let appearanceItem = NSTabViewItem(viewController: appearanceVC)
         appearanceItem.label = L10n.text("Appearance", "Görünüm")
-        appearanceItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: appearanceItem.label)
-
-        let menubarItem = NSTabViewItem(viewController: menubarVC)
-        menubarItem.label = L10n.text("Menubar", "Menubar")
-        menubarItem.image = NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: menubarItem.label)
-
-        let displayItem = NSTabViewItem(viewController: displayVC)
-        displayItem.label = L10n.text("Display", "Görüntü")
-        displayItem.image = NSImage(systemSymbolName: "slider.horizontal.below.rectangle", accessibilityDescription: displayItem.label)
-
-        let notificationsItem = NSTabViewItem(viewController: notificationsVC)
-        notificationsItem.label = L10n.text("Alerts", "Uyarılar")
-        notificationsItem.image = NSImage(systemSymbolName: "bell", accessibilityDescription: notificationsItem.label)
+        appearanceItem.image = NSImage(systemSymbolName: "paintbrush", accessibilityDescription: appearanceItem.label)
 
         let privacyItem = NSTabViewItem(viewController: privacyVC)
         privacyItem.label = L10n.text("Privacy", "Gizlilik")
@@ -54,7 +45,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         aboutItem.label = L10n.text("About", "Hakkında")
         aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
 
-        [usageItem, statsItem, costItem, appearanceItem, menubarItem, displayItem, notificationsItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
+        [usageItem, statsItem, costItem, generalItem, appearanceItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
@@ -85,9 +76,8 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         }
 
         appearanceVC.onThemeChange = onThemeChange
-        menubarVC.onThemeChange = onThemeChange
-        displayVC.onChange = { onThemeChange(ThemeStore.current.id) }
-        notificationsVC.onChange = { onThemeChange(ThemeStore.current.id) }
+        generalVC.onThemeChange = onThemeChange
+        generalVC.onChange = { onThemeChange(ThemeStore.current.id) }
         privacyVC.onChange = { onThemeChange(ThemeStore.current.id) }
     }
     required init?(coder: NSCoder) { fatalError() }
