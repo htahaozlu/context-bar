@@ -340,6 +340,13 @@ pub fn collect(worktree: &zed::Worktree) -> UsageSnapshot {
     }
 }
 
+/// The aggregator script, baked into the binary. The native engine prefers a
+/// real on-disk copy (app bundle Resources, exe sibling, dev source tree) but
+/// falls back to materializing this so a `cargo install`ed binary — which has
+/// no sidecar .py — is self-contained (still needs `python3` on PATH).
+#[cfg(not(target_arch = "wasm32"))]
+const EMBEDDED_USAGE_SCRIPT: &str = include_str!("usage_signal.py");
+
 #[cfg(not(target_arch = "wasm32"))]
 fn resolve_usage_script() -> std::path::PathBuf {
     use std::path::PathBuf;
@@ -362,7 +369,35 @@ fn resolve_usage_script() -> std::path::PathBuf {
             }
         }
     }
-    PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/src/usage_signal.py"))
+    // Dev tree: the source lives next to this crate (valid under `cargo run`).
+    let manifest_copy = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/src/usage_signal.py"));
+    if manifest_copy.is_file() {
+        return manifest_copy;
+    }
+    // Installed binary with no sidecar: write the embedded copy once and run it.
+    materialize_embedded_script().unwrap_or(manifest_copy)
+}
+
+/// Write [`EMBEDDED_USAGE_SCRIPT`] to `~/.context-bar/usage_signal.py` (only
+/// when missing or stale) and return its path.
+#[cfg(not(target_arch = "wasm32"))]
+fn materialize_embedded_script() -> Option<std::path::PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    let dir = std::path::PathBuf::from(home).join(".context-bar");
+    let path = dir.join("usage_signal.py");
+    let up_to_date = std::fs::metadata(&path)
+        .map(|m| m.len() as usize == EMBEDDED_USAGE_SCRIPT.len())
+        .unwrap_or(false);
+    if up_to_date {
+        return Some(path);
+    }
+    std::fs::create_dir_all(&dir).ok()?;
+    // Stage to a unique tmp sibling then rename, so a concurrent reader never
+    // sees a half-written script.
+    let tmp = dir.join(format!("usage_signal.py.tmp.{}", std::process::id()));
+    std::fs::write(&tmp, EMBEDDED_USAGE_SCRIPT).ok()?;
+    std::fs::rename(&tmp, &path).ok()?;
+    Some(path)
 }
 
 /// Where we cache the full Python-emitted snapshot. Distinct from
