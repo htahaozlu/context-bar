@@ -179,6 +179,7 @@ final class ContextSnapshot {
                 ?? dbl(sevenDayOverlay?["used_percentage"]),
             activeSession: u64(raw["active_session_tokens"]),
             activeSessionCost: dbl(raw["active_session_cost"]) ?? 0,
+            totalCost30d: dbl(raw["total_cost_30d"]) ?? 0,
             model: raw["last_model"] as? String,
             cwd: resolvedCwd,
             ctxPct: resolvedCtxPct,
@@ -215,6 +216,31 @@ final class ContextSnapshot {
             f.timeStyle = .short
         }
         return f.string(from: date)
+    }
+
+    /// Menubar budget pressure (C1): the worse of (monthly run-rate vs the
+    /// user's $ budget) and (the hottest 5h limit %). `nil` when neither
+    /// signal is configured/known — then no budget tint is shown.
+    static func budgetTier(_ agents: [Agent]) -> BudgetTier? {
+        var tier: BudgetTier?
+        func bump(_ t: BudgetTier) {
+            if tier == nil || t.rawValue > tier!.rawValue { tier = t }
+        }
+        let budget = DisplayPrefs.monthlyBudgetUSD
+        if budget > 0 {
+            let runRate = agents.reduce(0.0) { $0 + $1.totalCost30d }
+            let ratio = runRate / budget
+            bump(ratio >= 1.0 ? .critical : (ratio >= 0.8 ? .warn : .ok))
+        }
+        if let hottest = agents.compactMap({ $0.session5hPercent }).max() {
+            bump(hottest >= 80 ? .critical : (hottest >= 50 ? .warn : .ok))
+        }
+        return tier
+    }
+
+    /// Total monthly run-rate across agents (sum of 30-day estimated cost).
+    static func monthlyRunRate(_ agents: [Agent]) -> Double {
+        agents.reduce(0.0) { $0 + $1.totalCost30d }
     }
 
     /// Linear extrapolation of when the active session will fill its context

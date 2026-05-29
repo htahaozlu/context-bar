@@ -98,6 +98,9 @@ struct ActiveSession {
     let ctxPct: Double?
 }
 
+/// Menubar budget-pressure tier (C1), worst-of monthly $ run-rate and 5h %.
+enum BudgetTier: Int { case ok = 0, warn = 1, critical = 2 }
+
 struct Agent {
     let name: String
     let session5h: UInt64
@@ -106,6 +109,9 @@ struct Agent {
     let week7dPercent: Double?
     let activeSession: UInt64
     let activeSessionCost: Double
+    /// Estimated API-equivalent cost over the last 30 days — the monthly
+    /// run-rate the budget (C1) compares against.
+    let totalCost30d: Double
     let model: String?
     let cwd: String?
     let ctxPct: Double?

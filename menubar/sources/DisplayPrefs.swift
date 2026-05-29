@@ -16,6 +16,7 @@ enum DisplayPrefs {
     private static let kConfetti = "displayPrefs.confetti"
     private static let kRedactPaths = "displayPrefs.redactPaths"
     private static let kMaskShareProjects = "displayPrefs.maskShareProjects"
+    private static let kMonthlyBudget = "displayPrefs.monthlyBudgetUSD"
 
     static var resetStyle: ResetStyle {
         get {
@@ -69,6 +70,13 @@ enum DisplayPrefs {
     static var maskShareProjects: Bool {
         get { defaultsBool(kMaskShareProjects, default: true) }
         set { UserDefaults.standard.set(newValue, forKey: kMaskShareProjects) }
+    }
+
+    /// Monthly API-equivalent $ budget for the menubar color tier (C1).
+    /// 0 = off (then the menubar tier comes from the 5h limit % alone).
+    static var monthlyBudgetUSD: Double {
+        get { UserDefaults.standard.double(forKey: kMonthlyBudget) }
+        set { UserDefaults.standard.set(max(0, newValue), forKey: kMonthlyBudget) }
     }
 
     private static func defaultsBool(_ key: String, default def: Bool) -> Bool {

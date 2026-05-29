@@ -536,7 +536,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if let suffix = criticalBackgroundSuffix(font: font, theme: theme) {
             result.append(suffix)
         }
+        if let suffix = budgetSuffix(font: font) {
+            result.append(suffix)
+        }
         return result
+    }
+
+    /// Trailing budget-pressure dot (C1): yellow at warn, red at critical —
+    /// the worse of the monthly $ run-rate vs the user's budget and the hottest
+    /// 5h limit %. Hidden when calm (tier ok) or no budget/limit signal.
+    private func budgetSuffix(font: NSFont) -> NSAttributedString? {
+        guard let tier = ContextSnapshot.budgetTier(lastAllAgents), tier != .ok else { return nil }
+        let color: NSColor = tier == .critical ? .systemRed : .systemYellow
+        return NSAttributedString(string: "  ●", attributes: [
+            .font: font,
+            .foregroundColor: color,
+        ])
     }
 
     /// Builds a leading "● " glyph colored by the active incident severity.

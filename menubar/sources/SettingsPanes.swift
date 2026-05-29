@@ -164,6 +164,12 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
                 "Aktif oturum sakinken arka plan oturumu %80'i geçerse menubar başlığına uyarı eklenir."),
             body: makeToggle(title: L10n.text("Surface critical background sessions", "Kritik arka plan oturumlarını göster"),
                              on: DisplayPrefs.criticalBackground, action: #selector(criticalChanged(_:))))
+        addSection(
+            title: L10n.text("Monthly budget", "Aylık bütçe"),
+            subtitle: L10n.text(
+                "Tints the menubar title yellow then red as your estimated monthly run-rate nears this budget — or as your 5h limit fills. 0 = off (the 5h limit % still tints on its own).",
+                "Tahmini aylık harcaman bu bütçeye yaklaştıkça — ya da 5sa limitin dolarken — menubar başlığını sarı sonra kırmızı yapar. 0 = kapalı (5sa limit %'si yine de renklendirir)."),
+            body: makeBudgetField())
 
         // ── Notifications (was the Alerts tab) ──
         addSection(
@@ -186,6 +192,28 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         let btn = NSButton(checkboxWithTitle: title, target: self, action: action)
         btn.state = on ? .on : .off
         return btn
+    }
+
+    private func makeBudgetField() -> NSView {
+        let field = NSTextField()
+        field.placeholderString = L10n.text("USD / month", "USD / ay")
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        let v = DisplayPrefs.monthlyBudgetUSD
+        field.stringValue = v > 0 ? String(format: "%.0f", v) : ""
+        field.target = self
+        field.action = #selector(budgetChanged(_:))
+        let row = NSStackView(views: [NSTextField(labelWithString: "$"), field])
+        row.orientation = .horizontal
+        row.spacing = 4
+        row.alignment = .firstBaseline
+        return row
+    }
+
+    @objc private func budgetChanged(_ sender: NSTextField) {
+        let cleaned = sender.stringValue.filter { $0.isNumber || $0 == "." }
+        DisplayPrefs.monthlyBudgetUSD = Double(cleaned) ?? 0
+        onChange?()
     }
 
     @objc private func resetStyleChanged(_ sender: NSSegmentedControl) {
