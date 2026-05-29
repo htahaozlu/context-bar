@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.6.0] - 2026-05-29
+
+### Added
+
+- **Live 5h-block dashboard.** `context-bar blocks` prints a one-shot per-agent panel — usage % of limit, burn rate ($/hr · tok/min), projected block total, ETA-to-limit, and a reset countdown — and `context-bar live` is the same as an auto-refreshing `ratatui` TUI with a color-tiered gauge (`--interval`, `q`/`r`). Cross-platform; works over SSH. Built on a reusable `core::live::block_status`.
+- **Monthly budget + menubar color (macOS).** Set a monthly $ budget in General settings; the menubar title gains a yellow→red dot as the worse of your 30-day run-rate vs that budget and your hottest 5h limit % crosses 80% / 100% (50/80% for the limit). 0 = off (the 5h limit % still tints on its own).
+- **`cargo install context-bar` and `npx context-bar`.** Tagged releases now publish to crates.io (`context-bar-core` then `context-bar`) and to npm (the meta `context-bar` package + six `@context-bar/context-bar-<os>-<cpu>` prebuilt-binary packages with a no-postinstall JS launcher). Both are gated on the `CARGO_REGISTRY_TOKEN` / `NPM_TOKEN` repo secrets — see `docs/PUBLISHING.md`.
+
 ## [0.5.0] - 2026-05-29
 
 ### Changed
