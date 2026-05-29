@@ -14,6 +14,16 @@ readme = "README.md"
 keywords = ["claude", "codex", "usage", "cost", "tokens"]
 categories = ["command-line-utilities", "development-tools"]
 default-run = "context-bar"
+# crates.io caps a published crate at 10 MiB. The repo also carries the native
+# macOS app (Swift, multi-MB PNG/GIF/MP4 assets, docs) which the crate doesn't
+# need to build — whitelist only the Rust sources + manifest/readme/license.
+include = [
+    "src/**/*.rs",
+    "examples/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
 # The CLI is one explicit [[bin]]; src/bin/cli_report.rs is a module of it,
 # not its own binary. Disable auto-discovery so cargo doesn't treat it as one.
 autobins = false
