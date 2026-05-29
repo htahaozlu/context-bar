@@ -1,10 +1,36 @@
-# Publishing names — crates.io + npm
+# Publishing — crates.io + npm
 
-This is a **maintainer checklist** for reserving and publishing the project's names on
-crates.io and npm (EPIC A0/A2/A4). Every step here needs **your own** crates.io/npm
-credentials and most are **irreversible** — crates.io names can never be deleted (only
-*yanked*), and npm names, once taken, are hard to reclaim. So this is a runbook for a
-human to run by hand, not automation. Read each section fully before you paste anything.
+Publishing is **irreversible** (crates.io names can't be deleted, npm names are hard to
+reclaim) and needs **your own** credentials, so it's gated on two GitHub secrets you set
+once. After that it's fully automated on every `v*` tag.
+
+## ✅ Automated (recommended): set two secrets, then tag
+
+`.github/workflows/release.yml` already has `publish-crates` + `publish-npm` jobs. They
+**no-op until the matching secret exists**, so nothing publishes by accident. To enable:
+
+1. **crates.io** — create a token at <https://crates.io/settings/tokens> (scope: publish-new
+   + publish-update). Add repo secret **`CARGO_REGISTRY_TOKEN`**.
+2. **npm** — create an automation token at <https://www.npmjs.com/settings/~/tokens> (type:
+   *Automation*, so 2FA doesn't block CI). Add repo secret **`NPM_TOKEN`**. The `@context-bar`
+   scope is created automatically on first publish (`--access public`).
+   - `gh secret set CARGO_REGISTRY_TOKEN` / `gh secret set NPM_TOKEN` from the CLI, or the repo
+     Settings → Secrets → Actions UI.
+
+Then cut a release (bump `Cargo.toml` + `CHANGELOG.md` + `docs/releases/v<ver>.md`, push
+`main`, `git tag vX.Y.Z`, push the tag). The tagged run will: build the DMG + 6
+cross-platform binaries, `cargo publish` core then bin (enables `cargo install context-bar`),
+and assemble + `npm publish` the meta `context-bar` package + the six
+`@context-bar/context-bar-<os>-<cpu>` platform packages (enables `npx context-bar`).
+Watch the first run — npm packaging is intricate; `publish-npm` is isolated (`fail-fast`
+off, the DMG job is independent), so a hiccup never blocks the macOS release.
+
+---
+
+## Manual fallback / first-time reservation
+
+If you'd rather run it by hand (or reserve the names before a release), the steps below do
+the same thing. Read each fully before pasting.
 
 ## crates.io (A2/A4)
 

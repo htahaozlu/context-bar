@@ -228,3 +228,68 @@ jobs:
           include: LICENSE,README.md
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish the crates to crates.io (enables `cargo install context-bar`).
+  # No-op until the CARGO_REGISTRY_TOKEN secret is set. core first (the bin
+  # depends on it), then the bin — with a retry for index propagation lag.
+  publish-crates:
+    needs: build-macos-release
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish core then bin
+        if: env.CARGO_REGISTRY_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo publish -p context-bar-core
+          for i in $(seq 1 12); do
+            if cargo publish -p context-bar; then exit 0; fi
+            echo "bin publish failed (core may still be indexing); retry in 30s ($i/12)"
+            sleep 30
+          done
+          echo "::error::context-bar bin publish did not succeed after retries" >&2
+          exit 1
+
+  # Publish to npm (enables `npx context-bar` / `bunx` / `pnpm dlx`). Downloads
+  # the prebuilt binaries from this release, assembles the meta + 6 per-platform
+  # packages, and publishes them. No-op until the NPM_TOKEN secret is set.
+  publish-npm:
+    needs: upload-binaries
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Assemble + publish npm packages
+        if: env.NODE_AUTH_TOKEN != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          mkdir -p archives bins
+          gh release download "$TAG" -R "$REPO" \
+            -p 'context-bar-*.tar.gz' -p 'context-bar-*.zip' -D archives
+          for triple in aarch64-apple-darwin x86_64-apple-darwin \
+                        aarch64-unknown-linux-musl x86_64-unknown-linux-musl \
+                        aarch64-pc-windows-msvc x86_64-pc-windows-msvc; do
+            mkdir -p "bins/$triple"
+            if [[ -f "archives/context-bar-$triple.tar.gz" ]]; then
+              tar -xzf "archives/context-bar-$triple.tar.gz" -C "bins/$triple"
+            elif [[ -f "archives/context-bar-$triple.zip" ]]; then
+              unzip -o "archives/context-bar-$triple.zip" -d "bins/$triple"
+            fi
+          done
+          VERSION="$VERSION" BIN_DIR="$PWD/bins" bash scripts/npm-publish.sh
