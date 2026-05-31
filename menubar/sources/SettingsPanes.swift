@@ -263,6 +263,8 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
 
 final class PrivacySettingsViewController: PreferencePaneViewController {
     var onChange: (() -> Void)?
+    private let aiProviderPopup = NSPopUpButton()
+    private let aiKeyField = NSSecureTextField()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -314,6 +316,61 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
             ),
             body: maskShare
         )
+
+        addSection(
+            title: L10n.text("AI Advisor (bring your own key)", "AI Danışman (kendi anahtarın)"),
+            subtitle: L10n.text(
+                "Optional. Connect your own OpenAI or Gemini API key to get usage-efficiency tips. Only an aggregate summary — no transcripts, no project names — is sent to your chosen provider, and only when you press Analyze in the Cost tab. Off by default; nothing leaves your machine until you opt in.",
+                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — seçtiğin sağlayıcıya gönderilir, o da yalnızca Maliyet sekmesinde Analiz'e bastığında. Varsayılan kapalı; sen açana kadar makineden hiçbir şey çıkmaz."
+            ),
+            body: makeAIAdvisorField()
+        )
+    }
+
+    private func makeAIAdvisorField() -> NSView {
+        aiProviderPopup.removeAllItems()
+        AIProvider.allCases.forEach { aiProviderPopup.addItem(withTitle: $0.label) }
+        aiProviderPopup.selectItem(at: AIProvider.allCases.firstIndex(of: DisplayPrefs.aiProvider) ?? 0)
+        aiProviderPopup.target = self
+        aiProviderPopup.action = #selector(aiProviderChanged(_:))
+        aiProviderPopup.translatesAutoresizingMaskIntoConstraints = false
+
+        aiKeyField.placeholderString = keyPlaceholder(for: DisplayPrefs.aiProvider)
+        aiKeyField.target = self
+        aiKeyField.action = #selector(aiKeyCommitted(_:))
+        aiKeyField.translatesAutoresizingMaskIntoConstraints = false
+        aiKeyField.widthAnchor.constraint(equalToConstant: 300).isActive = true
+
+        let row = NSStackView(views: [aiProviderPopup, aiKeyField])
+        row.orientation = .horizontal
+        row.spacing = 8
+        row.alignment = .firstBaseline
+        return row
+    }
+
+    private func keyPlaceholder(for p: AIProvider) -> String {
+        if p == .off { return L10n.text("Select a provider first", "Önce bir sağlayıcı seçin") }
+        return AIKeychain.hasKey(for: p)
+            ? L10n.text("Key saved — paste to replace", "Anahtar kayıtlı — değiştirmek için yapıştır")
+            : L10n.text("Paste \(p.label) API key", "\(p.label) API anahtarını yapıştır")
+    }
+
+    @objc private func aiProviderChanged(_ s: NSPopUpButton) {
+        let p = AIProvider.allCases[max(0, s.indexOfSelectedItem)]
+        DisplayPrefs.aiProvider = p
+        aiKeyField.stringValue = ""
+        aiKeyField.placeholderString = keyPlaceholder(for: p)
+        onChange?()
+    }
+
+    @objc private func aiKeyCommitted(_ f: NSSecureTextField) {
+        let p = DisplayPrefs.aiProvider
+        guard p != .off else { return }
+        let v = f.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !v.isEmpty else { return }
+        AIKeychain.save(v, for: p)
+        f.stringValue = ""
+        f.placeholderString = L10n.text("Key saved ✓", "Anahtar kayıtlı ✓")
     }
 
     private func makeToggle(title: String, on: Bool, action: Selector) -> NSView {

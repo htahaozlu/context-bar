@@ -30,6 +30,9 @@ final class CostViewController: PreferencePaneViewController {
     private let instancesView = CostInstancesView()
     private var costDetailPopover: NSPopover?
     private let footnote = NSTextField(labelWithString: "")
+    private let aiButton = NSButton()
+    private let aiSpinner = NSProgressIndicator()
+    private let aiResult = NSTextField(wrappingLabelWithString: "")
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -125,11 +128,70 @@ final class CostViewController: PreferencePaneViewController {
             body: instancesStack
         )
 
+        aiButton.bezelStyle = .rounded
+        aiButton.title = L10n.text("Analyze my usage", "Kullanımımı analiz et")
+        aiButton.target = self
+        aiButton.action = #selector(analyzeAI)
+        aiButton.translatesAutoresizingMaskIntoConstraints = false
+        aiSpinner.style = .spinning
+        aiSpinner.controlSize = .small
+        aiSpinner.isDisplayedWhenStopped = false
+        aiSpinner.translatesAutoresizingMaskIntoConstraints = false
+        aiResult.font = NSFont.systemFont(ofSize: 11.5)
+        aiResult.textColor = .secondaryLabelColor
+        aiResult.maximumNumberOfLines = 0
+        aiResult.translatesAutoresizingMaskIntoConstraints = false
+        let aiRow = NSStackView(views: [aiButton, aiSpinner])
+        aiRow.orientation = .horizontal
+        aiRow.spacing = 8
+        aiRow.alignment = .centerY
+        let aiStack = NSStackView(views: [aiRow, aiResult])
+        aiStack.orientation = .vertical
+        aiStack.alignment = .leading
+        aiStack.spacing = 8
+        aiStack.translatesAutoresizingMaskIntoConstraints = false
+        addSection(
+            title: L10n.text("AI Advisor", "AI Danışman"),
+            subtitle: L10n.text(
+                "Get usage-efficiency tips from your own OpenAI / Gemini key (set it in Privacy settings). Sends an aggregate summary only — no transcripts, no project names.",
+                "Kendi OpenAI / Gemini anahtarınla kullanım verimliliği önerileri al (Gizlilik ayarlarından gir). Yalnızca özet gönderir — transcript yok, proje adı yok."
+            ),
+            body: aiStack
+        )
+
         footnote.font = NSFont.systemFont(ofSize: 10)
         footnote.textColor = .tertiaryLabelColor
         footnote.maximumNumberOfLines = 0
         footnote.translatesAutoresizingMaskIntoConstraints = false
         addSection(title: L10n.text("Source", "Kaynak"), subtitle: nil, body: footnote)
+    }
+
+    @objc private func analyzeAI() {
+        guard DisplayPrefs.aiProvider != .off, AIKeychain.hasKey(for: DisplayPrefs.aiProvider) else {
+            aiResult.textColor = .systemOrange
+            aiResult.stringValue = L10n.text(
+                "Connect an OpenAI or Gemini API key in Settings → Privacy → AI Advisor first.",
+                "Önce Ayarlar → Gizlilik → AI Danışman'dan bir OpenAI veya Gemini API anahtarı bağla."
+            )
+            return
+        }
+        aiButton.isEnabled = false
+        aiSpinner.startAnimation(nil)
+        aiResult.textColor = .secondaryLabelColor
+        aiResult.stringValue = L10n.text("Analyzing your 30-day usage…", "Son 30 günlük kullanımın analiz ediliyor…")
+        AIAdvisor.analyze { [weak self] result in
+            guard let self else { return }
+            self.aiButton.isEnabled = true
+            self.aiSpinner.stopAnimation(nil)
+            switch result {
+            case .success(let text):
+                self.aiResult.textColor = .labelColor
+                self.aiResult.stringValue = text
+            case .failure(let err):
+                self.aiResult.textColor = .systemOrange
+                self.aiResult.stringValue = L10n.text("Couldn't analyze: ", "Analiz edilemedi: ") + "\(err)"
+            }
+        }
     }
 
     @objc private func providerChanged(_ sender: NSSegmentedControl) {
