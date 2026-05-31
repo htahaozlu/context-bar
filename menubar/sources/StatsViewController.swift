@@ -291,7 +291,10 @@ final class StatsViewController: PreferencePaneViewController {
                 value: numberString(sessions)
             ),
             StatTileView(
-                caption: L10n.text("total tokens", "toplam token"),
+                // Fresh work only (input + output, NO cache). Deliberately NOT
+                // the cache-inclusive "Total Tokens" Claude Code / ccusage show —
+                // labelled explicitly so the two don't look like a mismatch.
+                caption: L10n.text("tokens (in + out)", "token (girdi + çıktı)"),
                 value: ContextSnapshot.formatTokens(tokens)
             ),
             StatTileView(
