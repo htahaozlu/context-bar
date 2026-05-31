@@ -33,6 +33,7 @@ final class CostViewController: PreferencePaneViewController {
     private let aiButton = NSButton()
     private let aiSpinner = NSProgressIndicator()
     private let aiResult = NSTextField(wrappingLabelWithString: "")
+    private let machinesHost = NSStackView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -104,6 +105,21 @@ final class CostViewController: PreferencePaneViewController {
         projectionLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
         savingsLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
 
+        // Cross-machine combined cost — a headline summary, so it sits right
+        // under the estimate tiles (only meaningful once a sync folder is set).
+        machinesHost.orientation = .vertical
+        machinesHost.alignment = .leading
+        machinesHost.spacing = 6
+        machinesHost.translatesAutoresizingMaskIntoConstraints = false
+        addSection(
+            title: L10n.text("Across your Macs", "Mac'lerin arasında"),
+            subtitle: L10n.text(
+                "Combined 30-day estimated cost from every Mac writing to your sync folder (set it in Privacy settings).",
+                "Senkron klasörüne yazan her Mac'in son 30 günlük tahmini maliyeti birleşik (Gizlilik ayarlarından klasörü gir)."
+            ),
+            body: machinesHost
+        )
+
         sparkHost.translatesAutoresizingMaskIntoConstraints = false
         sparkHost.heightAnchor.constraint(equalToConstant: 150).isActive = true
         addSection(
@@ -164,6 +180,39 @@ final class CostViewController: PreferencePaneViewController {
         footnote.maximumNumberOfLines = 0
         footnote.translatesAutoresizingMaskIntoConstraints = false
         addSection(title: L10n.text("Source", "Kaynak"), subtitle: nil, body: footnote)
+    }
+
+    private func populateMachines() {
+        machinesHost.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        func line(_ s: String, color: NSColor = .secondaryLabelColor, bold: Bool = false) -> NSTextField {
+            let l = NSTextField(labelWithString: s)
+            l.font = bold ? Typography.bodyMono(12, weight: .semibold) : Typography.bodyMono(11.5, weight: .regular)
+            l.textColor = color
+            return l
+        }
+        if DisplayPrefs.syncFolder.isEmpty {
+            machinesHost.addArrangedSubview(line(L10n.text(
+                "Not set up. Choose a synced folder in Settings → Privacy → Across your Macs.",
+                "Kurulmadı. Ayarlar → Gizlilik → Mac'lerin arasında'dan senkron klasör seç."), color: .tertiaryLabelColor))
+            return
+        }
+        let machines = MachineSync.readAll()
+        if machines.isEmpty {
+            machinesHost.addArrangedSubview(line(L10n.text(
+                "No machine data yet — it appears once each Mac has written + synced.",
+                "Henüz makine verisi yok — her Mac yazıp senkronlayınca görünür."), color: .tertiaryLabelColor))
+            return
+        }
+        let combined = machines.reduce(0.0) { $0 + $1.grandCost }
+        machinesHost.addArrangedSubview(line(
+            L10n.text("Combined 30-day: ", "Birleşik 30 gün: ") + ContextSnapshot.formatUSD(combined)
+                + "  ·  \(machines.count) " + L10n.text("Macs", "Mac"),
+            color: .labelColor, bold: true))
+        for m in machines {
+            let tag = m.isSelf ? " (" + L10n.text("this Mac", "bu Mac") + ")" : ""
+            machinesHost.addArrangedSubview(line(
+                "  \(m.machine)\(tag) — \(ContextSnapshot.formatUSD(m.grandCost))  ·  \(ContextSnapshot.formatTokens(m.grandTokens)) " + L10n.text("tok", "tok")))
+        }
     }
 
     @objc private func analyzeAI() {
@@ -300,6 +349,7 @@ final class CostViewController: PreferencePaneViewController {
 
     func reload() {
         guard isViewLoaded else { return }
+        populateMachines()
         let data = loadData()
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         instancesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }

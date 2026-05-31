@@ -265,6 +265,7 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     var onChange: (() -> Void)?
     private let aiProviderPopup = NSPopUpButton()
     private let aiKeyField = NSSecureTextField()
+    private let syncFolderLabel = NSTextField(labelWithString: "")
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -325,6 +326,56 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
             ),
             body: makeAIAdvisorField()
         )
+
+        addSection(
+            title: L10n.text("Across your Macs", "Mac'lerin arasında"),
+            subtitle: L10n.text(
+                "Point this at a folder you already sync (iCloud Drive, Dropbox…). Each Mac writes a compact usage summary there; the Cost tab then shows your combined usage across machines. Aggregates only — no transcripts, no project names. No server.",
+                "Zaten senkronladığın bir klasörü seç (iCloud Drive, Dropbox…). Her Mac oraya özet kullanım yazar; Maliyet sekmesi makineler arası birleşik kullanımını gösterir. Yalnızca özet — transcript yok, proje adı yok. Sunucu yok."
+            ),
+            body: makeSyncFolderField()
+        )
+    }
+
+    private func makeSyncFolderField() -> NSView {
+        let btn = NSButton(title: L10n.text("Choose folder…", "Klasör seç…"), target: self, action: #selector(chooseSyncFolder))
+        btn.bezelStyle = .rounded
+        syncFolderLabel.font = .systemFont(ofSize: 11)
+        syncFolderLabel.textColor = .secondaryLabelColor
+        syncFolderLabel.lineBreakMode = .byTruncatingMiddle
+        syncFolderLabel.stringValue = syncFolderDisplay()
+        let clear = NSButton(title: L10n.text("Clear", "Temizle"), target: self, action: #selector(clearSyncFolder))
+        clear.bezelStyle = .rounded
+        let row = NSStackView(views: [btn, syncFolderLabel, clear])
+        row.orientation = .horizontal
+        row.spacing = 8
+        row.alignment = .firstBaseline
+        return row
+    }
+
+    private func syncFolderDisplay() -> String {
+        DisplayPrefs.syncFolder.isEmpty
+            ? L10n.text("Not set", "Ayarlı değil")
+            : (DisplayPrefs.syncFolder as NSString).abbreviatingWithTildeInPath
+    }
+
+    @objc private func chooseSyncFolder() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true
+        p.canChooseFiles = false
+        p.allowsMultipleSelection = false
+        p.prompt = L10n.text("Use folder", "Klasörü kullan")
+        if p.runModal() == .OK, let url = p.url {
+            DisplayPrefs.syncFolder = url.path
+            syncFolderLabel.stringValue = syncFolderDisplay()
+            onChange?()
+        }
+    }
+
+    @objc private func clearSyncFolder() {
+        DisplayPrefs.syncFolder = ""
+        syncFolderLabel.stringValue = syncFolderDisplay()
+        onChange?()
     }
 
     private func makeAIAdvisorField() -> NSView {

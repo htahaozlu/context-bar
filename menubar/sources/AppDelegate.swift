@@ -500,6 +500,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         lastActive = active
         lastAllAgents = all
         repaintTitle()
+        // Publish this Mac's compact usage to the shared sync folder (no-op
+        // unless the user set one). Off the main concern path; cheap.
+        MachineSync.exportLocal()
         if popover.isShown {
             popoverVC.rebuild()
         }
