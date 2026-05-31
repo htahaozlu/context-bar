@@ -4,7 +4,7 @@ cask "context-bar" do
 
   url "https://github.com/htahaozlu/context-bar/releases/download/v#{version}/ContextBar.dmg"
   name "ContextBar"
-  desc "Local-first repo context generator with a native menubar companion"
+  desc "Usage and cost visibility for Claude Code and Codex — menubar app and CLI"
   homepage "https://github.com/htahaozlu/context-bar"
 
   livecheck do

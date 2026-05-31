@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <strong>Local-first repository context and native macOS usage visibility for coding agents.</strong>
+  <strong>Usage and cost visibility for Claude Code and Codex — a native macOS menubar app and a cross-platform terminal CLI.</strong>
 </p>
 
 <p align="center">
-  ContextBar keeps agents grounded in the repository they are working on, writes stable agent-readable briefs, and gives Claude Code and Codex usage a native macOS surface.
+  ContextBar shows where your Claude Code and Codex usage is going, on every surface you work from. The <strong>native macOS menubar app</strong> gives you a live session view, rolling 5h/7d limit gauges, cost trends, a WidgetKit widget, and a Share card. The <strong>cross-platform terminal CLI</strong> brings ccusage-class reports (daily / weekly / monthly / session / blocks) and a live TUI dashboard to macOS, Linux, Windows, and SSH — built on a pure-Rust engine, no <code>python3</code> required. Cost numbers are API-equivalent <strong>estimates</strong> priced from the LiteLLM rate table (the same source ccusage uses), not bills. Repository context stays fresh via local snapshots; no external service required.
 </p>
 
 <p align="center">
@@ -23,18 +23,29 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/downloads/htahaozlu/context-bar/total?style=flat-square&label=downloads" alt="Total Downloads">
-  <img src="https://img.shields.io/github/stars/htahaozlu/context-bar?style=flat-square" alt="Stars">
+  <strong>Prefer the terminal?</strong> <code>npx context-bar@latest daily</code> · <code>cargo install context-bar</code> — see <a href="#install">Install</a>.
 </p>
 
 <p align="center">
   <a href="https://github.com/htahaozlu/context-bar/releases/latest">
     <img alt="Latest release" src="https://img.shields.io/github/v/release/htahaozlu/context-bar?style=flat-square&label=release&color=2F81F7">
   </a>
-  <a href="LICENSE">
-    <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2">
+  <a href="https://crates.io/crates/context-bar">
+    <img alt="crates.io" src="https://img.shields.io/crates/v/context-bar?style=flat-square&label=crates.io&color=E07A2B">
   </a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-7DCEA0">
+  <a href="https://www.npmjs.com/package/context-bar">
+    <img alt="npm" src="https://img.shields.io/npm/v/context-bar?style=flat-square&label=npm&color=CB3837">
+  </a>
+  <a href="LICENSE">
+    <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-5DADE2?style=flat-square">
+  </a>
+</p>
+
+<p align="center">
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-7DCEA0?style=flat-square">
+  <img alt="Architectures" src="https://img.shields.io/badge/arch-arm64%20%7C%20x64-7DCEA0?style=flat-square">
+  <img src="https://img.shields.io/github/downloads/htahaozlu/context-bar/total?style=flat-square&label=downloads" alt="Total downloads">
+  <img src="https://img.shields.io/github/stars/htahaozlu/context-bar?style=flat-square" alt="Stars">
 </p>
 
 ## Live demo
@@ -43,51 +54,78 @@
   <img src="docs/images/context-bar-demo.gif" alt="ContextBar demo showing Claude Code and Codex usage updating live on macOS" width="100%">
 </p>
 
-ContextBar gives Claude Code and Codex a native macOS surface, so context drift and rolling usage stay visible while you work.
+The native macOS app keeps Claude Code and Codex context drift and rolling usage visible while you work; the terminal CLI brings the same usage and cost numbers to any OS, including over SSH.
 
 ## Install
 
-### Homebrew (recommended)
+ContextBar ships as two products from one release: a **native macOS app** and a **cross-platform terminal CLI**. Pick whichever fits how you work — or use both.
+
+### macOS app — Homebrew (recommended)
+
+The premium, native flagship: a menubar status item, a live AppKit popover, a WidgetKit widget, and a Share card. Requires macOS Ventura (13) or later.
 
 ```bash
 brew install --cask htahaozlu/context-bar/context-bar
 ```
 
-`brew` auto-taps `htahaozlu/homebrew-context-bar` on first install. Upgrade later with `brew update && brew upgrade --cask htahaozlu/context-bar/context-bar`.
-
-### macOS app (DMG)
-
-1. Download `ContextBar.dmg` from the [latest release](https://github.com/htahaozlu/context-bar/releases/latest) (universal: Apple Silicon + Intel).
-2. Drag `ContextBar.app` into `Applications`.
-3. First launch: right-click `ContextBar.app` → **Open** → **Open** again. The app is ad-hoc signed (not notarized).
-4. Eject and delete the DMG.
-
-If macOS reports the app as "damaged", remove the quarantine flag:
+`brew` auto-taps `htahaozlu/homebrew-context-bar` on first install. Upgrade later with:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/ContextBar.app
+brew update && brew upgrade --cask htahaozlu/context-bar/context-bar
 ```
 
-### CLI
+### Terminal CLI (macOS · Linux · Windows)
+
+The cross-platform reach: ccusage-class usage and cost reports plus a live TUI dashboard. Pure-Rust engine — **no `python3` required**. Runs on macOS, Linux (x64/arm64, static musl), and Windows (x64/arm64), including over SSH.
+
+**npm (no install — runs the latest):**
 
 ```bash
-cargo install --path .
+npx context-bar@latest daily
+# also works with other package managers:
+bunx context-bar daily
+pnpm dlx context-bar daily
 ```
 
-#### Terminal CLI
-
-Build from source or install from crates.io once published:
+To install it globally:
 
 ```bash
-git clone https://github.com/htahaozlu/context-bar.git
-cd context-bar
-cargo build --release   # binary at target/release/context-bar
+npm install -g context-bar
+```
 
-# or, once published:
+The meta package resolves a prebuilt binary for your platform via an optional dependency (`@htahaozlu/context-bar-<os>-<cpu>`); there is no postinstall, so it works under `npm ci --ignore-scripts`.
+
+**Cargo (crates.io):**
+
+```bash
 cargo install context-bar
 ```
 
-The terminal CLI currently spawns `python3` for usage aggregation, so it needs `python3` on `PATH`. Cross-platform prebuilt binaries, a pure-Rust engine (no `python3`), `npx context-bar`, and Windows support are rolling out in 0.5.0 — see `docs/ai/ROADMAP.md`.
+This builds `context-bar` (and its engine, `context-bar-core`) from crates.io.
+
+**Prebuilt binaries (GitHub releases):**
+
+Every [release](https://github.com/htahaozlu/context-bar/releases/latest) attaches a standalone binary for six targets, each with a `.sha256` checksum:
+
+| OS | arch | asset |
+| --- | --- | --- |
+| macOS | arm64 | `context-bar-aarch64-apple-darwin.tar.gz` |
+| macOS | x64 | `context-bar-x86_64-apple-darwin.tar.gz` |
+| Linux | arm64 | `context-bar-aarch64-unknown-linux-musl.tar.gz` |
+| Linux | x64 | `context-bar-x86_64-unknown-linux-musl.tar.gz` |
+| Windows | arm64 | `context-bar-aarch64-pc-windows-msvc.zip` |
+| Windows | x64 | `context-bar-x86_64-pc-windows-msvc.zip` |
+
+Download the archive for your platform, verify the checksum, unpack it, and put `context-bar` on your `PATH`. (Linux binaries are statically linked against musl, so they run on any distro.)
+
+### macOS app — direct download (DMG)
+
+If you don't use Homebrew:
+
+1. Download `ContextBar.dmg` from the [latest release](https://github.com/htahaozlu/context-bar/releases/latest) (universal: Apple Silicon + Intel).
+2. Drag `ContextBar.app` into `Applications`.
+3. Launch it. The app is **signed and notarized by Apple**, so it opens without a quarantine warning.
+4. Eject and delete the DMG.
 
 ## Preview
 
@@ -116,16 +154,19 @@ ContextBar solves two persistent problems in agent-driven development:
 - repository context drifts faster than an agent brief can keep up
 - usage and session state stay buried in terminal output and local transcripts
 
-It addresses both through a local pipeline that continuously produces stable project summaries and a native macOS HUD for Claude Code and Codex activity.
+It addresses both through a local pipeline that continuously produces stable project summaries, a cross-platform terminal CLI, and a native macOS HUD for Claude Code and Codex activity.
 
 ### Core surfaces
 
-- Repository snapshots under `.context-bar/`
-- Stable `AGENT.md` and `CLAUDE.md`
-- CLI for refresh, watch, and global views
-- Native AppKit menubar companion
+- Cross-platform terminal CLI — `daily` / `weekly` / `monthly` / `session` / `blocks` reports + a live TUI (macOS · Linux · Windows · SSH)
+- Native AppKit menubar app (menubar status item, popover, Cost tab, widget, Share card) — macOS
 - Estimated API-equivalent cost per day per project (Claude + Codex)
+- Repository snapshots under `.context-bar/` with stable `AGENT.md` and `CLAUDE.md`
 - Markdown and JSON artifacts for tooling
+
+## How it compares to ccusage
+
+The terminal CLI replicates [ccusage](https://github.com/ryoppippi/ccusage)'s `daily` / `weekly` / `monthly` / `session` / `blocks` reports for both Claude Code and Codex, on a pure-Rust engine (no `python3`), with API-equivalent cost priced from the same LiteLLM rate table. The native macOS app then adds what a passive CLI can't surface: live 5h/7d limit gauges in the menubar, an interactive cost-trend chart, a WidgetKit widget, and a one-click Share card. Use the CLI anywhere; reach for the app on macOS when you want it always-on.
 
 ## Key capabilities
 
@@ -264,7 +305,7 @@ The global HUD is written to `~/.context-bar/hud.md`.
 
 ## Terminal CLI
 
-`context-bar 0.4.0` adds a first-class terminal CLI built on the same cost engine that powers the macOS app (which remains the premium surface and is unchanged). New report verbs render `ccusage`-style tables for Claude Code and Codex usage.
+The terminal CLI is built on the same pure-Rust cost engine that powers the macOS app (which remains the premium flagship). It runs on macOS, Linux, and Windows (arm64 + x64), needs no `python3`, works over SSH, and installs via `npx context-bar`, `cargo install context-bar`, or a prebuilt binary. Report verbs render `ccusage`-style tables for Claude Code and Codex usage.
 
 ### Report verbs
 
@@ -325,7 +366,7 @@ ContextBar combines:
 - Claude Code usage from `~/.claude/projects/**/*.jsonl`
 - Codex CLI usage from `~/.codex/sessions/**/*.jsonl`
 
-No external service is required for the core repository summaries. Usage aggregation relies on locally available transcripts, optional native Claude Code statusline data, and `python3`.
+No external service is required for the core repository summaries. Usage aggregation relies on locally available transcripts and optional native Claude Code statusline data, parsed by a pure-Rust cross-platform engine (no `python3`).
 
 ### Claude Code parity
 

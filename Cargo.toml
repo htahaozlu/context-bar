@@ -11,7 +11,7 @@ description = "Usage HUD + API-equivalent cost estimator for AI coding agents (C
 repository = "https://github.com/htahaozlu/context-bar"
 homepage = "https://github.com/htahaozlu/context-bar"
 readme = "README.md"
-keywords = ["claude", "codex", "usage", "cost", "tokens"]
+keywords = ["claude", "codex", "usage", "cost", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 default-run = "context-bar"
 # crates.io caps a published crate at 10 MiB. The repo also carries the native

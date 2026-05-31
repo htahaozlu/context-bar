@@ -84,11 +84,11 @@ cat > "$meta/package.json" <<JSON
 {
   "name": "context-bar",
   "version": "$VERSION",
-  "description": "Usage + API-equivalent cost for AI coding agents (Claude Code, Codex CLI). Terminal CLI + live 5h-block dashboard.",
+  "description": "Usage and cost visibility for Claude Code and Codex. Cross-platform terminal CLI (macOS/Linux/Windows) with ccusage-style reports + a live 5h-block dashboard.",
   "license": "Apache-2.0",
   "repository": "github:htahaozlu/context-bar",
   "homepage": "https://github.com/htahaozlu/context-bar",
-  "keywords": ["claude", "codex", "usage", "cost", "tokens", "ccusage", "cli"],
+  "keywords": ["claude", "codex", "usage", "cost", "tokens", "ccusage", "cli", "cross-platform", "terminal", "tui"],
   "type": "module",
   "bin": { "context-bar": "dist/cli.js" },
   "files": ["dist", "LICENSE", "README.md"],

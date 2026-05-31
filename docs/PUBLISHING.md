@@ -12,7 +12,7 @@ once. After that it's fully automated on every `v*` tag.
 1. **crates.io** — create a token at <https://crates.io/settings/tokens> (scope: publish-new
    + publish-update). Add repo secret **`CARGO_REGISTRY_TOKEN`**.
 2. **npm** — create an automation token at <https://www.npmjs.com/settings/~/tokens> (type:
-   *Automation*, so 2FA doesn't block CI). Add repo secret **`NPM_TOKEN`**. The `@context-bar`
+   *Automation*, so 2FA doesn't block CI). Add repo secret **`NPM_TOKEN`**. The `@htahaozlu`
    scope is created automatically on first publish (`--access public`).
    - `gh secret set CARGO_REGISTRY_TOKEN` / `gh secret set NPM_TOKEN` from the CLI, or the repo
      Settings → Secrets → Actions UI.
@@ -21,7 +21,7 @@ Then cut a release (bump `Cargo.toml` + `CHANGELOG.md` + `docs/releases/v<ver>.m
 `main`, `git tag vX.Y.Z`, push the tag). The tagged run will: build the DMG + 6
 cross-platform binaries, `cargo publish` core then bin (enables `cargo install context-bar`),
 and assemble + `npm publish` the meta `context-bar` package + the six
-`@context-bar/context-bar-<os>-<cpu>` platform packages (enables `npx context-bar`).
+`@htahaozlu/context-bar-<os>-<cpu>` platform packages (enables `npx context-bar`).
 Watch the first run — npm packaging is intricate; `publish-npm` is isolated (`fail-fast`
 off, the DMG job is independent), so a hiccup never blocks the macOS release.
 
@@ -63,30 +63,24 @@ After the bin lands, this works for anyone:
 cargo install context-bar
 ```
 
-## npm name reservation (A0)
+## npm — LIVE as of 0.6.1
 
-Goal for 0.4.0: **reserve** the bare name `context-bar` and the `@context-bar` scope so
-nobody squats them. This is reservation only — no real distribution yet (see the note
-below).
+`npx context-bar` is published and working on all platforms. The release runs
+`scripts/npm-publish.sh` (driven by `release.yml` / `publish.yml`), which assembles and
+publishes the meta package `context-bar` (unscoped — the user-facing `npx context-bar`)
+plus six **scoped** `@htahaozlu/context-bar-<os>-<cpu>` prebuilt-binary packages.
 
-```bash
-# 1. Authenticate (one-time).
-npm login
+> **Why scoped platform packages?** npm's spam heuristic blocks a new account publishing a
+> family of near-identical *unscoped* `context-bar-*` names (esbuild/swc scope theirs too).
+> Scoped names under your own `@htahaozlu` scope publish freely. The meta stays unscoped.
 
-# 2. Reserve the bare name with a placeholder publish.
-#    (minimal package.json with name "context-bar" + a version, e.g. 0.0.0)
-npm publish
+> **npm token:** use a granular token with **Packages: Read and write** on **All packages**
+> (a token scoped to "only select packages" can't create new ones; classic tokens are
+> deprecated). Set repo secret `NPM_TOKEN`. Re-run npm-only with
+> `gh workflow run publish.yml -f tag=vX.Y.Z -f registry=npm`.
 
-# 3. Reserve the @context-bar scope by publishing one scoped placeholder.
-#    (package.json name "@context-bar/placeholder"; scoped packages are private
-#     by default, so --access public is required.)
-npm publish --access public
-```
-
-The **full** npm distribution — `optionalDependencies` fan-out, per-platform prebuilt
-binaries via `cargo-npm`, and the `taiki-e` cross-compile release matrix — is documented
-in the next section. **0.4.0 only RESERVES the names**; real `npx context-bar`
-distribution lands once you run the flow below.
+The reference flow below (cargo-npm) is an alternative; the repo actually uses
+`scripts/npm-publish.sh`.
 
 ## npm distribution — npx context-bar (A2)
 
@@ -114,7 +108,7 @@ prebuilt binaries** as release archives:
 ### Packaging with cargo-npm
 
 Use **`abemedia/cargo-npm`** to generate and publish the meta package `context-bar`
-plus a per-platform `@context-bar/context-bar-<os>-<arch>` subpackage for each triple.
+plus a per-platform `@htahaozlu/context-bar-<os>-<arch>` subpackage for each triple.
 The layout is **no postinstall** — the meta package lists the subpackages as
 `optionalDependencies`, each subpackage gates itself with `os` / `cpu` fields so npm only
 installs the one matching the host, and a tiny JS launcher in the meta package execs the
@@ -153,7 +147,7 @@ npx context-bar
 ### Platform notes
 
 - This needs **the maintainer's own npm credentials** (`NODE_AUTH_TOKEN`), the same
-  account that holds the reserved `context-bar` name and `@context-bar` scope.
+  account that holds the reserved `context-bar` name and `@htahaozlu` scope.
 - macOS-only features **degrade gracefully** on Linux/Windows: keychain account
   detection is macOS-specific, so on other platforms the binary reads
   `~/.claude/.credentials.json` directly instead.
