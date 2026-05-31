@@ -120,6 +120,7 @@ final class StatsViewController: PreferencePaneViewController {
         var byModel: [ModelBucket] = []
         var recent: [Session] = []
         var total30dTokens: UInt64 = 0
+        var subagent30dTokens: UInt64 = 0   // fresh tokens spent inside sub-agents (30d)
         var total30dSessions: Int = 0
         var maxSessionMinutes: Double = 0
     }
@@ -139,6 +140,7 @@ final class StatsViewController: PreferencePaneViewController {
         }
         var snap = Snapshot()
         snap.total30dTokens = u64(c["total_tokens_30d"])
+        snap.subagent30dTokens = u64(c["subagent_tokens_30d"])
         snap.total30dSessions = (c["total_sessions_30d"] as? Int) ?? 0
         snap.maxSessionMinutes = (c["max_session_minutes"] as? Double) ?? 0
         snap.byDay = ((c["by_day"] as? [[String: Any]]) ?? []).compactMap { o in
@@ -296,6 +298,14 @@ final class StatsViewController: PreferencePaneViewController {
                 // labelled explicitly so the two don't look like a mismatch.
                 caption: L10n.text("tokens (in + out)", "token (girdi + çıktı)"),
                 value: ContextSnapshot.formatTokens(tokens)
+            ),
+            StatTileView(
+                // Share of fresh tokens spent inside sub-agents (Task /
+                // dynamic-workflow runs) — the multi-agent burn the boss flagged.
+                caption: L10n.text("via sub-agents", "alt-ajanlarla"),
+                value: snap.total30dTokens > 0
+                    ? String(format: "%.0f%%", Double(snap.subagent30dTokens) / Double(snap.total30dTokens) * 100)
+                    : "—"
             ),
             StatTileView(
                 caption: L10n.text("active days", "aktif gün"),

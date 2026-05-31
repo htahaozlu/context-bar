@@ -139,6 +139,7 @@ final class ContextSnapshot {
             return ActiveSession(
                 id: id,
                 tokens: u64(obj["tokens"]),
+                subagentTokens: u64(obj["subagent_tokens"]),
                 cost: dbl(obj["cost"]) ?? 0,
                 project: (obj["project"] as? String) ?? "—",
                 model: obj["model"] as? String,
@@ -178,6 +179,7 @@ final class ContextSnapshot {
                 ?? dbl(sevenDayOverlay?["utilization"])
                 ?? dbl(sevenDayOverlay?["used_percentage"]),
             activeSession: u64(raw["active_session_tokens"]),
+            activeSessionSubagent: u64(raw["active_session_subagent_tokens"]),
             activeSessionCost: dbl(raw["active_session_cost"]) ?? 0,
             totalCost30d: dbl(raw["total_cost_30d"]) ?? 0,
             model: raw["last_model"] as? String,

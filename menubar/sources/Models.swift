@@ -90,6 +90,7 @@ func agentInlineLabel(name: String, font: NSFont, color: NSColor, iconScale: CGF
 struct ActiveSession {
     let id: String
     let tokens: UInt64
+    let subagentTokens: UInt64   // portion of `tokens` from sub-agent (Task) turns
     let cost: Double
     let project: String
     let model: String?
@@ -108,6 +109,7 @@ struct Agent {
     let week7d: UInt64
     let week7dPercent: Double?
     let activeSession: UInt64
+    let activeSessionSubagent: UInt64   // portion of activeSession from sub-agents
     let activeSessionCost: Double
     /// Estimated API-equivalent cost over the last 30 days — the monthly
     /// run-rate the budget (C1) compares against.
