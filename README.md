@@ -160,7 +160,10 @@ It addresses both through a local pipeline that continuously produces stable pro
 
 - Cross-platform terminal CLI — `daily` / `weekly` / `monthly` / `session` / `blocks` reports + a live TUI (macOS · Linux · Windows · SSH)
 - Native AppKit menubar app (menubar status item, popover, Cost tab, widget, Share card) — macOS
-- Estimated API-equivalent cost per day per project (Claude + Codex)
+- Estimated API-equivalent cost per day per project (Claude + Codex), with a click-to-drill-down cache explainer
+- **AI Advisor** — bring your own OpenAI/Gemini key for usage-efficiency tips (aggregate-only, opt-in)
+- **Across-your-Macs** combined usage via a folder you already sync (no server)
+- Sub-agent / dynamic-workflow token burn made visible
 - Repository snapshots under `.context-bar/` with stable `AGENT.md` and `CLAUDE.md`
 - Markdown and JSON artifacts for tooling
 
@@ -213,6 +216,22 @@ The **Cost** tab answers a question subscription users increasingly ask — *"wh
 - an interactive 30-day cost-trend chart — hover any day for its date, estimated cost, and tokens
 - priced **per turn by model** from the LiteLLM rate table (the same canonical source ccusage uses), fetched live with a 24h on-disk cache and a bundled offline fallback; Anthropic's prompt-cache and >200K long-context rules are honored
 - everything is clearly labelled an **estimate** — subscription plans are not billed per token. Set `CONTEXTBAR_PRICING_OFFLINE=1` to skip the live rate fetch.
+
+### Click any row — cache, in plain language
+
+Click a project row in the Cost table to open a drill-down: the four token buckets (input / output / cache-write / cache-read) with each one's share of the cost, the dominant line highlighted, and a short explainer of what cache tokens are and why **cache reads usually dominate a heavy session** (replayed context billed at 0.1× input — cheap per token, enormous by volume). It's built to *teach* the bill, not just show it.
+
+### Sub-agent (dynamic-workflow) burn
+
+A **"via sub-agents"** stat shows how much of your usage went to Task / multi-agent runs — the burn that's easy to start and hard to see. (Anthropic reports multi-agent setups use roughly 15× the tokens of a single chat.)
+
+### AI Advisor — bring your own key
+
+Connect **your own** OpenAI or Gemini API key (stored in the macOS Keychain) and press **Analyze** in the Cost tab to get specific, actionable recommendations to cut cost and improve context efficiency, grounded in your numbers. Privacy-first and opt-in: only a small **aggregate summary** is sent — never transcripts, never project names — and only to the provider you chose. Off by default.
+
+### Across your Macs
+
+Point context-bar at a folder you already sync (iCloud Drive, Dropbox, …) and each Mac writes a compact usage summary there; the Cost tab then shows your **combined 30-day cost across machines**, with a per-Mac breakdown. No server, no telemetry — just files in your own synced folder.
 
 ### Desktop & Notification Center widget
 

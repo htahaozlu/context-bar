@@ -161,8 +161,11 @@ Bu iki problemi, sürekli kararlı proje özetleri üreten yerel bir işlem hatt
 - `.context-bar/` altında depo snapshot'ları
 - Kararlı `AGENT.md` ve `CLAUDE.md`
 - refresh, watch ve global görünümler için CLI
-- Yerel AppKit menubar yardımcı uygulaması
+- Yerel AppKit menubar yardımcı uygulaması (Maliyet sekmesinde tıkla-aç cache açıklamalı detay)
 - Proje başına günlük tahmini API-eşdeğeri maliyet (Claude + Codex)
+- **AI Danışman** — kendi OpenAI/Gemini anahtarınla kullanım verimliliği önerileri (yalnızca özet, opt-in)
+- **Mac'lerin arasında** birleşik kullanım — zaten senkronladığın bir klasör üzerinden (sunucu yok)
+- Sub-agent / dynamic-workflow token yakımı görünür
 - Araçlar için Markdown ve JSON çıktıları
 
 ## Temel yetenekler
@@ -209,6 +212,22 @@ Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) d
 - interaktif 30 günlük maliyet trend grafiği — herhangi bir günün üzerine gelince tarih, tahmini maliyet ve token
 - **model bazında turn turn** fiyatlama, LiteLLM oran tablosundan (ccusage ile aynı kanonik kaynak) — 24s disk cache + gömülü offline fallback ile canlı çekilir; Anthropic'in prompt-cache ve >200K uzun-bağlam kuralları gözetilir
 - her şey açıkça **tahmin** olarak etiketli — abonelik planları token başına faturalandırılmaz. Canlı oran çekimini atlamak için `CONTEXTBAR_PRICING_OFFLINE=1`.
+
+### Bir satıra tıkla — cache, düz dille
+
+Maliyet tablosunda bir proje satırına tıkla, detay açılsın: dört token kovası (girdi / çıktı / cache-yazma / cache-okuma), her birinin maliyetteki payı, dominant kalem vurgulu ve cache token'ın ne olduğunu + ağır bir oturumda **cache okumalarının neden baskın olduğunu** (0.1× girdi fiyatına gelen tekrar oynatılan bağlam — token başına ucuz, hacimce devasa) anlatan kısa bir açıklama. Faturayı sadece göstermek değil, *öğretmek* için.
+
+### Sub-agent (dynamic-workflow) yakımı
+
+**"via sub-agents"** istatistiği, kullanımının ne kadarının Task / çoklu-ajan çalıştırmalarına gittiğini gösterir — başlatması kolay, görmesi zor olan yakım. (Anthropic, çoklu-ajan kurulumlarının bir sohbetin ~15 katı token kullandığını bildiriyor.)
+
+### AI Danışman — kendi anahtarın
+
+**Kendi** OpenAI veya Gemini API anahtarını bağla (macOS Keychain'de saklanır) ve Maliyet sekmesinde **Analiz**'e bas; sayılarına dayalı, maliyeti azaltıp bağlam verimliliğini artıracak somut öneriler al. Gizlilik-öncelikli ve opt-in: yalnızca küçük bir **özet** gönderilir — transcript yok, proje adı yok — ve yalnızca seçtiğin sağlayıcıya. Varsayılan kapalı.
+
+### Mac'lerin arasında
+
+context-bar'ı zaten senkronladığın bir klasöre (iCloud Drive, Dropbox…) yönlendir; her Mac oraya kompakt bir kullanım özeti yazsın. Maliyet sekmesi **makineler arası birleşik 30 günlük maliyeti** ve Mac başına kırılımı gösterir. Sunucu yok, telemetri yok — yalnızca kendi senkron klasöründeki dosyalar.
 
 ### Masaüstü ve Bildirim Merkezi widget'ı
 
