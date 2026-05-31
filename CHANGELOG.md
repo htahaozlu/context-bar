@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.0] - 2026-05-31
+
+### Added
+
+- **AI Advisor (bring your own key).** Connect your own OpenAI or Gemini API key (stored in the macOS Keychain) and press **Analyze** in the Cost tab to get specific, actionable recommendations to cut token cost and improve context efficiency, grounded in your own numbers. Opt-in and privacy-first: only a small **aggregate** summary is sent — never transcripts, never project names — and only to the provider you chose. When no key is set, the button reads "Connect a key →" and jumps straight to Settings → Privacy. Off by default.
+- **Across-your-Macs combined usage.** Point context-bar at a folder you already sync (iCloud Drive, Dropbox, …); each Mac writes a compact per-machine usage summary there, and the Cost tab shows your **combined 30-day cost across machines** with a per-Mac breakdown. No server, no telemetry — just files in your own synced folder.
+- **Cost-row drill-down + cache explainer.** Click any project row in the Cost table to open a detail popover: the four token buckets (input / output / cache-write / cache-read) with each one's share of the cost, the dominant line highlighted, and a plain-language explainer of what cache tokens are and why **cache reads usually dominate a heavy session**.
+- **Sub-agent burn visibility.** A "via sub-agents" Stats tile shows how much of your usage went to Task / dynamic-workflow (multi-agent) runs.
+
+### Fixed
+
+- **Sub-agent usage was undercounted entirely.** The engine only scanned main session transcripts (depth 1); sub-agent (Task / dynamic-workflow) transcripts are nested deeper (`projects/<proj>/<sessionId>/subagents/agent-*.jsonl`) and were dropped, so all sub-agent token + cost usage was missing. The engine now scans them — totals are complete and closer to what Claude Code itself reports. Sub-agent turns are detected via `isSidechain` (not `parentUuid`, which is on every threaded turn).
+- **Popover blank band; Cost-table dead horizontal gap.** (Carried from 0.6.x — popover now contracts as well as grows; the Cost table is a left-anchored aligned grid.)
+
+### Changed
+
+- **Stats "total tokens" relabelled "tokens (in + out)"** — it is fresh work (input + output), deliberately distinct from the cache-inclusive "Total Tokens" Claude Code / ccusage show, so the two no longer look like a mismatch.
+
 ## [0.6.1] - 2026-05-29
 
 ### Fixed

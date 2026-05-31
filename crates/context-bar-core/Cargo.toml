@@ -1,6 +1,6 @@
 [package]
 name = "context-bar-core"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "Engine for context-bar: AI coding-agent usage, rolling quota windows, and API-equivalent cost estimation from local transcripts."
