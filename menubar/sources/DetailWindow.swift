@@ -75,6 +75,9 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
             contentView.addSubview(effect, positioned: .below, relativeTo: nil)
         }
 
+        // Cost-tab "Connect a key" jumps straight to the Privacy pane (index 5:
+        // Usage·Stats·Cost·General·Appearance·Privacy·About) where the AI key lives.
+        costVC.onShowPrivacy = { [weak self] in self?.selectTab(index: 5) }
         appearanceVC.onThemeChange = onThemeChange
         generalVC.onThemeChange = onThemeChange
         generalVC.onChange = { onThemeChange(ThemeStore.current.id) }

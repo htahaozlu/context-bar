@@ -34,6 +34,9 @@ final class CostViewController: PreferencePaneViewController {
     private let aiSpinner = NSProgressIndicator()
     private let aiResult = NSTextField(wrappingLabelWithString: "")
     private let machinesHost = NSStackView()
+    /// Host opens Settings → Privacy (where the AI key lives) — a gentle,
+    /// one-click discovery path, not a nag.
+    var onShowPrivacy: (() -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -215,13 +218,24 @@ final class CostViewController: PreferencePaneViewController {
         }
     }
 
+    /// Switch the AI button between "connect a key" (discovery) and "analyze".
+    private func updateAIButton() {
+        let ready = DisplayPrefs.aiProvider != .off && AIKeychain.hasKey(for: DisplayPrefs.aiProvider)
+        if ready {
+            aiButton.title = L10n.text("Analyze my usage", "Kullanımımı analiz et")
+            aiButton.action = #selector(analyzeAI)
+        } else {
+            aiButton.title = L10n.text("Connect a key to get tips →", "İpuçları için anahtar bağla →")
+            aiButton.action = #selector(openAISettings)
+        }
+    }
+
+    @objc private func openAISettings() { onShowPrivacy?() }
+
     @objc private func analyzeAI() {
         guard DisplayPrefs.aiProvider != .off, AIKeychain.hasKey(for: DisplayPrefs.aiProvider) else {
-            aiResult.textColor = .systemOrange
-            aiResult.stringValue = L10n.text(
-                "Connect an OpenAI or Gemini API key in Settings → Privacy → AI Advisor first.",
-                "Önce Ayarlar → Gizlilik → AI Danışman'dan bir OpenAI veya Gemini API anahtarı bağla."
-            )
+            updateAIButton()
+            onShowPrivacy?()
             return
         }
         aiButton.isEnabled = false
@@ -350,6 +364,7 @@ final class CostViewController: PreferencePaneViewController {
     func reload() {
         guard isViewLoaded else { return }
         populateMachines()
+        updateAIButton()
         let data = loadData()
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         instancesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
