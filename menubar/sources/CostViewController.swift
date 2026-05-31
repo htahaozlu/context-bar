@@ -28,6 +28,7 @@ final class CostViewController: PreferencePaneViewController {
     private let sparkHost = NSView()
     private let instancesStack = NSStackView()
     private let instancesView = CostInstancesView()
+    private var costDetailPopover: NSPopover?
     private let footnote = NSTextField(labelWithString: "")
 
     override func viewDidLoad() {
@@ -480,7 +481,11 @@ final class CostViewController: PreferencePaneViewController {
                 let rowTotal = it.input + it.output + it.cacheCreate + it.cacheRead
                 modelRows.append(CostRow(kind: .data, leading: it.project,
                     sub: it.models.map(prettyModel).joined(separator: ", "),
-                    values: [tk(it.input), tk(it.output), tk(it.cacheCreate), tk(it.cacheRead), tk(rowTotal), formatUSD(it.cost)]))
+                    values: [tk(it.input), tk(it.output), tk(it.cacheCreate), tk(it.cacheRead), tk(rowTotal), formatUSD(it.cost)],
+                    detail: CostRowDetail(dayLabel: formatDay(day), project: it.project,
+                        models: it.models.map(prettyModel), input: it.input, output: it.output,
+                        cacheCreate: it.cacheCreate, cacheRead: it.cacheRead,
+                        totalTokens: rowTotal, totalCost: it.cost)))
             }
             if di < order.count - 1 {
                 modelRows.append(CostRow(kind: .separator, leading: "", sub: "", values: []))
@@ -490,6 +495,9 @@ final class CostViewController: PreferencePaneViewController {
         modelRows.append(CostRow(kind: .total, leading: L10n.text("Total", "Toplam"), sub: "",
             values: [tk(gIn), tk(gOut), tk(gCw), tk(gCr), tk(gIn + gOut + gCw + gCr), formatUSD(gCost)]))
 
+        instancesView.onRowClick = { [weak self] detail, rowRect in
+            self?.presentCostDetail(detail, relativeTo: rowRect)
+        }
         instancesView.rows = modelRows
 
         let card = NSView()
@@ -508,6 +516,20 @@ final class CostViewController: PreferencePaneViewController {
     }
 
     private func tk(_ v: UInt64) -> String { ContextSnapshot.formatTokens(v) }
+
+    /// Row click → drill-down popover with the 4-bucket breakdown + a
+    /// plain-language cache explainer (the "tıklayınca detay" + "öğretici"
+    /// request). Anchored to the clicked row; transient so it dismisses on
+    /// click-away without disturbing the scroll position.
+    private func presentCostDetail(_ detail: CostRowDetail, relativeTo rowRect: NSRect) {
+        costDetailPopover?.close()
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.animates = true
+        pop.contentViewController = CostDetailViewController(detail: detail)
+        costDetailPopover = pop
+        pop.show(relativeTo: rowRect, of: instancesView, preferredEdge: .maxX)
+    }
 
     // MARK: - Formatting
 
@@ -739,12 +761,29 @@ final class CostTrendChartView: NSView {
 }
 
 /// One row in the cost-by-project table.
+/// Raw payload for a clickable row — drives the drill-down detail popover.
+/// Per-bucket cost is closed-form from tokens for Claude rows (output = 5×
+/// input, cache-write = 1.25×, cache-read = 0.1× across all current Claude
+/// tiers, so the absolute rate cancels: bucketCost = total × weightShare).
+struct CostRowDetail {
+    let dayLabel: String
+    let project: String
+    let models: [String]
+    let input: UInt64
+    let output: UInt64
+    let cacheCreate: UInt64
+    let cacheRead: UInt64
+    let totalTokens: UInt64
+    let totalCost: Double
+}
+
 private struct CostRow {
     enum Kind { case header, day, data, total, separator, separatorStrong }
     let kind: Kind
     let leading: String
     let sub: String          // model list, for `.data` rows
     let values: [String]     // [input, output, cache+, cache↻, total, cost]
+    var detail: CostRowDetail? = nil  // present on clickable `.data` rows only
 }
 
 /// Draws the per-day-per-project cost table in a single view. Only the rows
@@ -757,7 +796,69 @@ private final class CostInstancesView: NSView {
         didSet { invalidateIntrinsicContentSize(); needsDisplay = true }
     }
 
+    /// Fired when a clickable (`.data`) row is clicked. Rect is in this view's
+    /// (flipped) coordinates — pass it straight to `NSPopover.show(relativeTo:)`.
+    var onRowClick: ((CostRowDetail, NSRect) -> Void)?
+
+    private var hoveredRowIndex: Int? {
+        didSet {
+            guard oldValue != hoveredRowIndex else { return }
+            if let oldValue { setNeedsDisplay(rowRect(at: oldValue)) }
+            if let hoveredRowIndex { setNeedsDisplay(rowRect(at: hoveredRowIndex)) }
+        }
+    }
+    private var hoverTracking: NSTrackingArea?
+
     override var isFlipped: Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTracking { removeTrackingArea(hoverTracking) }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self, userInfo: nil)
+        addTrackingArea(area)
+        hoverTracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        hoveredRowIndex = rowIndex(at: convert(event.locationInWindow, from: nil))
+    }
+    override func mouseExited(with event: NSEvent) { hoveredRowIndex = nil }
+
+    override func mouseDown(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        guard let i = rowIndex(at: p), let detail = rows[i].detail else {
+            super.mouseDown(with: event); return
+        }
+        let r = rowRect(at: i)
+        onRowClick?(detail, r.intersection(visibleRect).isEmpty ? r : r.intersection(visibleRect))
+    }
+
+    /// Row index at a point (flipped coords), but only for clickable rows.
+    private func rowIndex(at p: NSPoint) -> Int? {
+        guard bounds.contains(p) else { return nil }
+        var y: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            let h = rowHeight(row.kind)
+            if NSRect(x: 0, y: y, width: bounds.width, height: h).contains(p) {
+                return row.detail == nil ? nil : i
+            }
+            y += h
+        }
+        return nil
+    }
+
+    private func rowRect(at target: Int) -> NSRect {
+        var y: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            let h = rowHeight(row.kind)
+            if i == target { return NSRect(x: 0, y: y, width: bounds.width, height: h) }
+            y += h
+        }
+        return .zero
+    }
 
     // Fixed numeric grid: [input, output, cache+, cache↻, TOTAL, COST]. Columns
     // are LEFT-anchored to the end of the project column (NOT to bounds.width),
@@ -802,10 +903,15 @@ private final class CostInstancesView: NSView {
         var colX: [CGFloat] = []
         for w in numW { gx += colGap; colX.append(gx); gx += w }
         var y: CGFloat = 0
-        for row in rows {
+        for (i, row) in rows.enumerated() {
             let h = rowHeight(row.kind)
             let rect = NSRect(x: 0, y: y, width: bounds.width, height: h)
             if rect.intersects(dirtyRect) {
+                // Hover affordance on clickable rows.
+                if i == hoveredRowIndex, row.detail != nil {
+                    ThemeStore.current.accent.withAlphaComponent(0.10).setFill()
+                    NSBezierPath(roundedRect: rect.insetBy(dx: 0, dy: 1), xRadius: 5, yRadius: 5).fill()
+                }
                 drawRow(row, rect: rect, projectColW: projectColW, colX: colX, tableW: tableW)
             }
             y += h
@@ -917,5 +1023,202 @@ private final class CostInstancesView: NSView {
         ]
         if kern != 0 { attrs[.kern] = kern }
         (s as NSString).draw(in: rect, withAttributes: attrs)
+    }
+}
+
+// MARK: - Cost drill-down detail (click a row)
+
+/// A thin rounded proportional bar (track + fill) for the bucket breakdown.
+private final class ProportionBar: NSView {
+    var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
+    var fill: NSColor = .systemBlue { didSet { needsDisplay = true } }
+    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 5) }
+    override func draw(_ dirtyRect: NSRect) {
+        let track = NSBezierPath(roundedRect: bounds, xRadius: 2.5, yRadius: 2.5)
+        NSColor.separatorColor.withAlphaComponent(0.35).setFill(); track.fill()
+        let w = max(0, min(1, fraction)) * bounds.width
+        guard w > 0.5 else { return }
+        let f = NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: w, height: bounds.height), xRadius: 2.5, yRadius: 2.5)
+        fill.setFill(); f.fill()
+    }
+}
+
+/// Popover content for a clicked Cost row: the four token buckets with their
+/// cost share, the dominant line highlighted, and a plain-language cache
+/// explainer — the "click for detail" + "teach me what cache is" request.
+final class CostDetailViewController: NSViewController {
+    private let detail: CostRowDetail
+    init(detail: CostRowDetail) { self.detail = detail; super.init(nibName: nil, bundle: nil) }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private struct Bucket { let name: String; let tokens: UInt64; let cost: Double?; let frac: CGFloat; let color: NSColor }
+
+    override func loadView() {
+        let width: CGFloat = 360
+        let root = NSView(); root.translatesAutoresizingMaskIntoConstraints = false
+        root.wantsLayer = true
+
+        // Per-bucket cost share. Closed-form & exact for Claude-only rows
+        // (output 5×, cache-write 1.25×, cache-read 0.1× of input — rate cancels);
+        // for rows that include a non-Claude (Codex/GPT) model the ratios differ,
+        // so we show token volume only and skip the per-bucket dollar split.
+        let isAllClaude = detail.models.allSatisfy { m in
+            let l = m.lowercased()
+            return !l.contains("gpt") && !l.contains("codex") && !l.contains("o1")
+                && !l.contains("o3") && !l.contains("o4") && !l.contains("gemini")
+        }
+        let wIn = Double(detail.input) * 1.0
+        let wOut = Double(detail.output) * 5.0
+        let wCw = Double(detail.cacheCreate) * 1.25
+        let wCr = Double(detail.cacheRead) * 0.1
+        let wSum = wIn + wOut + wCw + wCr
+        func cost(_ w: Double) -> Double? { (isAllClaude && wSum > 0) ? detail.totalCost * (w / wSum) : nil }
+        func frac(_ w: Double) -> CGFloat { wSum > 0 ? CGFloat(w / wSum) : 0 }
+
+        let accent = ThemeStore.current.accent
+        let buckets = [
+            Bucket(name: L10n.text("Input", "Girdi"), tokens: detail.input, cost: cost(wIn), frac: frac(wIn), color: .systemGray),
+            Bucket(name: L10n.text("Output", "Çıktı"), tokens: detail.output, cost: cost(wOut), frac: frac(wOut), color: .systemTeal),
+            Bucket(name: L10n.text("Cache write (cache+)", "Önbellek yazma (önbel+)"), tokens: detail.cacheCreate, cost: cost(wCw), frac: frac(wCw), color: .systemOrange),
+            Bucket(name: L10n.text("Cache read (cache↻)", "Önbellek okuma (önbel↻)"), tokens: detail.cacheRead, cost: cost(wCr), frac: frac(wCr), color: accent),
+        ]
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = Spacing.s
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(stack)
+
+        // Header: project + day · models, total cost on the right.
+        let titleRow = NSStackView()
+        titleRow.orientation = .horizontal
+        titleRow.distribution = .fill
+        let title = NSTextField(labelWithString: detail.project)
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        title.lineBreakMode = .byTruncatingMiddle
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let cost = NSTextField(labelWithString: ContextSnapshot.formatUSD(detail.totalCost))
+        cost.font = Typography.bodyMono(14, weight: .bold)
+        cost.textColor = accent
+        cost.setContentHuggingPriority(.required, for: .horizontal)
+        titleRow.addArrangedSubview(title)
+        titleRow.addArrangedSubview(cost)
+        stack.addArrangedSubview(titleRow)
+        titleRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
+        let sub = NSTextField(labelWithString: "\(detail.dayLabel) · \(detail.models.joined(separator: ", "))")
+        sub.font = .systemFont(ofSize: 10.5, weight: .regular)
+        sub.textColor = .secondaryLabelColor
+        sub.lineBreakMode = .byTruncatingTail
+        stack.addArrangedSubview(sub)
+        sub.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
+        stack.addArrangedSubview(divider(width: width))
+
+        // Bucket rows — emphasize the dominant cost line (usually cache read).
+        let weights = [wIn, wOut, wCw, wCr]
+        let topIdx = weights.firstIndex(of: weights.max() ?? 0) ?? 3
+        for (i, b) in buckets.enumerated() {
+            stack.addArrangedSubview(bucketRow(b, emphasize: i == topIdx, width: width))
+        }
+
+        stack.addArrangedSubview(divider(width: width))
+
+        // Plain-language explainer (the educational ask).
+        let explainTitle = NSTextField(labelWithString: L10n.text("Where the money goes", "Para nereye gidiyor"))
+        explainTitle.font = .systemFont(ofSize: 10, weight: .semibold)
+        explainTitle.textColor = .tertiaryLabelColor
+        stack.addArrangedSubview(explainTitle)
+
+        let lines = [
+            L10n.text(
+                "Cache read (cache↻) is replayed context — served from cache at 0.1× the input price. It's the cheapest per token, but a long session replays it every turn, so its volume usually makes it the biggest line.",
+                "Önbellek okuma (önbel↻), tekrar oynatılan bağlamdır — önbellekten girdi fiyatının 0.1 katına gelir. Token başına en ucuzu, ama uzun bir oturum onu her turda tekrar oynatır; bu yüzden hacmi genelde en büyük kalemi yapar."),
+            L10n.text(
+                "Cache write (cache+) stores context for reuse, billed 1.25× input (5-min) or 2× (1-hour). Total Tokens sums all four buckets — it measures replay, not fresh work.",
+                "Önbellek yazma (önbel+) bağlamı tekrar kullanım için saklar; girdinin 1.25 katı (5 dk) veya 2 katı (1 saat). Toplam Token dört kovayı toplar — yapılan işi değil, tekrarı ölçer."),
+            L10n.text(
+                "To spend less: keep sessions focused and clear context between tasks; reserve multi-agent / parallel runs for hard problems — they use far more tokens.",
+                "Daha az harcamak için: oturumları odaklı tut, görevler arası bağlamı temizle; çoklu-ajan / paralel çalıştırmaları zor problemlere sakla — çok daha fazla token harcarlar."),
+        ]
+        for t in lines {
+            let l = NSTextField(wrappingLabelWithString: t)
+            l.font = .systemFont(ofSize: 11, weight: .regular)
+            l.textColor = .secondaryLabelColor
+            l.preferredMaxLayoutWidth = width - 2 * Spacing.m
+            stack.addArrangedSubview(l)
+            l.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+
+        if !isAllClaude {
+            let note = NSTextField(wrappingLabelWithString: L10n.text(
+                "Per-bucket cost is shown only for Claude-only rows (this row mixes providers, so only token volumes are shown).",
+                "Kova başına maliyet yalnızca Claude-only satırlarda gösterilir (bu satır sağlayıcıları karıştırıyor, sadece token hacmi gösteriliyor)."))
+            note.font = .systemFont(ofSize: 10, weight: .regular)
+            note.textColor = .tertiaryLabelColor
+            note.preferredMaxLayoutWidth = width - 2 * Spacing.m
+            stack.addArrangedSubview(note)
+            note.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+
+        NSLayoutConstraint.activate([
+            root.widthAnchor.constraint(equalToConstant: width),
+            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.m),
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.m),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.m),
+            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -Spacing.m),
+        ])
+        view = root
+        root.layoutSubtreeIfNeeded()
+        preferredContentSize = NSSize(width: width, height: ceil(root.fittingSize.height))
+    }
+
+    private func bucketRow(_ b: Bucket, emphasize: Bool, width: CGFloat) -> NSView {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        let name = NSTextField(labelWithString: b.name)
+        name.font = .systemFont(ofSize: 11.5, weight: emphasize ? .semibold : .regular)
+        name.textColor = emphasize ? .labelColor : .secondaryLabelColor
+        name.lineBreakMode = .byTruncatingTail
+        let right = NSTextField(labelWithString: b.cost.map { ContextSnapshot.formatUSD($0) } ?? ContextSnapshot.formatTokens(b.tokens))
+        right.font = Typography.bodyMono(11.5, weight: emphasize ? .semibold : .regular)
+        right.textColor = emphasize ? b.color : .secondaryLabelColor
+        right.alignment = .right
+        right.setContentHuggingPriority(.required, for: .horizontal)
+        let toks = NSTextField(labelWithString: ContextSnapshot.formatTokens(b.tokens) + L10n.text(" tok", " tok"))
+        toks.font = Typography.bodyMono(9.5, weight: .regular)
+        toks.textColor = .tertiaryLabelColor
+        let bar = ProportionBar(); bar.fraction = b.frac; bar.fill = b.color
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        [name, right, toks, bar].forEach { $0.translatesAutoresizingMaskIntoConstraints = false; container.addSubview($0) }
+        NSLayoutConstraint.activate([
+            name.topAnchor.constraint(equalTo: container.topAnchor),
+            name.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            right.firstBaselineAnchor.constraint(equalTo: name.firstBaselineAnchor),
+            right.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            name.trailingAnchor.constraint(lessThanOrEqualTo: right.leadingAnchor, constant: -8),
+            bar.topAnchor.constraint(equalTo: name.bottomAnchor, constant: 4),
+            bar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            bar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            bar.heightAnchor.constraint(equalToConstant: 5),
+            toks.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: 2),
+            toks.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            toks.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            container.widthAnchor.constraint(equalToConstant: width - 2 * Spacing.m),
+        ])
+        // Hide the redundant token line when the right side already shows tokens (no cost).
+        toks.isHidden = (b.cost == nil)
+        return container
+    }
+
+    private func divider(width: CGFloat) -> NSView {
+        let v = NSView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.wantsLayer = true
+        v.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.5).cgColor
+        v.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        v.widthAnchor.constraint(equalToConstant: width - 2 * Spacing.m).isActive = true
+        return v
     }
 }
