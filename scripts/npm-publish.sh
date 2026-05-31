@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Publish context-bar to npm: six per-platform packages
-# (@context-bar/context-bar-<os>-<cpu>, each carrying one prebuilt binary with
+# (@htahaozlu/context-bar-<os>-<cpu>, each carrying one prebuilt binary with
 # os/cpu set so npm installs only the matching one) then the meta `context-bar`
 # package (a JS launcher + optionalDependencies on the six). No postinstall.
+# Platform packages are SCOPED under @htahaozlu — npm's spam heuristic blocks a
+# family of new UNSCOPED `context-bar-*` names (esbuild/swc scope theirs too);
+# scoped names under your own scope publish freely. Meta stays unscoped so the
+# user-facing command is `npx context-bar`.
 #
 # Inputs (env): VERSION (e.g. 0.6.0), BIN_DIR (dir with <triple>/context-bar[.exe]).
 # Requires: node + npm authed via NODE_AUTH_TOKEN. Idempotent: an
@@ -47,7 +51,7 @@ for entry in "${TARGETS[@]}"; do
   ext=""; [[ "$os" == "win32" ]] && ext=".exe"
   src="$BIN_DIR/$triple/context-bar$ext"
   if [[ ! -f "$src" ]]; then
-    echo "::warning::missing binary $src — skipping @context-bar/context-bar-$os-$cpu"
+    echo "::warning::missing binary $src — skipping @htahaozlu/context-bar-$os-$cpu"
     continue
   fi
   pkg="$WORK/$os-$cpu"
@@ -57,7 +61,7 @@ for entry in "${TARGETS[@]}"; do
   [[ -f "$ROOT/LICENSE" ]] && cp "$ROOT/LICENSE" "$pkg/LICENSE"
   cat > "$pkg/package.json" <<JSON
 {
-  "name": "context-bar-$os-$cpu",
+  "name": "@htahaozlu/context-bar-$os-$cpu",
   "version": "$VERSION",
   "description": "context-bar prebuilt binary ($os $cpu).",
   "license": "Apache-2.0",
@@ -89,12 +93,12 @@ cat > "$meta/package.json" <<JSON
   "bin": { "context-bar": "dist/cli.js" },
   "files": ["dist", "LICENSE", "README.md"],
   "optionalDependencies": {
-    "context-bar-darwin-arm64": "$VERSION",
-    "context-bar-darwin-x64": "$VERSION",
-    "context-bar-linux-arm64": "$VERSION",
-    "context-bar-linux-x64": "$VERSION",
-    "context-bar-win32-arm64": "$VERSION",
-    "context-bar-win32-x64": "$VERSION"
+    "@htahaozlu/context-bar-darwin-arm64": "$VERSION",
+    "@htahaozlu/context-bar-darwin-x64": "$VERSION",
+    "@htahaozlu/context-bar-linux-arm64": "$VERSION",
+    "@htahaozlu/context-bar-linux-x64": "$VERSION",
+    "@htahaozlu/context-bar-win32-arm64": "$VERSION",
+    "@htahaozlu/context-bar-win32-x64": "$VERSION"
   }
 }
 JSON

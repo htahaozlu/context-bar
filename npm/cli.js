@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Launcher for the `context-bar` npm package. The real binary ships in a
-// per-platform optional dependency (@context-bar/context-bar-<os>-<cpu>);
+// per-platform optional dependency (@htahaozlu/context-bar-<os>-<cpu>);
 // npm/pnpm/bun install only the one matching this host's os/cpu. We resolve it
 // and exec it. No postinstall — works under `npm ci --ignore-scripts`.
 import { createRequire } from 'node:module'
@@ -12,14 +12,14 @@ const require = createRequire(import.meta.url)
 
 function platformPackage(p = process.platform, a = process.arch) {
   if (p === 'darwin') {
-    if (a === 'arm64') return 'context-bar-darwin-arm64'
-    if (a === 'x64') return 'context-bar-darwin-x64'
+    if (a === 'arm64') return '@htahaozlu/context-bar-darwin-arm64'
+    if (a === 'x64') return '@htahaozlu/context-bar-darwin-x64'
   } else if (p === 'linux') {
-    if (a === 'arm64') return 'context-bar-linux-arm64'
-    if (a === 'x64') return 'context-bar-linux-x64'
+    if (a === 'arm64') return '@htahaozlu/context-bar-linux-arm64'
+    if (a === 'x64') return '@htahaozlu/context-bar-linux-x64'
   } else if (p === 'win32') {
-    if (a === 'arm64') return 'context-bar-win32-arm64'
-    if (a === 'x64') return 'context-bar-win32-x64'
+    if (a === 'arm64') return '@htahaozlu/context-bar-win32-arm64'
+    if (a === 'x64') return '@htahaozlu/context-bar-win32-x64'
   }
   return undefined
 }
