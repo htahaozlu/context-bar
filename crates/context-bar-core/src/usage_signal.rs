@@ -24,6 +24,9 @@ pub struct ActiveSession {
     pub id: String,
     #[serde(default)]
     pub tokens: u64,
+    /// Portion of `tokens` from sub-agent (Task) turns — the multi-agent burn.
+    #[serde(default)]
+    pub subagent_tokens: u64,
     #[serde(default)]
     pub cost: f64,
     #[serde(default)]
@@ -62,6 +65,9 @@ pub struct AgentUsage {
     pub cache_read_tokens_30d: u64,
     #[serde(default)]
     pub active_session_tokens: u64,
+    /// Portion of `active_session_tokens` from sub-agent (Task) turns.
+    #[serde(default)]
+    pub active_session_subagent_tokens: u64,
     #[serde(default)]
     pub active_session_cost: f64,
     #[serde(default)]
@@ -86,6 +92,13 @@ pub struct AgentUsage {
     // Aggregates for the detail page. All optional/empty in the no-data case.
     #[serde(default)]
     pub total_tokens_30d: u64,
+    /// Of the 30d fresh tokens, how much was spent inside sub-agents
+    /// (Task / dynamic-workflow sidechains) — the multi-agent burn.
+    #[serde(default)]
+    pub subagent_tokens_30d: u64,
+    /// Estimated API-equivalent cost of those sub-agent turns over 30d.
+    #[serde(default)]
+    pub subagent_cost_30d: f64,
     #[serde(default)]
     pub total_sessions_30d: u64,
     #[serde(default)]

@@ -37,6 +37,9 @@ struct PerFile {
     first_ts: f64,
     last_ts: f64,
     tokens: u64,
+    /// Of `tokens`, how much came from sub-agent (Task tool) turns — the
+    /// dynamic-workflow / multi-agent burn the user can't otherwise see.
+    subagent_tokens: u64,
     cache_read: u64,
     cost: f64,
     model: Option<String>,
@@ -142,6 +145,12 @@ fn build_active_sessions(per_session: &BTreeMap<String, PerFile>, now: f64) -> V
         if now - s.last_ts > ACTIVE_WINDOW {
             continue;
         }
+        // Pure sub-agent (Task) transcript files aren't user "sessions" — they're
+        // the spawned agents of a real session. Count them in the aggregates but
+        // don't list them as standalone active/parallel sessions.
+        if s.tokens > 0 && s.subagent_tokens == s.tokens {
+            continue;
+        }
         let window = match s.last_window {
             Some(w) if w > 0 => Some(w),
             _ => claude_context_window(s.model.as_deref(), s.max_ctx, &s.betas),
@@ -156,6 +165,7 @@ fn build_active_sessions(per_session: &BTreeMap<String, PerFile>, now: f64) -> V
         actives.push(ActiveSession {
             id: session_id(path),
             tokens: s.tokens,
+            subagent_tokens: s.subagent_tokens,
             cost: round6(s.cost),
             started_at: Some(iso_utc(s.first_ts)),
             last_turn_at: Some(iso_utc(s.last_ts)),
@@ -248,6 +258,7 @@ fn finish(
     if let Some(file) = &out.active_session_file {
         if let Some(s) = per_session.get(file) {
             out.active_session_tokens = s.tokens;
+            out.active_session_subagent_tokens = s.subagent_tokens;
             out.active_session_cost = round6(s.cost);
             out.active_session_started_at = Some(iso_utc(s.first_ts));
         }
@@ -298,7 +309,13 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
 
     let projects = home.join(".claude").join("projects");
     let mut files = Vec::new();
-    walk_jsonl(&projects, 1, &mut files);
+    // Depth 3, not 1: main sessions live at projects/<proj>/<uuid>.jsonl, but
+    // sub-agent (Task / dynamic-workflow) transcripts are nested deeper at
+    // projects/<proj>/<sessionId>/subagents/agent-*.jsonl. Scanning only depth 1
+    // silently dropped ALL sub-agent token usage — a real undercount vs Claude's
+    // own totals. These files are pure-sidechain (no overlap with the main file),
+    // so counting them adds the burn without double-counting.
+    walk_jsonl(&projects, 3, &mut files);
     files.sort();
 
     for path in &files {
@@ -351,6 +368,19 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
             }
             let inp = fresh_in + cache_create + cache_read;
             let total = fresh_in + outp;
+            // Foreground-pick signal (pre-existing, unchanged): parentUuid is the
+            // message-threading link, present on ~every turn — kept only for the
+            // existing fallback heuristic below, NOT a sub-agent marker.
+            let is_subagent = obj.get("parentUuid").is_some_and(truthy)
+                || obj.get("parent_tool_use_id").is_some_and(truthy)
+                || msg.get("parentUuid").is_some_and(truthy)
+                || msg.get("parent_tool_use_id").is_some_and(truthy);
+            // TRUE sub-agent (Task tool / dynamic-workflow) turn: Claude Code tags
+            // these `isSidechain: true`. parentUuid is NOT it (it's on every
+            // threaded turn). Used for the sub-agent burn split.
+            let is_sidechain = obj.get("isSidechain").and_then(Value::as_bool) == Some(true)
+                || obj.get("parent_tool_use_id").is_some_and(truthy)
+                || msg.get("parent_tool_use_id").is_some_and(truthy);
 
             let turn_model = str_field(msg, "model");
             let rate = match_pricing(turn_model.as_deref().unwrap_or(""), table);
@@ -383,6 +413,9 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
                 sess.last_input = inp;
             }
             sess.tokens += total;
+            if is_sidechain {
+                sess.subagent_tokens += total;
+            }
             sess.cache_read += cache_read;
             sess.cost += cost;
             sess.events.push((ts, metrics));
@@ -428,12 +461,14 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
             if age <= WIN_30D {
                 out.cache_read_tokens_30d += cache_read;
                 out.cache_savings_30d += cache_saved;
+                // Sub-agent (Task/dynamic-workflow) burn over 30d. Claude writes
+                // each sub-agent to its own pure-sidechain file, so this is a
+                // clean aggregate of fresh tokens spent inside sub-agents.
+                if is_sidechain {
+                    out.subagent_tokens_30d += total;
+                    out.subagent_cost_30d += cost;
+                }
             }
-
-            let is_subagent = obj.get("parentUuid").is_some_and(truthy)
-                || obj.get("parent_tool_use_id").is_some_and(truthy)
-                || msg.get("parentUuid").is_some_and(truthy)
-                || msg.get("parent_tool_use_id").is_some_and(truthy);
 
             if ts > last_ts {
                 last_ts = ts;
