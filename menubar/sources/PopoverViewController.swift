@@ -64,9 +64,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // right-gap split. Vertical insets stay on the stack so it still
         // lays out top-to-bottom with the right top/bottom breathing room.
         contentStack.alignment = .notAnAttribute
+        // Uniform outer gutter on all four sides so the cards float clearly
+        // inside the popover instead of sitting flush against its rounded
+        // edges. Top/bottom come from these insets; left/right come from
+        // `addCard` at the SAME value (Spacing.m) so the gutter is consistent
+        // all the way around.
         contentStack.edgeInsets = NSEdgeInsets(
-            top: Spacing.xxs, left: 0,
-            bottom: Spacing.xxs, right: 0
+            top: Spacing.l, left: 0,
+            bottom: Spacing.l, right: 0
         )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
@@ -100,8 +105,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // cutoff leaves the key byte-identical → the early-bail fires → the
         // parallel card is never removed and the popover never shrinks.
         let parallelVisible = primary.map { parallelSessions(for: $0, now: now).count } ?? 0
-        let key = snapshotKey(active: active, primary: primary, all: all,
-                              others: activeOthers, parallelVisible: parallelVisible)
+        let key = snapshotKey(
+            active: active, primary: primary, all: all,
+            others: activeOthers, parallelVisible: parallelVisible)
         // Engine returned — stop the manual-refresh spinner whether or not the
         // snapshot key actually changed. If the footer gets rebuilt below the
         // call is a no-op against the new button.
@@ -190,10 +196,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         contentStack.addArrangedSubview(v)
         // Single horizontal source of truth — pinned to stack anchors at
         // required priority. Stack's alignment is `.notAnAttribute`, so no
-        // implicit horizontal constraint competes with these. 12pt clears
-        // the popover's rounded corner curve and gives cards a generous,
-        // legible breathing margin without looking pinched.
-        let pad: CGFloat = Spacing.s
+        // implicit horizontal constraint competes with these. Matches the
+        // top/bottom `edgeInsets` (Spacing.m) so the outer gutter is uniform
+        // on all four sides — cards clear the popover's rounded corners and
+        // read as floating inside it, not fused to the outer edge.
+        let pad: CGFloat = Spacing.l
         NSLayoutConstraint.activate([
             v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
             v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),
@@ -215,9 +222,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         stack.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(stack)
         let pad: CGFloat = hero ? Spacing.m : Spacing.s
-        // Hero gets extra top breathing — the green dot + project title felt
-        // crammed against the top edge at the symmetric Spacing.m.
-        let topPad: CGFloat = hero ? Spacing.l : pad
+        // Symmetric internal padding. The hero's extra top breathing is now
+        // supplied by the popover's uniform outer gutter, so its own insets
+        // can stay even on all sides.
+        let topPad: CGFloat = pad
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: card.topAnchor, constant: topPad),
             stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: pad),
@@ -232,14 +240,16 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         stack.alignment = .leading
         stack.spacing = Spacing.s
 
-        let title = NSTextField(labelWithString: L10n.text("Gathering session data…", "Oturum verileri toplanıyor…"))
+        let title = NSTextField(
+            labelWithString: L10n.text("Gathering session data…", "Oturum verileri toplanıyor…"))
         title.font = Typography.title(14)
         title.textColor = .labelColor
 
-        let sub = NSTextField(wrappingLabelWithString: L10n.text(
-            "Scanning Claude and Codex transcripts. This usually takes a second.",
-            "Claude ve Codex transcript'leri taranıyor. Genellikle bir saniye sürer."
-        ))
+        let sub = NSTextField(
+            wrappingLabelWithString: L10n.text(
+                "Scanning Claude and Codex transcripts. This usually takes a second.",
+                "Claude ve Codex transcript'leri taranıyor. Genellikle bir saniye sürer."
+            ))
         sub.font = Typography.body(11)
         sub.textColor = .secondaryLabelColor
         sub.maximumNumberOfLines = 0
@@ -271,15 +281,17 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         iv.contentTintColor = .tertiaryLabelColor
         iv.translatesAutoresizingMaskIntoConstraints = false
 
-        let title = NSTextField(labelWithString: L10n.text("No agent data yet", "Henüz ajan verisi yok"))
+        let title = NSTextField(
+            labelWithString: L10n.text("No agent data yet", "Henüz ajan verisi yok"))
         title.font = Typography.title(14)
         title.textColor = .labelColor
         title.alignment = .center
 
-        let sub = NSTextField(wrappingLabelWithString: L10n.text(
-            "Start a Claude or Codex session to see context and limits here.",
-            "Bağlam ve limitleri görmek için Claude veya Codex oturumu başlatın."
-        ))
+        let sub = NSTextField(
+            wrappingLabelWithString: L10n.text(
+                "Start a Claude or Codex session to see context and limits here.",
+                "Bağlam ve limitleri görmek için Claude veya Codex oturumu başlatın."
+            ))
         sub.font = Typography.body(11)
         sub.textColor = .secondaryLabelColor
         sub.alignment = .center
@@ -304,16 +316,22 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let projectFont = Typography.display(22, weight: .semibold)
         let dotColor: NSColor = isActive ? .systemGreen : .tertiaryLabelColor
         let title = NSMutableAttributedString()
-        title.append(NSAttributedString(string: "●  ", attributes: [
-            .font: NSFont.systemFont(ofSize: 13, weight: .bold),
-            .foregroundColor: dotColor,
-            .baselineOffset: 3,
-        ]))
-        title.append(NSAttributedString(string: a.project, attributes: [
-            .font: projectFont,
-            .foregroundColor: Palette.primaryText,
-            .kern: -0.3,
-        ]))
+        title.append(
+            NSAttributedString(
+                string: "●  ",
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+                    .foregroundColor: dotColor,
+                    .baselineOffset: 3,
+                ]))
+        title.append(
+            NSAttributedString(
+                string: a.project,
+                attributes: [
+                    .font: projectFont,
+                    .foregroundColor: Palette.primaryText,
+                    .kern: -0.3,
+                ]))
         let projectLbl = NSTextField(labelWithAttributedString: title)
         projectLbl.lineBreakMode = .byTruncatingTail
         projectLbl.maximumNumberOfLines = 1
@@ -331,14 +349,15 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // metrics than systemFont so even at 22pt vs 22pt the baseline /
         // cap-mid won't match. Same font end-to-end is the only reliable
         // way to get the title and pct visually centered on the same line.
-        let pctLbl = NSTextField(labelWithAttributedString: NSAttributedString(
-            string: pctStr,
-            attributes: [
-                .font: projectFont,
-                .foregroundColor: pctColor,
-                .kern: -0.3,
-            ]
-        ))
+        let pctLbl = NSTextField(
+            labelWithAttributedString: NSAttributedString(
+                string: pctStr,
+                attributes: [
+                    .font: projectFont,
+                    .foregroundColor: pctColor,
+                    .kern: -0.3,
+                ]
+            ))
         pctLbl.setContentHuggingPriority(.required, for: .horizontal)
 
         // Same-size baseline align — project and pct share font metrics so
@@ -410,16 +429,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let ctxLabel = L10n.text("Context", "Bağlam")
         var detailText: String
         if let w = a.ctxWindow {
-            detailText = "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
+            detailText =
+                "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
         } else if used > 0 {
-            detailText = "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) " + L10n.text("session", "oturum")
+            detailText =
+                "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) "
+                + L10n.text("session", "oturum")
         } else {
             detailText = L10n.text("Context unknown", "Bağlam bilinmiyor")
-        }
-        // Estimated API-equivalent cost of this session — answers "how much did
-        // this session cost?" at a glance. "~" keeps it clearly an estimate.
-        if a.activeSessionCost > 0 {
-            detailText += "  ·  ~\(ContextSnapshot.formatUSD(a.activeSessionCost)) " + L10n.text("est.", "tahmini")
         }
         let detail = NSTextField(labelWithString: detailText)
         detail.font = Typography.bodyMono(11, weight: .regular)
@@ -429,28 +446,6 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         stack.addArrangedSubview(detail)
         bar.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         bar.heightAnchor.constraint(equalToConstant: 4).isActive = true
-
-        // Burn-rate forecast line — only shown when the prefs flag is on and
-        // the extrapolation cleared the confidence gate inside ContextSnapshot.burnRate.
-        if DisplayPrefs.burnRate, (pct ?? 0) > 40,
-           let burn = ContextSnapshot.burnRate(a) {
-            let eta = ContextSnapshot.burnRateText(burn.etaSeconds)
-            let resetTxt: String? = {
-                if let r = a.session5hResetsAt { return ContextSnapshot.resetsText(r) }
-                return nil
-            }()
-            var parts: [String] = ["↗ " + L10n.text("on pace to fill in", "doluş süresi") + " \(eta)"]
-            if let r = resetTxt {
-                parts.append(L10n.text("window resets in \(r)", "pencere \(r) sonra"))
-            }
-            let forecast = NSTextField(labelWithString: parts.joined(separator: "  ·  "))
-            forecast.font = NSFont.systemFont(ofSize: 10, weight: .regular)
-            forecast.textColor = .tertiaryLabelColor
-            forecast.lineBreakMode = .byTruncatingTail
-            forecast.maximumNumberOfLines = 1
-            stack.addArrangedSubview(forecast)
-            forecast.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        }
 
         // Incident strip — visible only when IncidentPoller surfaces an
         // active upstream incident. Click opens the status page.
@@ -463,8 +458,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         // Celebration trigger — once per window rollover.
         if DisplayPrefs.confetti,
-           Celebration.consumeReset(a.session5hResetsAt, key: "\(a.name).\(Celebration.session5hKey())") ||
-            Celebration.consumeReset(a.week7dResetsAt, key: "\(a.name).\(Celebration.week7dKey())") {
+            Celebration.consumeReset(
+                a.session5hResetsAt, key: "\(a.name).\(Celebration.session5hKey())")
+                || Celebration.consumeReset(
+                    a.week7dResetsAt, key: "\(a.name).\(Celebration.week7dKey())")
+        {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak container] in
                 guard let container else { return }
                 Celebration.burst(in: container)
@@ -488,9 +486,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         pctLbl.textColor = ContextSnapshot.ctxColor(pct)
 
         let used = a.activeSession
-        let detailText = a.ctxWindow.map { w in
-            "\(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
-        } ?? ContextSnapshot.formatTokens(used)
+        let detailText =
+            a.ctxWindow.map { w in
+                "\(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
+            } ?? ContextSnapshot.formatTokens(used)
         let detail = NSTextField(labelWithString: detailText)
         detail.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         detail.textColor = .tertiaryLabelColor
@@ -570,29 +569,32 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         var rows: [NSView] = []
         let showsRemaining = a.name.caseInsensitiveCompare("Codex") == .orderedSame
         if a.session5hPercent != nil || a.session5h > 0 {
-            rows.append(makeLimitRow(
-                label: L10n.text("5h limit", "5sa limit"),
-                percent: a.session5hPercent,
-                fallbackValue: ContextSnapshot.formatTokens(a.session5h),
-                resetsAt: a.session5hResetsAt,
-                showsRemaining: showsRemaining
-            ))
+            rows.append(
+                makeLimitRow(
+                    label: L10n.text("5h limit", "5sa limit"),
+                    percent: a.session5hPercent,
+                    fallbackValue: ContextSnapshot.formatTokens(a.session5h),
+                    resetsAt: a.session5hResetsAt,
+                    showsRemaining: showsRemaining
+                ))
         }
         if a.week7dPercent != nil || a.week7d > 0 {
-            rows.append(makeLimitRow(
-                label: L10n.text("7d limit", "7g limit"),
-                percent: a.week7dPercent,
-                fallbackValue: ContextSnapshot.formatTokens(a.week7d),
-                resetsAt: a.week7dResetsAt,
-                showsRemaining: showsRemaining
-            ))
+            rows.append(
+                makeLimitRow(
+                    label: L10n.text("7d limit", "7g limit"),
+                    percent: a.week7dPercent,
+                    fallbackValue: ContextSnapshot.formatTokens(a.week7d),
+                    resetsAt: a.week7dResetsAt,
+                    showsRemaining: showsRemaining
+                ))
         }
         if a.activeSession > 0 {
-            rows.append(makeSimpleStatRow(
-                label: L10n.text("Session total", "Oturum toplam"),
-                value: ContextSnapshot.formatTokens(a.activeSession),
-                valueColor: .secondaryLabelColor
-            ))
+            rows.append(
+                makeSimpleStatRow(
+                    label: L10n.text("Session total", "Oturum toplam"),
+                    value: ContextSnapshot.formatTokens(a.activeSession),
+                    valueColor: .secondaryLabelColor
+                ))
         }
         for row in rows {
             stack.addArrangedSubview(row)
@@ -603,7 +605,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
     /// Limit row with inline progress bar: label + percent + reset on top line,
     /// full-width bar below. Bar color tracks the usage threshold.
-    private func makeLimitRow(label: String, percent: Double?, fallbackValue: String, resetsAt: Date?, showsRemaining: Bool = false) -> NSView {
+    private func makeLimitRow(
+        label: String, percent: Double?, fallbackValue: String, resetsAt: Date?,
+        showsRemaining: Bool = false
+    ) -> NSView {
         let color = usageColor(percent)
         let valueText: String = {
             guard let percent else { return fallbackValue }
@@ -723,11 +728,13 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         for sess in shown {
             stack.addArrangedSubview(makeParallelSessionRow(sess))
-            stack.arrangedSubviews.last?.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            stack.arrangedSubviews.last?.widthAnchor.constraint(equalTo: stack.widthAnchor)
+                .isActive = true
         }
 
         if overflow > 0 {
-            let more = NSTextField(labelWithString: L10n.text("+ \(overflow) more", "+ \(overflow) daha"))
+            let more = NSTextField(
+                labelWithString: L10n.text("+ \(overflow) more", "+ \(overflow) daha"))
             more.font = NSFont.systemFont(ofSize: 10, weight: .regular)
             more.textColor = .tertiaryLabelColor
             stack.addArrangedSubview(more)
@@ -807,7 +814,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     /// Fingerprint of the data the popover actually renders. Two consecutive
     /// refreshes producing the same key skip the rebuild entirely so the
     /// popover doesn't tear down + re-add its cards on every 10s tick.
-    private func snapshotKey(active: Agent?, primary: Agent?, all: [Agent], others: [ToolSummary], parallelVisible: Int) -> String {
+    private func snapshotKey(
+        active: Agent?, primary: Agent?, all: [Agent], others: [ToolSummary], parallelVisible: Int
+    ) -> String {
         var parts: [String] = []
         parts.append(active?.name ?? "-")
         // Time-derived visible count — folds the 30-min parallel-session cutoff
@@ -827,11 +836,15 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
             parts.append(p.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")
             parts.append(p.sessionStarted.map { String(Int($0.timeIntervalSince1970)) } ?? "-")
             for s in p.activeSessions {
-                parts.append("S:\(s.id)|\(s.project)|\(s.model ?? "-")|\(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(s.tokens)|\(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")")
+                parts.append(
+                    "S:\(s.id)|\(s.project)|\(s.model ?? "-")|\(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(s.tokens)|\(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")"
+                )
             }
         }
         for ag in all where ag.name != primary?.name {
-            parts.append("A:\(ag.name)|\(ag.session5h)|\(ag.session5hPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.week7d)|\(ag.week7dPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.activeSession)|\(ag.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")|\(ag.model ?? "-")")
+            parts.append(
+                "A:\(ag.name)|\(ag.session5h)|\(ag.session5hPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.week7d)|\(ag.week7dPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.activeSession)|\(ag.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")|\(ag.model ?? "-")"
+            )
         }
         for t in others {
             parts.append("O:\(t.name)|\(t.tokens7d)|\(t.sessions7d)|\(t.lastModel ?? "-")")
@@ -923,10 +936,13 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // smaller values keep clipping the "T" of THEME at the corner curve.
         let edgeGuard: CGFloat = Spacing.m
         NSLayoutConstraint.activate([
-            themeBtn.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: edgeGuard),
+            themeBtn.leadingAnchor.constraint(
+                equalTo: container.leadingAnchor, constant: edgeGuard),
             themeBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            themeBtn.trailingAnchor.constraint(lessThanOrEqualTo: rightStack.leadingAnchor, constant: -Spacing.xs),
-            rightStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -edgeGuard),
+            themeBtn.trailingAnchor.constraint(
+                lessThanOrEqualTo: rightStack.leadingAnchor, constant: -Spacing.xs),
+            rightStack.trailingAnchor.constraint(
+                equalTo: container.trailingAnchor, constant: -edgeGuard),
             rightStack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             container.heightAnchor.constraint(equalToConstant: 40),
         ])
@@ -953,8 +969,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         }
         popup.menu?.delegate = self
 
-        let prefix = NSTextField(labelWithAttributedString:
-            Typography.captionAttributed(L10n.text("Theme", "Tema")))
+        let prefix = NSTextField(
+            labelWithAttributedString:
+                Typography.captionAttributed(L10n.text("Theme", "Tema")))
         prefix.lineBreakMode = .byClipping
         prefix.cell?.usesSingleLineMode = true
         prefix.maximumNumberOfLines = 1
@@ -982,7 +999,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
     func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
         if let id = item?.representedObject as? String,
-           Theme.all.contains(where: { $0.id == id }) {
+            Theme.all.contains(where: { $0.id == id })
+        {
             onPreviewTheme?(id)
         } else {
             onPreviewTheme?(nil)
@@ -1006,20 +1024,22 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         result.append(NSAttributedString(string: "● ", attributes: swatchAttrs(theme.projectColor)))
         result.append(NSAttributedString(string: "● ", attributes: swatchAttrs(theme.pctMid)))
         result.append(NSAttributedString(string: " ", attributes: [.font: font]))
-        result.append(NSAttributedString(
-            string: theme.name,
-            attributes: [.font: font, .foregroundColor: Palette.primaryText]
-        ))
+        result.append(
+            NSAttributedString(
+                string: theme.name,
+                attributes: [.font: font, .foregroundColor: Palette.primaryText]
+            ))
         if !compact {
             // Trailing example token ("42%") in the theme's percent color so
             // the user sees how the numeric values will render.
-            result.append(NSAttributedString(
-                string: "   42%",
-                attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular),
-                    .foregroundColor: theme.pctMid,
-                ]
-            ))
+            result.append(
+                NSAttributedString(
+                    string: "   42%",
+                    attributes: [
+                        .font: NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular),
+                        .foregroundColor: theme.pctMid,
+                    ]
+                ))
         }
         return result
     }
