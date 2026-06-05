@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.1] - 2026-06-05
+
+### Changed
+
+- **Cleaner popover hero.** Cards now float inside the popover with a uniform gutter on all four sides instead of sitting flush against the rounded edges, and the hero card's internal padding is symmetric. The hero meta line is trimmed to a single line: the estimated session-cost (`~$… est.`) and the burn-rate forecast (`↗ on pace to fill in …`) lines have been removed.
+
+### Removed
+
+- The **Burn-rate forecast** display option (Settings → Forecast) and its underlying preference — the forecast line it controlled is gone, so the toggle no longer had any effect.
+
 ## [0.7.0] - 2026-05-31
 
 ### Added
