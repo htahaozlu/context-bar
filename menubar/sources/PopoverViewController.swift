@@ -67,7 +67,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // Uniform outer gutter on all four sides so the cards float clearly
         // inside the popover instead of sitting flush against its rounded
         // edges. Top/bottom come from these insets; left/right come from
-        // `addCard` at the SAME value (Spacing.m) so the gutter is consistent
+        // `addCard` at the SAME value (Spacing.l) so the gutter is consistent
         // all the way around.
         contentStack.edgeInsets = NSEdgeInsets(
             top: Spacing.l, left: 0,
@@ -197,7 +197,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // Single horizontal source of truth — pinned to stack anchors at
         // required priority. Stack's alignment is `.notAnAttribute`, so no
         // implicit horizontal constraint competes with these. Matches the
-        // top/bottom `edgeInsets` (Spacing.m) so the outer gutter is uniform
+        // top/bottom `edgeInsets` (Spacing.l) so the outer gutter is uniform
         // on all four sides — cards clear the popover's rounded corners and
         // read as floating inside it, not fused to the outer edge.
         let pad: CGFloat = Spacing.l

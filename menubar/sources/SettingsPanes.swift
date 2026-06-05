@@ -151,13 +151,6 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
             body: makeToggle(title: L10n.text("Warning marks on bars", "Çubuklarda uyarı işaretleri"),
                              on: DisplayPrefs.tickMarks, action: #selector(ticksChanged(_:))))
         addSection(
-            title: L10n.text("Forecast", "Tahmin"),
-            subtitle: L10n.text(
-                "Adds an \"on pace to fill in X\" line under the context bar when usage trends predictively.",
-                "Kullanım eğilim gösterdiğinde bağlam çubuğunun altına \"X içinde dolacak\" satırı ekler."),
-            body: makeToggle(title: L10n.text("Burn-rate forecast", "Tüketim tahmini"),
-                             on: DisplayPrefs.burnRate, action: #selector(burnChanged(_:))))
-        addSection(
             title: L10n.text("Background sessions", "Arka plan oturumları"),
             subtitle: L10n.text(
                 "When the foreground session is calm and a background session exceeds 80%, append a warning chip to the menubar title.",
@@ -222,10 +215,6 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
     }
     @objc private func ticksChanged(_ sender: NSButton) {
         DisplayPrefs.tickMarks = sender.state == .on
-        onChange?()
-    }
-    @objc private func burnChanged(_ sender: NSButton) {
-        DisplayPrefs.burnRate = sender.state == .on
         onChange?()
     }
     @objc private func criticalChanged(_ sender: NSButton) {

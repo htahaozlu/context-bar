@@ -245,42 +245,6 @@ final class ContextSnapshot {
         agents.reduce(0.0) { $0 + $1.totalCost30d }
     }
 
-    /// Linear extrapolation of when the active session will fill its context
-    /// window at current burn rate. Returns nil if we lack data, the session
-    /// is too short for a confident estimate, or token rate is non-positive.
-    /// Confidence gates: need ≥ 2 min elapsed and ≥ 5% pct change worth of
-    /// tokens since session start.
-    static func burnRate(_ a: Agent) -> (etaSeconds: TimeInterval, etaDate: Date)? {
-        guard let pct = a.ctxPct, pct > 0, pct < 100,
-              let start = a.sessionStarted,
-              let window = a.ctxWindow, window > 0 else { return nil }
-        let now = Date()
-        let elapsed = now.timeIntervalSince(start)
-        guard elapsed >= 120 else { return nil }
-        let used = Double(a.activeSession)
-        guard used > 0 else { return nil }
-        let rate = used / elapsed
-        guard rate > 0 else { return nil }
-        let remaining = Double(window) - used
-        guard remaining > 0 else { return nil }
-        let eta = remaining / rate
-        guard eta.isFinite, eta > 60 else { return nil }
-        return (eta, now.addingTimeInterval(eta))
-    }
-
-    /// Formats a burn-rate ETA as "in 1h 47m". Shorter than `resetsIn` —
-    /// suppresses leading "<1m" / day-units for the hero where space matters.
-    static func burnRateText(_ eta: TimeInterval) -> String {
-        let tr = L10n.lang == .tr
-        let hU = tr ? "sa" : "h"
-        let mU = tr ? "dk" : "m"
-        if eta < 60 { return "<1\(mU)" }
-        if eta < 3600 { return "\(Int(eta / 60))\(mU)" }
-        let h = Int(eta / 3600)
-        let m = (Int(eta) % 3600) / 60
-        return m == 0 ? "\(h)\(hU)" : "\(h)\(hU) \(m)\(mU)"
-    }
-
     static func resetsIn(_ date: Date?) -> String {
         guard let date else { return "—" }
         let remaining = date.timeIntervalSinceNow

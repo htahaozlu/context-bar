@@ -11,7 +11,6 @@ enum DisplayPrefs {
     private static let kResetStyle = "displayPrefs.resetStyle"
     private static let kTickMarks = "displayPrefs.tickMarks"
     private static let kCriticalBg = "displayPrefs.criticalBg"
-    private static let kBurnRate = "displayPrefs.burnRate"
     private static let kIncidents = "displayPrefs.incidents"
     private static let kConfetti = "displayPrefs.confetti"
     private static let kRedactPaths = "displayPrefs.redactPaths"
@@ -38,12 +37,6 @@ enum DisplayPrefs {
     static var criticalBackground: Bool {
         get { defaultsBool(kCriticalBg, default: true) }
         set { UserDefaults.standard.set(newValue, forKey: kCriticalBg) }
-    }
-
-    /// Burn-rate forecast line in the hero card.
-    static var burnRate: Bool {
-        get { defaultsBool(kBurnRate, default: true) }
-        set { UserDefaults.standard.set(newValue, forKey: kBurnRate) }
     }
 
     /// Poll upstream status pages and surface incident overlay.
