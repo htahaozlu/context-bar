@@ -30,12 +30,17 @@ final class StatsViewController: PreferencePaneViewController {
 
     // Daily / range drill-down.
     private let modeControl = NSSegmentedControl()
+    /// Native graphical calendar, shown inside a popover off `dateButton`.
     private let datePicker = NSDatePicker()
+    private let dateButton = NSButton()
+    private var datePopover: NSPopover?
     private let todayButton = NSButton()
     private let selDateLabel = NSTextField(labelWithString: "")
     private let selTotalLabel = NSTextField(labelWithString: "")
     private let selMetaLabel = NSTextField(labelWithString: "")
     private let breakdownView = ProjectBreakdownView()
+    private let sessionsLabel = NSTextField(labelWithString: "")
+    private let sessionListView = SessionListView()
     private let breakdownNote = NSTextField(wrappingLabelWithString: "")
 
     /// Currently selected day (day mode) or range bounds — start-of-day, local.
@@ -166,7 +171,7 @@ final class StatsViewController: PreferencePaneViewController {
         modeControl.translatesAutoresizingMaskIntoConstraints = false
         modeControl.setContentHuggingPriority(.required, for: .horizontal)
 
-        datePicker.datePickerStyle = .textFieldAndStepper
+        datePicker.datePickerStyle = .clockAndCalendar
         datePicker.datePickerElements = [.yearMonthDay]
         datePicker.datePickerMode = .single
         datePicker.dateValue = selStart
@@ -174,7 +179,17 @@ final class StatsViewController: PreferencePaneViewController {
         datePicker.target = self
         datePicker.action = #selector(dateChanged(_:))
         datePicker.translatesAutoresizingMaskIntoConstraints = false
-        datePicker.setContentHuggingPriority(.required, for: .horizontal)
+
+        // A clean pill that opens the native calendar in a popover — minimal in
+        // the row, full graphical month grid on demand.
+        dateButton.bezelStyle = .texturedRounded
+        dateButton.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: nil)
+        dateButton.imagePosition = .imageLeading
+        dateButton.imageHugsTitle = true
+        dateButton.target = self
+        dateButton.action = #selector(openCalendar)
+        dateButton.translatesAutoresizingMaskIntoConstraints = false
+        dateButton.setContentHuggingPriority(.required, for: .horizontal)
 
         todayButton.title = L10n.text("Today", "Bugün")
         todayButton.bezelStyle = .rounded
@@ -188,7 +203,7 @@ final class StatsViewController: PreferencePaneViewController {
         spacer.translatesAutoresizingMaskIntoConstraints = false
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let controls = NSStackView(views: [modeControl, datePicker, todayButton, spacer])
+        let controls = NSStackView(views: [modeControl, dateButton, todayButton, spacer])
         controls.orientation = .horizontal
         controls.alignment = .centerY
         controls.spacing = 10
@@ -218,12 +233,17 @@ final class StatsViewController: PreferencePaneViewController {
 
         breakdownView.translatesAutoresizingMaskIntoConstraints = false
 
+        sessionsLabel.attributedStringValue = Typography.captionAttributed(
+            L10n.text("Sessions", "Oturumlar"), color: .secondaryLabelColor)
+        sessionsLabel.translatesAutoresizingMaskIntoConstraints = false
+        sessionListView.translatesAutoresizingMaskIntoConstraints = false
+
         breakdownNote.font = NSFont.systemFont(ofSize: 11)
         breakdownNote.textColor = .tertiaryLabelColor
         breakdownNote.maximumNumberOfLines = 0
         breakdownNote.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = NSStackView(views: [controls, header, selMetaLabel, breakdownView, breakdownNote])
+        let stack = NSStackView(views: [controls, header, selMetaLabel, breakdownView, sessionsLabel, sessionListView, breakdownNote])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
@@ -231,6 +251,8 @@ final class StatsViewController: PreferencePaneViewController {
         stack.setCustomSpacing(14, after: controls)
         stack.setCustomSpacing(4, after: header)
         stack.setCustomSpacing(14, after: selMetaLabel)
+        stack.setCustomSpacing(14, after: breakdownView)
+        stack.setCustomSpacing(6, after: sessionsLabel)
 
         addSection(
             title: L10n.text("Daily breakdown", "Günlük kırılım"),
@@ -245,6 +267,28 @@ final class StatsViewController: PreferencePaneViewController {
         controls.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         breakdownView.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        sessionListView.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+
+    /// Show the native graphical calendar in a transient popover off the pill.
+    @objc private func openCalendar() {
+        datePicker.datePickerMode = (dayMode == .day) ? .single : .range
+        let host = NSView()
+        host.translatesAutoresizingMaskIntoConstraints = false
+        host.addSubview(datePicker)
+        NSLayoutConstraint.activate([
+            datePicker.topAnchor.constraint(equalTo: host.topAnchor, constant: Spacing.s),
+            datePicker.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: Spacing.s),
+            datePicker.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -Spacing.s),
+            datePicker.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -Spacing.s),
+        ])
+        let vc = NSViewController()
+        vc.view = host
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.contentViewController = vc
+        datePopover = pop
+        pop.show(relativeTo: dateButton.bounds, of: dateButton, preferredEdge: .maxY)
     }
 
     @objc private func rangeChanged(_ sender: NSSegmentedControl) {
@@ -290,6 +334,8 @@ final class StatsViewController: PreferencePaneViewController {
             selEnd = max(s, e)
         }
         refreshBreakdown()
+        // A single-day pick is a complete action — dismiss the calendar.
+        if dayMode == .day { datePopover?.close() }
     }
 
     @objc private func jumpToToday() {
@@ -583,7 +629,14 @@ final class StatsViewController: PreferencePaneViewController {
 
     private struct Day { let date: String; let tokens: UInt64; let sessions: Int; let cost: Double }
     private struct ModelBucket { let model: String; let tokens: UInt64; let sessions: Int }
-    private struct Session { let durationMinutes: Double; let tokens: UInt64 }
+    private struct Session {
+        let startedAt: String
+        let durationMinutes: Double
+        let tokens: UInt64
+        let model: String
+        let project: String
+        let cost: Double
+    }
     private struct ProjInst { let date: String; let project: String; let tokens: UInt64; let cost: Double }
 
     private struct Snapshot {
@@ -666,8 +719,12 @@ final class StatsViewController: PreferencePaneViewController {
         }
         snap.recent = ((c["recent_sessions"] as? [[String: Any]]) ?? []).compactMap { o in
             Session(
+                startedAt: (o["started_at"] as? String) ?? "",
                 durationMinutes: (o["duration_minutes"] as? Double) ?? 0,
-                tokens: u64(o["tokens"])
+                tokens: u64(o["tokens"]),
+                model: (o["model"] as? String) ?? "",
+                project: (o["project"] as? String) ?? "",
+                cost: dbl(o["cost"])
             )
         }
         return snap
@@ -881,6 +938,45 @@ final class StatsViewController: PreferencePaneViewController {
 
     private func dayKey(_ d: Date) -> String { Self.dayKeyFmt.string(from: d) }
 
+    private static let isoParserFull: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
+    }()
+    private static let isoParserBasic: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f
+    }()
+    private static let timeFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = .current; return f
+    }()
+    private func parseISO(_ s: String) -> Date? {
+        Self.isoParserFull.date(from: s) ?? Self.isoParserBasic.date(from: s)
+    }
+
+    /// Rows for the per-day session list: recent_sessions whose start day falls
+    /// inside the selection, newest-first, capped. (recent_sessions is the last
+    /// ~20, so older days show none — totals/projects still cover the full year.)
+    private func sessionRowsForSelection(_ keys: Set<String>) -> [SessionListView.Row] {
+        let matched: [(Date, Session)] = snapshot.recent.compactMap { s in
+            guard let d = parseISO(s.startedAt), keys.contains(dayKey(d)) else { return nil }
+            return (d, s)
+        }
+        return matched
+            .sorted { $0.0 > $1.0 }
+            .prefix(15)
+            .map { (date, s) in
+                let detail = [s.model.isEmpty ? nil : prettyModelName(s.model),
+                              s.project.isEmpty ? nil : s.project]
+                    .compactMap { $0 }.joined(separator: " · ")
+                return SessionListView.Row(
+                    time: Self.timeFmt.string(from: date),
+                    duration: s.durationMinutes > 0 ? durationString(minutes: s.durationMinutes) : "",
+                    detail: detail,
+                    tokens: s.tokens,
+                    cost: s.cost
+                )
+            }
+    }
+
     /// Keep the picked day/range inside the recorded window so an empty pick
     /// after a provider switch lands on a day that actually has data.
     private func clampSelectionToHistory() {
@@ -949,6 +1045,12 @@ final class StatsViewController: PreferencePaneViewController {
 
         breakdownView.rows = Array(projRows)
         heatmapView.selectedKey = (dayMode == .day) ? dayKey(selStart) : nil
+        dateButton.title = selectionTitle()
+
+        // Sessions behind the selection (recent_sessions = last ~20).
+        let sessionRows = sessionRowsForSelection(keys)
+        sessionListView.rows = sessionRows
+        sessionsLabel.isHidden = sessionRows.isEmpty
 
         // Note / empty state.
         if totalTokens == 0 {

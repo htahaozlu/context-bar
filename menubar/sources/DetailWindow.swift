@@ -8,6 +8,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
     let costVC = CostViewController()
     private let generalVC = GeneralSettingsViewController()
     private let privacyVC = PrivacySettingsViewController()
+    private let aboutVC = AboutSettingsViewController()
 
     init(onThemeChange: @escaping (String) -> Void) {
         super.init(window: nil)
@@ -28,8 +29,8 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         costItem.label = L10n.text("Value", "Değer")
         costItem.image = NSImage(systemSymbolName: "dollarsign.circle", accessibilityDescription: costItem.label)
 
-        // Settings panes, consolidated: General (incl. Appearance) · Privacy
-        // (incl. About).
+        // Settings panes: General (incl. Appearance) · Privacy · About. About
+        // is its own tab again so the update controls stand on their own.
         let generalItem = NSTabViewItem(viewController: generalVC)
         generalItem.label = L10n.text("General", "Genel")
         generalItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: generalItem.label)
@@ -38,7 +39,11 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         privacyItem.label = L10n.text("Privacy", "Gizlilik")
         privacyItem.image = NSImage(systemSymbolName: "hand.raised", accessibilityDescription: privacyItem.label)
 
-        [usageItem, statsItem, costItem, generalItem, privacyItem].forEach(tabVC.addTabViewItem)
+        let aboutItem = NSTabViewItem(viewController: aboutVC)
+        aboutItem.label = L10n.text("About", "Hakkında")
+        aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
+
+        [usageItem, statsItem, costItem, generalItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),

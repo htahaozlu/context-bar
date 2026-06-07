@@ -411,6 +411,76 @@ final class TokenCompositionView: NSView {
     }
 }
 
+// MARK: - SessionListView
+//
+// The individual sessions behind a selected day/range: start time + duration
+// on the left, model · project beneath, tokens · cost on the right. Hairline
+// between rows. Custom-drawn, no per-row subviews.
+final class SessionListView: NSView {
+    struct Row {
+        let time: String
+        let duration: String
+        let detail: String // model · project
+        let tokens: UInt64
+        let cost: Double
+    }
+
+    var rows: [Row] = [] {
+        didSet { invalidateIntrinsicContentSize(); needsDisplay = true }
+    }
+
+    override var isFlipped: Bool { true }
+    private let rowH: CGFloat = 42
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: max(1, CGFloat(rows.count) * rowH))
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard !rows.isEmpty else { return }
+        let w = bounds.width
+        for (i, row) in rows.enumerated() {
+            let y = CGFloat(i) * rowH
+            if i > 0 {
+                NSColor.separatorColor.withAlphaComponent(0.4).setStroke()
+                let line = NSBezierPath()
+                line.move(to: NSPoint(x: 0, y: y))
+                line.line(to: NSPoint(x: w, y: y))
+                line.lineWidth = 0.5
+                line.stroke()
+            }
+
+            let value = "\(ContextSnapshot.formatTokens(row.tokens)) · \(ContextSnapshot.formatUSD(row.cost))"
+            let valAttr = NSAttributedString(string: value, attributes: [
+                .font: Typography.bodyMono(11, weight: .medium),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ])
+            let vs = valAttr.size()
+            valAttr.draw(at: NSPoint(x: w - vs.width, y: y + 8))
+
+            let head = NSMutableAttributedString(string: row.time, attributes: [
+                .font: Typography.bodyMono(12, weight: .semibold),
+                .foregroundColor: NSColor.labelColor,
+            ])
+            if !row.duration.isEmpty {
+                head.append(NSAttributedString(string: "  \(row.duration)", attributes: [
+                    .font: NSFont.systemFont(ofSize: 11),
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                ]))
+            }
+            head.draw(at: NSPoint(x: 0, y: y + 6))
+
+            let para = NSMutableParagraphStyle()
+            para.lineBreakMode = .byTruncatingTail
+            let det = NSAttributedString(string: row.detail, attributes: [
+                .font: NSFont.systemFont(ofSize: 10),
+                .foregroundColor: NSColor.tertiaryLabelColor,
+                .paragraphStyle: para,
+            ])
+            det.draw(in: NSRect(x: 0, y: y + 23, width: max(20, w - vs.width - 12), height: 14))
+        }
+    }
+}
+
 // MARK: - InsightCardView
 //
 // One narrative insight: a tinted SF-Symbol chip + a headline (the metric,
