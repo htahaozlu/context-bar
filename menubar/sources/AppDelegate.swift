@@ -30,6 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Capture-only: pin the app to light/dark so marketing & regression
+        // screenshots can render either appearance without flipping the whole
+        // system. No effect in normal use (variable unset → follows system).
+        if let want = ProcessInfo.processInfo.environment["CONTEXTBAR_FORCE_APPEARANCE"]?.lowercased() {
+            NSApp.appearance = NSAppearance(named: want == "light" ? .aqua : .darkAqua)
+        }
         setupMainMenu()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)

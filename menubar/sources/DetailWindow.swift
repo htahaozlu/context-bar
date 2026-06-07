@@ -7,9 +7,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
     let statsVC = StatsViewController()
     let costVC = CostViewController()
     private let generalVC = GeneralSettingsViewController()
-    private let appearanceVC = AppearanceSettingsViewController()
     private let privacyVC = PrivacySettingsViewController()
-    private let aboutVC = AboutViewController()
 
     init(onThemeChange: @escaping (String) -> Void) {
         super.init(window: nil)
@@ -24,28 +22,23 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         statsItem.label = L10n.text("Stats", "İstatistik")
         statsItem.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis", accessibilityDescription: statsItem.label)
 
+        // "Value" (was "Cost") — the figure is hypothetical API value, not a
+        // bill. The hero on this tab makes that explicit.
         let costItem = NSTabViewItem(viewController: costVC)
-        costItem.label = L10n.text("Cost", "Maliyet")
+        costItem.label = L10n.text("Value", "Değer")
         costItem.image = NSImage(systemSymbolName: "dollarsign.circle", accessibilityDescription: costItem.label)
 
-        // Settings panes (Apple-style IA): General · Appearance · Privacy.
+        // Settings panes, consolidated: General (incl. Appearance) · Privacy
+        // (incl. About).
         let generalItem = NSTabViewItem(viewController: generalVC)
         generalItem.label = L10n.text("General", "Genel")
         generalItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: generalItem.label)
-
-        let appearanceItem = NSTabViewItem(viewController: appearanceVC)
-        appearanceItem.label = L10n.text("Appearance", "Görünüm")
-        appearanceItem.image = NSImage(systemSymbolName: "paintbrush", accessibilityDescription: appearanceItem.label)
 
         let privacyItem = NSTabViewItem(viewController: privacyVC)
         privacyItem.label = L10n.text("Privacy", "Gizlilik")
         privacyItem.image = NSImage(systemSymbolName: "hand.raised", accessibilityDescription: privacyItem.label)
 
-        let aboutItem = NSTabViewItem(viewController: aboutVC)
-        aboutItem.label = L10n.text("About", "Hakkında")
-        aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
-
-        [usageItem, statsItem, costItem, generalItem, appearanceItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
+        [usageItem, statsItem, costItem, generalItem, privacyItem].forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
@@ -75,13 +68,24 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
             contentView.addSubview(effect, positioned: .below, relativeTo: nil)
         }
 
-        // Cost-tab "Connect a key" jumps straight to the Privacy pane (index 5:
-        // Usage·Stats·Cost·General·Appearance·Privacy·About) where the AI key lives.
-        costVC.onShowPrivacy = { [weak self] in self?.selectTab(index: 5) }
-        appearanceVC.onThemeChange = onThemeChange
-        generalVC.onThemeChange = onThemeChange
-        generalVC.onChange = { onThemeChange(ThemeStore.current.id) }
-        privacyVC.onChange = { onThemeChange(ThemeStore.current.id) }
+        // "Connect a key" (Value + Stats AI advisor) jumps to the Privacy pane
+        // (index 4: Usage·Stats·Value·General·Privacy) where the AI key lives.
+        costVC.onShowPrivacy = { [weak self] in self?.selectTab(index: 4) }
+        statsVC.onShowPrivacy = { [weak self] in self?.selectTab(index: 4) }
+
+        // A theme/language/setting change must immediately re-render the data
+        // tabs too — so the Value hero picks up the new accent (contrast-corrected
+        // per theme), the budget bar reflects a new budget, and labels re-localize
+        // without reopening the window.
+        let apply: (String) -> Void = { [weak self] id in
+            onThemeChange(id)
+            self?.usageVC.reload()
+            self?.statsVC.reload()
+            self?.costVC.reload()
+        }
+        generalVC.onThemeChange = apply
+        generalVC.onChange = { apply(ThemeStore.current.id) }
+        privacyVC.onChange = { apply(ThemeStore.current.id) }
     }
     required init?(coder: NSCoder) { fatalError() }
 

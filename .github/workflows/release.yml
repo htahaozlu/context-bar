@@ -38,6 +38,19 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
 
+      - name: Refuse same-version manual release
+        if: github.ref_type != 'tag'
+        shell: bash
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/${TAG_NAME}" >/dev/null; then
+            echo "::error::${TAG_NAME} already exists. Bump Cargo.toml to a new version and push a new tag; replacing same-version assets will not update installed apps."
+            exit 1
+          fi
+
       - name: Sync app bundle version
         shell: bash
         env:

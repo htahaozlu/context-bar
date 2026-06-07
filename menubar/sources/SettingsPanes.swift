@@ -1,16 +1,24 @@
 import AppKit
 import Foundation
 
-final class AppearanceSettingsViewController: PreferencePaneViewController {
+/// General settings — merges the former Menubar, Display, Notifications, and
+/// Appearance tabs into one pane. The settings window now holds just
+/// General · Privacy (the 3 data views live on their own tabs).
+final class GeneralSettingsViewController: PreferencePaneViewController {
     var onThemeChange: ((String) -> Void)?
+    var onChange: (() -> Void)?
+    private let displayChips = HorizontalDisplayController()
+    private let preview = TitlePreviewView()
     private var cardViews: [(ThemeCardView, Theme)] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
+        refreshPreview()
     }
 
-    private func buildUI() {
+    /// Theme grid + language picker (formerly the standalone Appearance tab).
+    private func buildThemeAndLanguage() {
         cardViews = Theme.all.map { theme in
             let card = ThemeCardView(theme: theme)
             card.isSelected = theme.id == ThemeStore.current.id
@@ -22,7 +30,6 @@ final class AppearanceSettingsViewController: PreferencePaneViewController {
             }
             return (card, theme)
         }
-
         let rows = stride(from: 0, to: cardViews.count, by: 3).map { start -> NSStackView in
             let end = min(start + 3, cardViews.count)
             let row = NSStackView(views: cardViews[start..<end].map { $0.0 as NSView })
@@ -37,36 +44,30 @@ final class AppearanceSettingsViewController: PreferencePaneViewController {
         themeGrid.spacing = 12
         addSection(
             title: L10n.text("Theme", "Tema"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Pick a menubar palette.", "Bir menubar paleti seç."),
+            symbol: "paintpalette",
+            info: L10n.text(
                 "Pick the menubar palette that matches your desktop. The preview uses the same typography and accent logic shown in the status item.",
-                "Masaüstüne en uygun menubar paletini seçin. Önizleme, durum çubuğunda kullanılan aynı tipografi ve vurgu mantığını gösterir."
-            ),
-            body: themeGrid
-        )
+                "Masaüstüne en uygun menubar paletini seçin. Önizleme, durum çubuğunda kullanılan aynı tipografi ve vurgu mantığını gösterir."),
+            body: themeGrid)
         cardViews.forEach { $0.0.heightAnchor.constraint(equalToConstant: 82).isActive = true }
 
         let langControl = NSSegmentedControl(
             labels: AppLanguage.allCases.map(\.label),
             trackingMode: .selectOne,
             target: self,
-            action: #selector(languageChanged(_:))
-        )
+            action: #selector(languageChanged(_:)))
         langControl.selectedSegment = AppLanguage.allCases.firstIndex(of: LanguageStore.selected) ?? 0
         addSection(
             title: L10n.text("Language", "Dil"),
-            subtitle: L10n.text(
-                "Follow the system language or pin the UI to English or Turkish.",
-                "Arayüzü sistem diline bırakın ya da İngilizce veya Türkçe olarak sabitleyin."
-            ),
-            body: langControl
-        )
+            subtitle: L10n.text("System, English, or Turkish.", "Sistem, İngilizce ya da Türkçe."),
+            symbol: "globe",
+            body: langControl)
     }
 
     private func updateCardSelection() {
         let current = ThemeStore.current.id
-        for (card, theme) in cardViews {
-            card.isSelected = theme.id == current
-        }
+        for (card, theme) in cardViews { card.isSelected = theme.id == current }
     }
 
     @objc private func languageChanged(_ sender: NSSegmentedControl) {
@@ -74,24 +75,11 @@ final class AppearanceSettingsViewController: PreferencePaneViewController {
         LanguageStore.set(language)
         onThemeChange?(ThemeStore.current.id)
     }
-}
-
-/// General settings — merges the former Menubar, Display, and Notifications
-/// tabs into one pane so the settings window holds just General · Appearance ·
-/// Privacy (Apple-style IA; the 3 data views live on their own tabs).
-final class GeneralSettingsViewController: PreferencePaneViewController {
-    var onThemeChange: ((String) -> Void)?
-    var onChange: (() -> Void)?
-    private let displayChips = HorizontalDisplayController()
-    private let preview = TitlePreviewView()
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        buildUI()
-        refreshPreview()
-    }
 
     private func buildUI() {
+        // Appearance (merged in): visual customization first — theme + language.
+        buildThemeAndLanguage()
+
         let sepControl = NSSegmentedControl(
             labels: SeparatorStore.options.map { $0.label },
             trackingMode: .selectOne,
@@ -101,10 +89,12 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         sepControl.selectedSegment = SeparatorStore.currentIndex
         addSection(
             title: L10n.text("Separator", "Ayraç"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Character between fields in the title.",
+                                "Başlıktaki alanlar arasındaki karakter."),
+            symbol: "rectangle.split.3x1",
+            info: L10n.text(
                 "Character shown between the agent icon, project, and context values in the menubar title.",
-                "Menubar başlığında ajan ikonu, proje ve bağlam değerleri arasında gösterilen karakter."
-            ),
+                "Menubar başlığında ajan ikonu, proje ve bağlam değerleri arasında gösterilen karakter."),
             body: sepControl
         )
 
@@ -114,10 +104,12 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         }
         addSection(
             title: L10n.text("Title content", "Başlık içeriği"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Toggle fields; drag ⠿ to reorder.",
+                                "Alanları aç/kapat; sıralamak için ⠿ sürükle."),
+            symbol: "slider.horizontal.3",
+            info: L10n.text(
                 "Toggle the checkbox to show a field. Grab the ⠿ handle and drag a card left or right to reorder.",
-                "Bir alanı göstermek için onay kutusunu işaretleyin. Sıralamak için ⠿ tutamacından kartı sağa veya sola sürükleyin."
-            ),
+                "Bir alanı göstermek için onay kutusunu işaretleyin. Sıralamak için ⠿ tutamacından kartı sağa veya sola sürükleyin."),
             body: displayChips.container
         )
 
@@ -125,10 +117,9 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
         addSection(
             title: L10n.text("Preview", "Önizleme"),
-            subtitle: L10n.text(
-                "Live sample of how the menubar title will look with agent icons. Changes apply instantly.",
-                "Menubar başlığının ajan ikonlarıyla nasıl görüneceğine dair canlı örnek. Değişiklikler anında uygulanır."
-            ),
+            subtitle: L10n.text("Live menubar sample. Updates instantly.",
+                                "Canlı menubar örneği. Anında güncellenir."),
+            symbol: "eye",
             body: preview
         )
 
@@ -139,42 +130,60 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         resetCtrl.selectedSegment = DisplayPrefs.resetStyle == .relative ? 0 : 1
         addSection(
             title: L10n.text("Reset time", "Sıfırlama zamanı"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Show resets as a duration or a clock time.",
+                                "Sıfırlamaları süre ya da saat olarak göster."),
+            symbol: "clock",
+            info: L10n.text(
                 "Show window resets as a relative duration (\"in 1h 47m\") or an absolute clock time (\"14:32\").",
                 "Pencere sıfırlamalarını göreli süre (\"1sa 47dk\") veya saat olarak (\"14:32\") göster."),
             body: resetCtrl)
         addSection(
             title: L10n.text("Bar marks", "Çubuk işaretleri"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Tick marks at 70% and 90%. Off by default.",
+                                "%70 ve %90'da çizgiler. Varsayılan kapalı."),
+            symbol: "ruler",
+            info: L10n.text(
                 "Adds thin tick marks at 70% and 90% on every context bar. Off by default for a cleaner look.",
                 "Her bağlam çubuğunda %70 ve %90'a ince çizgiler ekler. Daha sade görünüm için varsayılan kapalıdır."),
             body: makeToggle(title: L10n.text("Warning marks on bars", "Çubuklarda uyarı işaretleri"),
                              on: DisplayPrefs.tickMarks, action: #selector(ticksChanged(_:))))
         addSection(
             title: L10n.text("Background sessions", "Arka plan oturumları"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Warn when a background session gets hot.",
+                                "Arka plan oturumu ısınınca uyar."),
+            symbol: "square.stack.3d.up",
+            info: L10n.text(
                 "When the foreground session is calm and a background session exceeds 80%, append a warning chip to the menubar title.",
                 "Aktif oturum sakinken arka plan oturumu %80'i geçerse menubar başlığına uyarı eklenir."),
             body: makeToggle(title: L10n.text("Surface critical background sessions", "Kritik arka plan oturumlarını göster"),
                              on: DisplayPrefs.criticalBackground, action: #selector(criticalChanged(_:))))
         addSection(
             title: L10n.text("Monthly budget", "Aylık bütçe"),
-            subtitle: L10n.text(
-                "Tints the menubar title yellow then red as your estimated monthly run-rate nears this budget — or as your 5h limit fills. 0 = off (the 5h limit % still tints on its own).",
-                "Tahmini aylık harcaman bu bütçeye yaklaştıkça — ya da 5sa limitin dolarken — menubar başlığını sarı sonra kırmızı yapar. 0 = kapalı (5sa limit %'si yine de renklendirir)."),
+            subtitle: L10n.text("Tints the menubar near your budget. 0 = off.",
+                                "Bütçeye yaklaşınca menubar'ı renklendirir. 0 = kapalı."),
+            symbol: "target",
+            info: L10n.text(
+                "Tints the menubar title yellow then red as your estimated monthly run-rate nears this budget — or as your 5h limit fills. 0 = off (the 5h limit % still tints on its own). The Cost tab also shows your pace against this budget.",
+                "Tahmini aylık harcaman bu bütçeye yaklaştıkça — ya da 5sa limitin dolarken — menubar başlığını sarı sonra kırmızı yapar. 0 = kapalı (5sa limit %'si yine de renklendirir). Maliyet sekmesi de bu bütçeye göre hızını gösterir."),
             body: makeBudgetField())
 
         // ── Notifications (was the Alerts tab) ──
         addSection(
             title: L10n.text("Provider status", "Sağlayıcı durumu"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Anthropic/OpenAI incident dot + card.",
+                                "Anthropic/OpenAI olay noktası + kartı."),
+            symbol: "dot.radiowaves.left.and.right",
+            info: L10n.text(
                 "Polls Anthropic and OpenAI status pages every 5 minutes. Adds a colored dot to the menubar title and an incident card to the popover when an incident is active.",
                 "Anthropic ve OpenAI durum sayfaları 5 dakikada bir kontrol edilir. Olay olduğunda menubar başlığında renkli nokta ve popover'da kart görünür."),
             body: makeToggle(title: L10n.text("Show upstream incident overlay", "Üst kaynak olay göstergesi"),
                              on: DisplayPrefs.incidents, action: #selector(incidentsChanged(_:))))
         addSection(
             title: L10n.text("Delight", "İnce dokunuş"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("A particle burst when a quota window resets.",
+                                "Kota penceresi sıfırlanınca kısa animasyon."),
+            symbol: "sparkles",
+            info: L10n.text(
                 "Plays a brief particle burst in the popover when a 5-hour or weekly quota window resets. Respects reduce-motion.",
                 "5 saatlik veya haftalık kota penceresi sıfırlandığında popover'da kısa bir parçacık animasyonu oynatır. Hareketi azalt ayarına uyar."),
             body: makeToggle(title: L10n.text("Celebrate quota window resets", "Pencere sıfırlamada kutlama"),
@@ -255,6 +264,7 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     private let aiProviderPopup = NSPopUpButton()
     private let aiKeyField = NSSecureTextField()
     private let syncFolderLabel = NSTextField(labelWithString: "")
+    private let changelogURL = URL(string: "https://github.com/htahaozlu/context-bar/blob/main/CHANGELOG.md")!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -269,10 +279,12 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         )
         addSection(
             title: L10n.text("Shared output", "Paylaşılan çıktı"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Mask home paths and emails in exports.",
+                                "Dışa aktarımda ev yollarını ve e-postaları gizle."),
+            symbol: "eye.slash",
+            info: L10n.text(
                 "Replaces $HOME with ~, collapses /Users/<name>/ paths, and masks email addresses in any text exported through the app — useful before sharing screenshots or logs.",
-                "$HOME değerini ~ ile değiştirir, /Users/<ad>/ yollarını sadeleştirir ve uygulamadan dışa aktarılan metinlerde e-posta adreslerini gizler. Ekran görüntüsü veya günlük paylaşmadan önce işe yarar."
-            ),
+                "$HOME değerini ~ ile değiştirir, /Users/<ad>/ yollarını sadeleştirir ve uygulamadan dışa aktarılan metinlerde e-posta adreslerini gizler. Ekran görüntüsü veya günlük paylaşmadan önce işe yarar."),
             body: redact
         )
 
@@ -286,10 +298,9 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         previewStack.spacing = 6
         addSection(
             title: L10n.text("Preview", "Önizleme"),
-            subtitle: L10n.text(
-                "How a path/email looks after redaction.",
-                "Bir yol/e-postanın gizleme sonrası görünümü."
-            ),
+            subtitle: L10n.text("A path/email after redaction.",
+                                "Gizleme sonrası bir yol/e-posta."),
+            symbol: "eye",
             body: previewStack
         )
 
@@ -300,30 +311,127 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         )
         addSection(
             title: L10n.text("Share card", "Paylaşım kartı"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Hide real project names when sharing.",
+                                "Paylaşırken gerçek proje adlarını gizle."),
+            symbol: "square.and.arrow.up",
+            info: L10n.text(
                 "When you share Today's HUD from the popover footer, real project names are replaced with generic labels (Project A, Project B). Turn off to share real names.",
-                "Popover altındaki paylaşım düğmesinden Today's HUD'u paylaşırken proje adları genel etiketlerle değiştirilir (Project A, Project B). Gerçek adları paylaşmak için kapatın."
-            ),
+                "Popover altındaki paylaşım düğmesinden Today's HUD'u paylaşırken proje adları genel etiketlerle değiştirilir (Project A, Project B). Gerçek adları paylaşmak için kapatın."),
             body: maskShare
         )
 
         addSection(
             title: L10n.text("AI Advisor (bring your own key)", "AI Danışman (kendi anahtarın)"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Optional. Your own OpenAI/Gemini key for tips.",
+                                "İsteğe bağlı. Öneriler için kendi OpenAI/Gemini anahtarın."),
+            symbol: "sparkles",
+            info: L10n.text(
                 "Optional. Connect your own OpenAI or Gemini API key to get usage-efficiency tips. Only an aggregate summary — no transcripts, no project names — is sent to your chosen provider, and only when you press Analyze in the Cost tab. Off by default; nothing leaves your machine until you opt in.",
-                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — seçtiğin sağlayıcıya gönderilir, o da yalnızca Maliyet sekmesinde Analiz'e bastığında. Varsayılan kapalı; sen açana kadar makineden hiçbir şey çıkmaz."
-            ),
+                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — seçtiğin sağlayıcıya gönderilir, o da yalnızca Maliyet sekmesinde Analiz'e bastığında. Varsayılan kapalı; sen açana kadar makineden hiçbir şey çıkmaz."),
             body: makeAIAdvisorField()
         )
 
         addSection(
             title: L10n.text("Across your Macs", "Mac'lerin arasında"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Combine usage via a folder you already sync.",
+                                "Zaten senkronladığın bir klasörle kullanımı birleştir."),
+            symbol: "macbook.and.iphone",
+            info: L10n.text(
                 "Point this at a folder you already sync (iCloud Drive, Dropbox…). Each Mac writes a compact usage summary there; the Cost tab then shows your combined usage across machines. Aggregates only — no transcripts, no project names. No server.",
-                "Zaten senkronladığın bir klasörü seç (iCloud Drive, Dropbox…). Her Mac oraya özet kullanım yazar; Maliyet sekmesi makineler arası birleşik kullanımını gösterir. Yalnızca özet — transcript yok, proje adı yok. Sunucu yok."
-            ),
+                "Zaten senkronladığın bir klasörü seç (iCloud Drive, Dropbox…). Her Mac oraya özet kullanım yazar; Maliyet sekmesi makineler arası birleşik kullanımını gösterir. Yalnızca özet — transcript yok, proje adı yok. Sunucu yok."),
             body: makeSyncFolderField()
         )
+
+        // About (merged in): app identity, updates, and where data lives.
+        buildAboutSections()
+    }
+
+    /// Former About tab — app identity hero, updates, repository context,
+    /// data sources, and files/shortcuts, appended below the privacy controls.
+    private func buildAboutSections() {
+        addHero(AboutHeroView())
+
+        let actions = NSStackView(views: [
+            makeActionButton(title: L10n.text("Check for Updates", "Güncellemeleri kontrol et"),
+                             action: #selector(checkForUpdates)),
+            makeActionButton(title: L10n.text("View Changelog", "Değişiklik kaydını aç"),
+                             action: #selector(openChangelog)),
+        ])
+        actions.orientation = .horizontal
+        actions.alignment = .centerY
+        actions.spacing = 10
+        addSection(
+            title: L10n.text("Updates", "Güncellemeler"),
+            subtitle: L10n.text("Distributed from GitHub Releases.",
+                                "GitHub Releases üzerinden dağıtılır."),
+            symbol: "arrow.down.circle",
+            body: actions)
+
+        let context = NSStackView(views: [
+            makeInfoRow(title: L10n.text("Artifacts folder", "Artifact klasörü"), value: "\(NSHomeDirectory())/.context-bar"),
+            makeInfoRow(title: L10n.text("Repository brief", "Repo brifi"), value: ".context-bar/AGENT.md"),
+            makeInfoRow(title: L10n.text("Claude compatibility", "Claude uyumluluğu"), value: "CLAUDE.md"),
+        ])
+        context.orientation = .vertical; context.spacing = 10; context.alignment = .leading
+        addSection(
+            title: L10n.text("Repository context", "Repo bağlamı"),
+            subtitle: L10n.text("Local brief + sidecars for agents.",
+                                "Ajanlar için yerel brief + yan dosyalar."),
+            symbol: "folder",
+            info: L10n.text(
+                "Stable local brief and machine-readable sidecars so agents re-enter a project with less drift.",
+                "Ajanlar projeye daha az kayma ile geri dönebilsin diye sabit yerel brief ve makinece okunabilir yan dosyalar."),
+            body: context)
+
+        let sources = NSStackView(views: [
+            makeInfoRow(title: "Git", value: L10n.text("branch, commits, worktree", "branch, commit, worktree")),
+            makeInfoRow(title: "Claude Code", value: "~/.claude/projects/**/*.jsonl"),
+            makeInfoRow(title: "Codex CLI", value: "~/.codex/sessions/**/*.jsonl"),
+            makeInfoRow(title: "Output", value: "~/.context-bar/context.json"),
+        ])
+        sources.orientation = .vertical; sources.spacing = 10; sources.alignment = .leading
+        addSection(
+            title: L10n.text("Data sources", "Veri kaynakları"),
+            subtitle: L10n.text("Built locally from transcripts. No server.",
+                                "Transkriptlerden yerelde oluşur. Sunucu yok."),
+            symbol: "tray.full",
+            info: L10n.text(
+                "Usage is built locally from existing transcript files. No remote service required.",
+                "Kullanım özeti mevcut transcript dosyalarından yerelde oluşturulur. Uzak servis gerekmez."),
+            body: sources)
+
+        let locations = NSStackView(views: [
+            makeInfoRow(title: L10n.text("Version", "Sürüm"), value: AppMetadata.current.detailedVersionLabel),
+            makeInfoRow(title: L10n.text("App bundle", "Uygulama paketi"), value: "dist/ContextBar.app"),
+            makeInfoRow(title: L10n.text("Disk image", "DMG"), value: "dist/ContextBar.dmg"),
+            makeInfoRow(title: L10n.text("Open window", "Pencereyi aç"), value: "⌘D"),
+            makeInfoRow(title: L10n.text("Refresh", "Yenile"), value: "⌘R"),
+        ])
+        locations.orientation = .vertical; locations.spacing = 10; locations.alignment = .leading
+        addSection(
+            title: L10n.text("Files and shortcuts", "Dosyalar ve kısayollar"),
+            subtitle: L10n.text("Where things live + keyboard shortcuts.",
+                                "Dosyaların yeri + klavye kısayolları."),
+            symbol: "keyboard",
+            info: L10n.text(
+                "Build artifacts live in the repository. Runtime data stays under your home directory.",
+                "Build artefact'ları repo içinde kalır. Çalışma verileri home dizini altında tutulur."),
+            body: locations)
+    }
+
+    private func makeActionButton(title: String, action: Selector) -> NSButton {
+        let button = NSButton(title: title, target: self, action: action)
+        button.bezelStyle = .rounded
+        button.controlSize = .regular
+        return button
+    }
+
+    @objc private func checkForUpdates() {
+        UpdateManager.shared.checkForUpdates(presenter: view.window)
+    }
+
+    @objc private func openChangelog() {
+        NSWorkspace.shared.open(changelogURL)
     }
 
     private func makeSyncFolderField() -> NSView {
@@ -427,107 +535,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     @objc private func maskShareChanged(_ sender: NSButton) {
         DisplayPrefs.maskShareProjects = sender.state == .on
         onChange?()
-    }
-}
-
-final class AboutViewController: PreferencePaneViewController {
-    private let changelogURL = URL(string: "https://github.com/htahaozlu/context-bar/blob/main/CHANGELOG.md")!
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        addHero(AboutHeroView())
-
-        let actions = NSStackView(views: [
-            makeActionButton(
-                title: L10n.text("Check for Updates", "Güncellemeleri kontrol et"),
-                action: #selector(checkForUpdates)
-            ),
-            makeActionButton(
-                title: L10n.text("View Changelog", "Değişiklik kaydını aç"),
-                action: #selector(openChangelog)
-            )
-        ])
-        actions.orientation = .horizontal
-        actions.alignment = .centerY
-        actions.spacing = 10
-        addSection(
-            title: L10n.text("Updates", "Güncellemeler"),
-            subtitle: L10n.text(
-                "ContextBar releases are distributed from GitHub Releases.",
-                "ContextBar sürümleri GitHub Releases üzerinden dağıtılır."
-            ),
-            body: actions
-        )
-
-        let context = NSStackView(views: [
-            makeInfoRow(title: L10n.text("Artifacts folder", "Artifact klasörü"), value: "\(NSHomeDirectory())/.context-bar"),
-            makeInfoRow(title: L10n.text("Repository brief", "Repo brifi"), value: ".context-bar/AGENT.md"),
-            makeInfoRow(title: L10n.text("Claude compatibility", "Claude uyumluluğu"), value: "CLAUDE.md"),
-        ])
-        context.orientation = .vertical
-        context.spacing = 10
-        context.alignment = .leading
-        addSection(
-            title: L10n.text("Repository context", "Repo bağlamı"),
-            subtitle: L10n.text(
-                "Stable local brief and machine-readable sidecars so agents re-enter a project with less drift.",
-                "Ajanlar projeye daha az kayma ile geri dönebilsin diye sabit yerel brief ve makinece okunabilir yan dosyalar."
-            ),
-            body: context
-        )
-
-        let sources = NSStackView(views: [
-            makeInfoRow(title: "Git", value: L10n.text("branch, commits, worktree", "branch, commit, worktree")),
-            makeInfoRow(title: "Claude Code", value: "~/.claude/projects/**/*.jsonl"),
-            makeInfoRow(title: "Codex CLI", value: "~/.codex/sessions/**/*.jsonl"),
-            makeInfoRow(title: "Output", value: "~/.context-bar/context.json"),
-        ])
-        sources.orientation = .vertical
-        sources.spacing = 10
-        sources.alignment = .leading
-        addSection(
-            title: L10n.text("Data sources", "Veri kaynakları"),
-            subtitle: L10n.text(
-                "Usage is built locally from existing transcript files. No remote service required.",
-                "Kullanım özeti mevcut transcript dosyalarından yerelde oluşturulur. Uzak servis gerekmez."
-            ),
-            body: sources
-        )
-
-        let locations = NSStackView(views: [
-            makeInfoRow(title: L10n.text("Version", "Sürüm"), value: AppMetadata.current.detailedVersionLabel),
-            makeInfoRow(title: L10n.text("App bundle", "Uygulama paketi"), value: "dist/ContextBar.app"),
-            makeInfoRow(title: L10n.text("Disk image", "DMG"), value: "dist/ContextBar.dmg"),
-            makeInfoRow(title: L10n.text("Open window", "Pencereyi aç"), value: "⌘D"),
-            makeInfoRow(title: L10n.text("Refresh", "Yenile"), value: "⌘R"),
-        ])
-        locations.orientation = .vertical
-        locations.spacing = 10
-        locations.alignment = .leading
-        addSection(
-            title: L10n.text("Files and shortcuts", "Dosyalar ve kısayollar"),
-            subtitle: L10n.text(
-                "Build artifacts live in the repository. Runtime data stays under your home directory.",
-                "Build artefact'ları repo içinde kalır. Çalışma verileri home dizini altında tutulur."
-            ),
-            body: locations
-        )
-    }
-
-    private func makeActionButton(title: String, action: Selector) -> NSButton {
-        let button = NSButton(title: title, target: self, action: action)
-        button.bezelStyle = .rounded
-        button.controlSize = .regular
-        return button
-    }
-
-    @objc private func checkForUpdates() {
-        UpdateManager.shared.checkForUpdates(presenter: view.window)
-    }
-
-    @objc private func openChangelog() {
-        NSWorkspace.shared.open(changelogURL)
     }
 }
 

@@ -69,18 +69,20 @@ class PreferencePaneViewController: NSViewController {
         view.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
     }
 
-    func addSection(title: String, subtitle: String? = nil, body: NSView) {
+    /// A section: uppercase header (optional SF Symbol anchor + optional ⓘ
+    /// info popover) over a short one-line subtitle and a card body. Keep
+    /// `subtitle` to ~one line; move the long "why" into `info` so the pane
+    /// stays scannable instead of a wall of prose.
+    func addSection(title: String, subtitle: String? = nil,
+                    symbol: String? = nil, info: String? = nil, body: NSView) {
         let section = NSStackView()
         section.orientation = .vertical
         section.alignment = .leading
         section.spacing = 4
         section.translatesAutoresizingMaskIntoConstraints = false
 
-        // Sonoma System Settings-style uppercase section header — small,
-        // medium weight, secondary color — keeps the focus on the card body.
-        let titleLabel = NSTextField(labelWithAttributedString:
-            Typography.captionAttributed(title, color: .secondaryLabelColor))
-        section.addArrangedSubview(titleLabel)
+        let header = makeSectionHeader(title: title, symbol: symbol, info: info)
+        section.addArrangedSubview(header)
 
         if let subtitle, !subtitle.isEmpty {
             let subtitleLabel = NSTextField(wrappingLabelWithString: subtitle)
@@ -90,7 +92,7 @@ class PreferencePaneViewController: NSViewController {
             section.addArrangedSubview(subtitleLabel)
             section.setCustomSpacing(8, after: subtitleLabel)
         } else {
-            section.setCustomSpacing(6, after: titleLabel)
+            section.setCustomSpacing(6, after: header)
         }
 
         let card = PreferenceSectionCard(content: body)
@@ -100,8 +102,102 @@ class PreferencePaneViewController: NSViewController {
         card.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
     }
 
+    /// Sonoma System Settings-style header: small uppercase label, optionally
+    /// led by a monochrome SF Symbol and trailed by an ⓘ button that reveals
+    /// the long explanation on demand (so it doesn't crowd the page).
+    private func makeSectionHeader(title: String, symbol: String?, info: String?) -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 5
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        if let symbol,
+           let image = NSImage(systemSymbolName: symbol, accessibilityDescription: title) {
+            let iv = NSImageView(image: image)
+            iv.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+            iv.contentTintColor = .secondaryLabelColor
+            iv.setContentHuggingPriority(.required, for: .horizontal)
+            row.addArrangedSubview(iv)
+        }
+
+        let titleLabel = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(title, color: .secondaryLabelColor))
+        row.addArrangedSubview(titleLabel)
+
+        if let info, !info.isEmpty {
+            row.addArrangedSubview(InfoButton(info: info))
+        }
+        return row
+    }
+
     func makeInfoRow(title: String, value: String) -> NSView {
         ResponsiveInfoRowView(title: title, value: value)
+    }
+}
+
+/// A small ⓘ glyph that reveals a section's long explanation in a transient
+/// popover on click (and as a tooltip on hover). Lets headers carry a short
+/// subtitle while the full "why" stays one tap away — no wall of text.
+final class InfoButton: NSButton {
+    private let infoText: String
+    private var popover: NSPopover?
+
+    init(info: String) {
+        self.infoText = info
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        isBordered = false
+        bezelStyle = .inline
+        imagePosition = .imageOnly
+        let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+        image = NSImage(systemSymbolName: "info.circle", accessibilityDescription:
+            L10n.text("More info", "Daha fazla bilgi"))?.withSymbolConfiguration(cfg)
+        contentTintColor = .tertiaryLabelColor
+        target = self
+        action = #selector(toggle)
+        toolTip = info
+        setContentHuggingPriority(.required, for: .horizontal)
+        setAccessibilityLabel(L10n.text("More info", "Daha fazla bilgi"))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func toggle() {
+        if let popover, popover.isShown { popover.close(); return }
+        let p = NSPopover()
+        p.behavior = .transient
+        p.animates = true
+        p.contentViewController = InfoPopoverViewController(text: infoText)
+        p.show(relativeTo: bounds, of: self, preferredEdge: .maxY)
+        popover = p
+    }
+}
+
+/// Popover body for an `InfoButton` — a single wrapping paragraph, sized to a
+/// comfortable reading width.
+final class InfoPopoverViewController: NSViewController {
+    private let text: String
+    init(text: String) { self.text = text; super.init(nibName: nil, bundle: nil) }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func loadView() {
+        let width: CGFloat = 320
+        let root = NSView()
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .systemFont(ofSize: 11.5)
+        label.textColor = .labelColor
+        label.maximumNumberOfLines = 0
+        label.preferredMaxLayoutWidth = width - 2 * Spacing.m
+        label.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(label)
+        NSLayoutConstraint.activate([
+            root.widthAnchor.constraint(equalToConstant: width),
+            label.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.m),
+            label.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.m),
+            label.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.m),
+            label.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -Spacing.m),
+        ])
+        view = root
     }
 }
 

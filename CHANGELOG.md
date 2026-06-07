@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.2] - 2026-06-07
+
+### Added
+
+- **Stats tab: full-year activity heatmap.** The activity grid now spans a whole year (GitHub-style contribution graph) with month and weekday labels and a Less→More legend. Hover any day to read its date and tokens; click a day to drill into it below.
+- **Stats tab: daily / date-range breakdown.** Pick a single day or a date range (or click a heatmap cell) to see total tokens, sessions and estimated cost for that selection, plus a per-project bar breakdown of where the tokens went (project detail covers the last 30 days; daily totals span the full year).
+- **Stats tab: Insights.** A new local, always-on section that explains your usage in plain language — a token-composition bar (input / output / cache-read) plus narrative cards for sub-agent share, cache dominance and savings, last-session context pressure, model mix, project concentration and your most-active day. All computed on-device. An optional "Analyze with AI" button reuses the bring-your-own-key advisor (privacy-safe aggregates only).
+
+### Changed
+
+- **"Cost" tab renamed to "Value."** The figure is hypothetical pay-per-token API value, not a bill; the new name and hero make that explicit.
+- **Settings consolidated.** Appearance now lives under General and About under Privacy, trimming the window to five tabs (Usage · Stats · Value · General · Privacy).
+- **Section headers refreshed.** Each settings/stats section header now carries a monochrome SF Symbol anchor and an optional ⓘ info popover, moving the long "why" off the page so panes stay scannable.
+
 ## [0.7.1] - 2026-06-05
 
 ### Changed

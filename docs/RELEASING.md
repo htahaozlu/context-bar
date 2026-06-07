@@ -43,6 +43,13 @@ The build script auto-detects a `Developer ID Application: ...` identity from th
 
 ### Cut a release
 
+Always cut a new semantic version for every user-visible app fix.
+Do not replace assets under an existing tag such as `v0.7.0`: the in-app
+updater compares the installed `CFBundleShortVersionString` to the latest
+GitHub release tag, and Homebrew casks also key upgrades by `version`. If the
+tag/version is unchanged, users can keep running the old app even though a new
+DMG asset was uploaded.
+
 ```bash
 scripts/create-macos-dmg.sh
 ```
@@ -66,6 +73,11 @@ Both commands should report `accepted` / `valid`.
 ## CI release
 
 `.github/workflows/release.yml` produces a DMG on every `v*` tag. The job picks up signing credentials from GitHub Actions secrets when available, and falls back to an unsigned build otherwise.
+
+Manual `workflow_dispatch` is only for a brand-new version whose tag does not
+exist yet. The workflow intentionally fails when the derived `vX.Y.Z` tag
+already exists, because same-version rebuilds are indistinguishable to the
+installed updater.
 
 Required secrets for a fully signed + notarized CI release:
 

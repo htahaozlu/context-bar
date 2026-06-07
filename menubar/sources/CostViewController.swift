@@ -22,8 +22,8 @@ final class CostViewController: PreferencePaneViewController {
 
     private let providerControl = NSSegmentedControl()
     private let rangeControl = NSSegmentedControl()
+    private let heroCard = CostHeroView()
     private let tilesStack = NSStackView()
-    private let projectionLabel = NSTextField(labelWithString: "")
     private let savingsLabel = NSTextField(labelWithString: "")
     private let sparkHost = NSView()
     private let instancesStack = NSStackView()
@@ -45,6 +45,11 @@ final class CostViewController: PreferencePaneViewController {
     }
 
     private func buildUI() {
+        // Clarity banner first (Codex/UX review): what you actually pay, the
+        // hypothetical metered-API value, the subscription saving, and budget
+        // pace — so the big number never reads as a bill.
+        addHero(heroCard)
+
         providerControl.segmentStyle = .texturedRounded
         providerControl.segmentCount = 2
         providerControl.setLabel("Claude", forSegment: 0)
@@ -55,10 +60,11 @@ final class CostViewController: PreferencePaneViewController {
         providerControl.translatesAutoresizingMaskIntoConstraints = false
         addSection(
             title: L10n.text("Provider", "Sağlayıcı"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Cost source.", "Maliyet kaynağı."),
+            symbol: "cpu",
+            info: L10n.text(
                 "Cost source. Each provider is priced from its own transcripts.",
-                "Maliyet kaynağı. Her sağlayıcı kendi transkriptlerinden fiyatlanır."
-            ),
+                "Maliyet kaynağı. Her sağlayıcı kendi transkriptlerinden fiyatlanır."),
             body: providerControl
         )
 
@@ -73,6 +79,7 @@ final class CostViewController: PreferencePaneViewController {
         addSection(
             title: L10n.text("Range", "Aralık"),
             subtitle: nil,
+            symbol: "calendar",
             body: rangeControl
         )
 
@@ -81,17 +88,12 @@ final class CostViewController: PreferencePaneViewController {
         tilesStack.spacing = 10
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
 
-        // Projection line — the headline for a subscription user weighing a
-        // forced move to the metered API. Bold run-rate + plain-language sub.
-        projectionLabel.maximumNumberOfLines = 0
-        projectionLabel.translatesAutoresizingMaskIntoConstraints = false
-
         savingsLabel.font = NSFont.systemFont(ofSize: 11)
         savingsLabel.textColor = .secondaryLabelColor
         savingsLabel.maximumNumberOfLines = 0
         savingsLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let costStack = NSStackView(views: [tilesStack, projectionLabel, savingsLabel])
+        let costStack = NSStackView(views: [tilesStack, savingsLabel])
         costStack.orientation = .vertical
         costStack.alignment = .leading
         costStack.spacing = 10
@@ -99,13 +101,17 @@ final class CostViewController: PreferencePaneViewController {
         addSection(
             title: L10n.text("Estimated cost", "Tahmini maliyet"),
             subtitle: L10n.text(
-                "What this usage would cost on the metered API. You're on a subscription — these are estimates, not charges.",
-                "Bu kullanımın ölçümlü API'de tutacağı tahmini maliyet. Abonelik kullandığınız için bunlar tahmindir, fatura değildir."
+                "Priced as if metered — not your bill.",
+                "Ölçümlüymüş gibi fiyatlandı — fatura değil."
+            ),
+            symbol: "function",
+            info: L10n.text(
+                "What this usage would cost on the pay-per-token API. You're on a subscription, so these are estimates, not charges. today / 7d / 30d windows, plus 30-day input vs output token totals.",
+                "Bu kullanımın token başına ödenen API'de tutacağı tutar. Aboneliktesin, bu yüzden bunlar tahmindir, fatura değil. bugün / 7g / 30g pencereleri ve 30 günlük girdi/çıktı token toplamları."
             ),
             body: costStack
         )
         tilesStack.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
-        projectionLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
         savingsLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
 
         // Cross-machine combined cost — a headline summary, so it sits right
@@ -116,10 +122,12 @@ final class CostViewController: PreferencePaneViewController {
         machinesHost.translatesAutoresizingMaskIntoConstraints = false
         addSection(
             title: L10n.text("Across your Macs", "Mac'lerin arasında"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Combined 30-day cost across machines.",
+                                "Makineler arası birleşik 30 günlük maliyet."),
+            symbol: "macbook.and.iphone",
+            info: L10n.text(
                 "Combined 30-day estimated cost from every Mac writing to your sync folder (set it in Privacy settings).",
-                "Senkron klasörüne yazan her Mac'in son 30 günlük tahmini maliyeti birleşik (Gizlilik ayarlarından klasörü gir)."
-            ),
+                "Senkron klasörüne yazan her Mac'in son 30 günlük tahmini maliyeti birleşik (Gizlilik ayarlarından klasörü gir)."),
             body: machinesHost
         )
 
@@ -127,10 +135,9 @@ final class CostViewController: PreferencePaneViewController {
         sparkHost.heightAnchor.constraint(equalToConstant: 150).isActive = true
         addSection(
             title: L10n.text("Cost trend (30 days)", "Maliyet trendi (30 gün)"),
-            subtitle: L10n.text(
-                "Estimated daily cost. Hover any day for its date, cost, and tokens.",
-                "Tahmini günlük maliyet. Tarih, maliyet ve token için bir günün üzerine gelin."
-            ),
+            subtitle: L10n.text("Estimated daily cost — hover for a day.",
+                                "Tahmini günlük maliyet — gün için üzerine gel."),
+            symbol: "chart.xyaxis.line",
             body: sparkHost
         )
 
@@ -140,10 +147,12 @@ final class CostViewController: PreferencePaneViewController {
         instancesStack.translatesAutoresizingMaskIntoConstraints = false
         addSection(
             title: L10n.text("Daily cost by project", "Projeye göre günlük maliyet"),
-            subtitle: L10n.text(
-                "One row per project per day — like `better-ccusage daily --instances`.",
-                "Gün başına proje başına bir satır — `better-ccusage daily --instances` gibi."
-            ),
+            subtitle: L10n.text("One row per project per day. Click a row for detail.",
+                                "Gün başına proje başına bir satır. Detay için satıra tıkla."),
+            symbol: "tablecells",
+            info: L10n.text(
+                "One row per project per day — like `better-ccusage daily --instances`. Click any row for a token-bucket breakdown and a plain-language cache explainer.",
+                "Gün başına proje başına bir satır — `better-ccusage daily --instances` gibi. Token dağılımı ve sade önbellek açıklaması için bir satıra tıkla."),
             body: instancesStack
         )
 
@@ -171,10 +180,12 @@ final class CostViewController: PreferencePaneViewController {
         aiStack.translatesAutoresizingMaskIntoConstraints = false
         addSection(
             title: L10n.text("AI Advisor", "AI Danışman"),
-            subtitle: L10n.text(
+            subtitle: L10n.text("Usage tips from your own AI key.",
+                                "Kendi AI anahtarınla kullanım önerileri."),
+            symbol: "sparkles",
+            info: L10n.text(
                 "Get usage-efficiency tips from your own OpenAI / Gemini key (set it in Privacy settings). Sends an aggregate summary only — no transcripts, no project names.",
-                "Kendi OpenAI / Gemini anahtarınla kullanım verimliliği önerileri al (Gizlilik ayarlarından gir). Yalnızca özet gönderir — transcript yok, proje adı yok."
-            ),
+                "Kendi OpenAI / Gemini anahtarınla kullanım verimliliği önerileri al (Gizlilik ayarlarından gir). Yalnızca özet gönderir — transcript yok, proje adı yok."),
             body: aiStack
         )
 
@@ -182,7 +193,8 @@ final class CostViewController: PreferencePaneViewController {
         footnote.textColor = .tertiaryLabelColor
         footnote.maximumNumberOfLines = 0
         footnote.translatesAutoresizingMaskIntoConstraints = false
-        addSection(title: L10n.text("Source", "Kaynak"), subtitle: nil, body: footnote)
+        addSection(title: L10n.text("Source", "Kaynak"), subtitle: nil,
+                   symbol: "doc.text", body: footnote)
     }
 
     private func populateMachines() {
@@ -366,6 +378,14 @@ final class CostViewController: PreferencePaneViewController {
         populateMachines()
         updateAIButton()
         let data = loadData()
+
+        // Clarity hero — plan price only for Claude (Codex has no per-plan list
+        // price). Estimated monthly drives the big "API value" number + budget.
+        let planPrice = (provider == .claude) ? planMonthlyPrice(data.planType, data.planTier) : nil
+        let planLabel = planPrice != nil ? planName(data.planType, data.planTier) : nil
+        heroCard.update(planName: planLabel, planPrice: planPrice,
+                        estMonthly: data.cost30d, budget: DisplayPrefs.monthlyBudgetUSD)
+
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         instancesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         // Clear EVERY trend-host subview (chart, caption, empty label) so
@@ -409,7 +429,6 @@ final class CostViewController: PreferencePaneViewController {
         tilesStack.addArrangedSubview(row)
         row.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
 
-        renderProjection(data)
         renderSavings(data)
         renderTrend(data.dailyPoints)
         renderInstances(visible)
@@ -419,47 +438,6 @@ final class CostViewController: PreferencePaneViewController {
             "Rates: \(src). Estimated as if metered. Subscription usage isn't billed per token; API-key usage is — the transcripts don't record which mode a session used, so all of it is shown as an estimate.",
             "Oranlar: \(src). Ölçümlüymüş gibi tahmin. Abonelik kullanımı token başına faturalanmaz; API-key kullanımı faturalanır — transkriptler bir oturumun hangi modda olduğunu kaydetmediği için hepsi tahmin olarak gösterilir."
         )
-    }
-
-    /// Headline for a subscription user weighing a forced move to the metered
-    /// API: monthly run-rate (last 30 days) and, for Claude, how it compares to
-    /// the active plan's price.
-    private func renderProjection(_ data: CostData) {
-        let monthly = data.cost30d
-        guard monthly > 0 else {
-            projectionLabel.stringValue = ""
-            projectionLabel.isHidden = true
-            return
-        }
-        projectionLabel.isHidden = false
-        let big = "≈ \(formatUSD(monthly)) / \(L10n.text("month", "ay"))"
-        let result = NSMutableAttributedString(string: big, attributes: [
-            .font: Typography.displayMono(18, weight: .semibold),
-            .foregroundColor: ThemeStore.current.accent,
-            .kern: -0.2,
-        ])
-
-        var sub = L10n.text(
-            "On the metered API, projected from the last 30 days.",
-            "Ölçümlü API'de, son 30 güne göre öngörü."
-        )
-        if provider == .claude, let price = planMonthlyPrice(data.planType, data.planTier) {
-            let mult = monthly / price
-            let multStr = mult >= 10 ? String(format: "%.0f×", mult) : String(format: "%.1f×", mult)
-            let plan = planName(data.planType, data.planTier)
-            sub = L10n.text(
-                "Projected from the last 30 days — about \(multStr) your \(plan) plan (\(formatUSD(price))/mo).",
-                "Son 30 güne göre öngörü — \(plan) planınızın (\(formatUSD(price))/ay) yaklaşık \(multStr) katı."
-            )
-        }
-        result.append(NSAttributedString(string: "\n" + sub, attributes: [
-            .font: NSFont.systemFont(ofSize: 11),
-            .foregroundColor: NSColor.secondaryLabelColor,
-        ]))
-        let para = NSMutableParagraphStyle()
-        para.lineSpacing = 3
-        result.addAttribute(.paragraphStyle, value: para, range: NSRange(location: 0, length: result.length))
-        projectionLabel.attributedStringValue = result
     }
 
     /// Cache-savings insight: the net USD prompt caching saved vs paying full
@@ -987,15 +965,13 @@ private final class CostInstancesView: NSView {
         return .zero
     }
 
-    // Fixed numeric grid: [input, output, cache+, cache↻, TOTAL, COST]. Columns
-    // are LEFT-anchored to the end of the project column (NOT to bounds.width),
-    // so the grid hugs the leading edge and any extra width is harmless trailing
-    // margin — never an internal gap. Same colX shared by every row kind so the
-    // digits stack vertically.
+    // Fixed numeric grid: [input, output, cache+, cache↻, TOTAL, COST]. The
+    // numeric block is right-anchored to the view. Earlier versions capped the
+    // project column at 300pt and left the remaining width blank on the right,
+    // which looked like a layout regression in wider windows.
     private let colGap: CGFloat = 14
     private let numW: [CGFloat] = [60, 60, 60, 60, 66, 92]
     private let projMin: CGFloat = 130
-    private let projMax: CGFloat = 300
     private var numericBlock: CGFloat { numW.reduce(0, +) + colGap * CGFloat(numW.count) }
 
     private func rowHeight(_ k: CostRow.Kind) -> CGFloat {
@@ -1021,11 +997,12 @@ private final class CostInstancesView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Project column flexes between projMin..projMax; the numeric block is
-        // fixed. Numerics start at the project column's right edge — leftover
-        // width becomes trailing margin, so wide windows never open an internal gap.
-        let projectColW = min(projMax, max(projMin, bounds.width - numericBlock))
-        let tableW = projectColW + numericBlock
+        // Project column takes all remaining width once the fixed numeric grid
+        // is seated. On narrow widths the table may clip at the far right, but
+        // normal/detail-window widths keep every column visible without a dead
+        // trailing band.
+        let projectColW = max(projMin, bounds.width - numericBlock)
+        let tableW = max(bounds.width, projectColW + numericBlock)
         var gx = projectColW
         var colX: [CGFloat] = []
         for w in numW { gx += colGap; colX.append(gx); gx += w }
@@ -1347,5 +1324,210 @@ final class CostDetailViewController: NSViewController {
         v.heightAnchor.constraint(equalToConstant: 1).isActive = true
         v.widthAnchor.constraint(equalToConstant: width - 2 * Spacing.m).isActive = true
         return v
+    }
+}
+
+// MARK: - Cost clarity hero
+//
+// The banner that answers the #1 confusion: "I pay $20/mo but the Cost tab
+// shows thousands." It states, in order: what you actually pay (plan price),
+// the big hypothetical metered-API value, a plain "this is not a bill" line,
+// the subscription saving (positive framing), and — when set — how the pace
+// compares to the user's monthly budget (same thresholds as the menubar tint).
+final class CostHeroView: NSView {
+    private let stack = NSStackView()
+    /// Last inputs, so a theme switch or light/dark toggle can re-render with
+    /// freshly contrast-corrected colors (text colors are baked, not dynamic).
+    private var pending: (name: String?, price: Double?, est: Double, budget: Double)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        Surface.applyHero(self)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 9
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.m),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.l),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.l),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Spacing.m),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        Surface.refreshHeroChrome(self)
+        render()   // re-bake colors for the new light/dark appearance
+    }
+
+    func update(planName: String?, planPrice: Double?, estMonthly: Double, budget: Double) {
+        pending = (planName, planPrice, estMonthly, budget)
+        render()
+    }
+
+    private func render() {
+        guard let p = pending else { isHidden = true; return }
+        let planName = p.name, planPrice = p.price, estMonthly = p.est, budget = p.budget
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        guard estMonthly > 0 else { isHidden = true; return }
+        isHidden = false
+        // Theme accents range from system blue to neon yellow / pale lavender;
+        // contrast-correct so the headline stays legible on every theme in both
+        // light and dark — never a near-invisible yellow on a light card.
+        let accent = readableAccent(ThemeStore.current.accent)
+        let usd = ContextSnapshot.formatUSD
+        let perMo = L10n.text(" / mo", " / ay")
+
+        // Row A — what you actually pay (Claude plans with a known list price).
+        if let planName, let planPrice {
+            let left = NSTextField(labelWithString: L10n.text("Your plan · ", "Planın · ") + planName)
+            left.font = .systemFont(ofSize: 12, weight: .medium)
+            left.textColor = .secondaryLabelColor
+            left.lineBreakMode = .byTruncatingTail
+            left.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            let right = NSTextField(labelWithString: usd(planPrice) + perMo)
+            right.font = Typography.bodyMono(12.5, weight: .semibold)
+            right.textColor = .labelColor
+            right.alignment = .right
+            right.setContentHuggingPriority(.required, for: .horizontal)
+            right.setContentCompressionResistancePriority(.required, for: .horizontal)
+            let row = NSStackView(views: [symbol("checkmark.seal.fill", accent), left, right])
+            row.orientation = .horizontal
+            row.distribution = .fill
+            row.alignment = .centerY
+            row.spacing = 6
+            stack.addArrangedSubview(row)
+            pin(row)
+        }
+
+        // Row B — the big "API value" figure (what people misread as a bill).
+        let bigText = "≈ " + usd(estMonthly) + perMo
+        let big = NSTextField(labelWithAttributedString: NSAttributedString(string: bigText, attributes: [
+            .font: Typography.displayMono(24, weight: .semibold),
+            .foregroundColor: accent,
+            .kern: -0.3,
+        ]))
+        let bigRow = NSStackView(views: [symbol("chart.line.uptrend.xyaxis", accent, size: 15), big])
+        bigRow.orientation = .horizontal
+        bigRow.alignment = .centerY
+        bigRow.spacing = 8
+        stack.addArrangedSubview(bigRow)
+
+        let cap = NSTextField(labelWithString:
+            L10n.text("estimated API value of your usage", "kullanımının tahmini API değeri"))
+        cap.font = .systemFont(ofSize: 11)
+        cap.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(cap)
+
+        // Row C — the reassurance. The single most important line on the tab.
+        let disclaimer = NSTextField(wrappingLabelWithString: L10n.text(
+            "This is not a bill. You're on a subscription — it's what the same token usage would cost on the pay-per-token API.",
+            "Bu bir fatura değil. Aboneliktesin — aynı token kullanımının token başına ödenen API'de tutacağı tahmini tutar."))
+        disclaimer.font = .systemFont(ofSize: 11.5)
+        disclaimer.textColor = .secondaryLabelColor
+        disclaimer.maximumNumberOfLines = 0
+        stack.addArrangedSubview(disclaimer)
+        pin(disclaimer)
+
+        // Row D — positive framing: how much the subscription saves vs metered.
+        if let planPrice, planPrice > 0, estMonthly > planPrice {
+            let saved = estMonthly - planPrice
+            let mult = estMonthly / planPrice
+            let multStr = mult >= 10 ? String(format: "%.0f×", mult) : String(format: "%.1f×", mult)
+            let txt = L10n.text(
+                "≈\(usd(saved))\(perMo) saved vs metered API — about \(multStr) your plan's value.",
+                "Ölçümlü API'ye kıyasla ≈\(usd(saved))\(perMo) tasarruf — planının yaklaşık \(multStr) değeri.")
+            let label = NSTextField(wrappingLabelWithString: txt)
+            label.font = .systemFont(ofSize: 11.5, weight: .semibold)
+            label.textColor = .systemGreen
+            label.maximumNumberOfLines = 0
+            let row = NSStackView(views: [symbol("arrow.down.circle.fill", .systemGreen), label])
+            row.orientation = .horizontal
+            row.alignment = .centerY
+            row.spacing = 6
+            stack.addArrangedSubview(row)
+            pin(row)
+        }
+
+        // Row E — budget pace (warn ≥ 80%, critical ≥ 100% — matches the menubar
+        // tint), or a one-line hook to set a budget when none is configured.
+        if budget > 0 {
+            let ratio = estMonthly / budget
+            let tint: NSColor = ratio >= 1.0 ? .systemRed : (ratio >= 0.8 ? .systemYellow : accent)
+            let caption = NSTextField(labelWithString:
+                L10n.text("Budget", "Bütçe") + " · " + usd(estMonthly) + " / " + usd(budget)
+                + String(format: " · %.0f%%", min(999, ratio * 100)))
+            caption.font = Typography.bodyMono(10.5, weight: .medium)
+            caption.textColor = .secondaryLabelColor
+            let capRow = NSStackView(views: [symbol("target", tint, size: 11), caption])
+            capRow.orientation = .horizontal
+            capRow.alignment = .centerY
+            capRow.spacing = 6
+
+            let bar = ProportionBar()
+            bar.fraction = CGFloat(min(1.0, ratio))
+            bar.fill = tint
+            bar.translatesAutoresizingMaskIntoConstraints = false
+            bar.heightAnchor.constraint(equalToConstant: 6).isActive = true
+
+            let budgetStack = NSStackView(views: [capRow, bar])
+            budgetStack.orientation = .vertical
+            budgetStack.alignment = .leading
+            budgetStack.spacing = 5
+            stack.addArrangedSubview(budgetStack)
+            pin(budgetStack)
+            pin(bar)
+        } else {
+            let hint = NSTextField(labelWithString: L10n.text(
+                "Tip: set a monthly budget in Settings → General to track your pace here.",
+                "İpucu: hızını burada izlemek için Ayarlar → Genel'den aylık bütçe gir."))
+            hint.font = .systemFont(ofSize: 10.5)
+            hint.textColor = .tertiaryLabelColor
+            hint.maximumNumberOfLines = 0
+            stack.addArrangedSubview(hint)
+            pin(hint)
+        }
+    }
+
+    /// Adapts a theme accent so it always contrasts the frosted card: pulls
+    /// over-light accents (terminal yellow, pastel lavender) down on a light
+    /// card, and over-dark accents up on a dark card. Resolved against this
+    /// view's effective appearance so dynamic accents (system blue, mono
+    /// black/white) resolve to the right side first.
+    private func readableAccent(_ color: NSColor) -> NSColor {
+        var resolved = color
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            resolved = color.usingColorSpace(.sRGB) ?? color
+        }
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        var r = resolved.redComponent, g = resolved.greenComponent, b = resolved.blueComponent
+        let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        if !isDark, lum > 0.6 {
+            let k = min(0.7, (lum - 0.45) / 0.55)
+            r *= (1 - k); g *= (1 - k); b *= (1 - k)
+        } else if isDark, lum < 0.35 {
+            let k = min(0.7, (0.5 - lum) / 0.5)
+            r += (1 - r) * k; g += (1 - g) * k; b += (1 - b) * k
+        }
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
+    }
+
+    private func symbol(_ name: String, _ color: NSColor,
+                        size: CGFloat = 12, weight: NSFont.Weight = .semibold) -> NSImageView {
+        let iv = NSImageView()
+        iv.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+        iv.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: size, weight: weight)
+        iv.contentTintColor = color
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        iv.setContentHuggingPriority(.required, for: .horizontal)
+        iv.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return iv
+    }
+
+    private func pin(_ v: NSView) {
+        v.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
 }

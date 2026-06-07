@@ -214,6 +214,16 @@ final class UsageViewController: NSViewController {
         let title = NSTextField(labelWithString: L10n.text("Other AI tools", "Diğer AI araçları"))
         title.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
         title.translatesAutoresizingMaskIntoConstraints = false
+        let titleIcon = NSImageView()
+        titleIcon.image = NSImage(systemSymbolName: "wrench.and.screwdriver", accessibilityDescription: nil)
+        titleIcon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        titleIcon.contentTintColor = .secondaryLabelColor
+        titleIcon.translatesAutoresizingMaskIntoConstraints = false
+        let titleRow = NSStackView(views: [titleIcon, title])
+        titleRow.orientation = .horizontal
+        titleRow.spacing = 6
+        titleRow.alignment = .centerY
+        titleRow.translatesAutoresizingMaskIntoConstraints = false
 
         let rows = NSStackView()
         rows.orientation = .vertical
@@ -237,7 +247,7 @@ final class UsageViewController: NSViewController {
             r.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
         }
 
-        let stack = NSStackView(views: [title, rows])
+        let stack = NSStackView(views: [titleRow, rows])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
