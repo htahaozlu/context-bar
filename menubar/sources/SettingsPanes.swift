@@ -271,6 +271,18 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     }
 
     private func buildUI() {
+        // AI Advisor first — it's the actionable opt-in users come here for.
+        addSection(
+            title: L10n.text("AI Advisor (bring your own key)", "AI Danışman (kendi anahtarın)"),
+            subtitle: L10n.text("Optional. Your own OpenAI/Gemini key for tips.",
+                                "İsteğe bağlı. Öneriler için kendi OpenAI/Gemini anahtarın."),
+            symbol: "sparkles",
+            info: L10n.text(
+                "Optional. Connect your own OpenAI or Gemini API key to get usage-efficiency tips. Only an aggregate summary — no transcripts, no project names — is sent to your chosen provider, and only when you press Analyze in the Cost tab. Off by default; nothing leaves your machine until you opt in.",
+                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — seçtiğin sağlayıcıya gönderilir, o da yalnızca Maliyet sekmesinde Analiz'e bastığında. Varsayılan kapalı; sen açana kadar makineden hiçbir şey çıkmaz."),
+            body: makeAIAdvisorField()
+        )
+
         let redact = makeToggle(
             title: L10n.text("Mask project paths and emails", "Proje yollarını ve e-postaları gizle"),
             on: DisplayPrefs.redactPaths,
@@ -287,22 +299,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
             body: redact
         )
 
-        let preview = makeInfoRow(
-            title: L10n.text("Sample", "Örnek"),
-            value: PersonalInfoRedactor.force("/Users/jane/projects/secret-app — jane@example.com")
-        )
-        let previewStack = NSStackView(views: [preview])
-        previewStack.orientation = .vertical
-        previewStack.alignment = .leading
-        previewStack.spacing = 6
-        addSection(
-            title: L10n.text("Preview", "Önizleme"),
-            subtitle: L10n.text("A path/email after redaction.",
-                                "Gizleme sonrası bir yol/e-posta."),
-            symbol: "eye",
-            body: previewStack
-        )
-
         let maskShare = makeToggle(
             title: L10n.text("Mask project names on share card", "Paylaşım kartında proje adlarını gizle"),
             on: DisplayPrefs.maskShareProjects,
@@ -317,17 +313,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
                 "When you share Today's HUD from the popover footer, real project names are replaced with generic labels (Project A, Project B). Turn off to share real names.",
                 "Popover altındaki paylaşım düğmesinden Today's HUD'u paylaşırken proje adları genel etiketlerle değiştirilir (Project A, Project B). Gerçek adları paylaşmak için kapatın."),
             body: maskShare
-        )
-
-        addSection(
-            title: L10n.text("AI Advisor (bring your own key)", "AI Danışman (kendi anahtarın)"),
-            subtitle: L10n.text("Optional. Your own OpenAI/Gemini key for tips.",
-                                "İsteğe bağlı. Öneriler için kendi OpenAI/Gemini anahtarın."),
-            symbol: "sparkles",
-            info: L10n.text(
-                "Optional. Connect your own OpenAI or Gemini API key to get usage-efficiency tips. Only an aggregate summary — no transcripts, no project names — is sent to your chosen provider, and only when you press Analyze in the Cost tab. Off by default; nothing leaves your machine until you opt in.",
-                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — seçtiğin sağlayıcıya gönderilir, o da yalnızca Maliyet sekmesinde Analiz'e bastığında. Varsayılan kapalı; sen açana kadar makineden hiçbir şey çıkmaz."),
-            body: makeAIAdvisorField()
         )
 
         addSection(

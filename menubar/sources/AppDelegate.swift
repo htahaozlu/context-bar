@@ -801,6 +801,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             keyEquivalent: "q"
         )
         appMenu.addItem(quitItem)
+
+        // Edit menu. Without it, ⌘X/⌘C/⌘V/⌘A don't reach text fields in an
+        // accessory app (no menu supplies the key equivalents), so the API-key
+        // field couldn't be pasted into — only typed. Standard responder-chain
+        // selectors (nil target → routed to the focused field editor).
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: L10n.text("Edit", "Düzen"))
+        editMenuItem.submenu = editMenu
+        editMenu.addItem(withTitle: L10n.text("Cut", "Kes"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: L10n.text("Copy", "Kopyala"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: L10n.text("Paste", "Yapıştır"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: L10n.text("Select All", "Tümünü Seç"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
         NSApp.mainMenu = mainMenu
     }
 }

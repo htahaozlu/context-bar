@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.8] - 2026-06-08
+
+### Fixed
+
+- **Couldn't paste into the AI API-key field** — only typing worked. As an accessory (menubar) app with no Edit menu, ⌘X/⌘C/⌘V/⌘A weren't delivered to text fields. Added a standard Edit menu, so the key field (and any field) now accepts paste.
+
+### Changed
+
+- **Privacy pane reordered.** AI Advisor (bring your own key) moved to the top, and the redaction "Preview" sample section was removed.
+
 ## [0.7.7] - 2026-06-08
 
 ### Changed
