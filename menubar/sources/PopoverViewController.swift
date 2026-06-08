@@ -64,14 +64,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // right-gap split. Vertical insets stay on the stack so it still
         // lays out top-to-bottom with the right top/bottom breathing room.
         contentStack.alignment = .notAnAttribute
-        // Uniform outer gutter on all four sides so the cards float clearly
-        // inside the popover instead of sitting flush against its rounded
-        // edges. Top/bottom come from these insets; left/right come from
-        // `addCard` at the SAME value (Spacing.l) so the gutter is consistent
-        // all the way around.
+        // Tight outer gutter. Wider values repeatedly read as dead space at
+        // the top and right of the shipped menubar popover.
         contentStack.edgeInsets = NSEdgeInsets(
-            top: Spacing.l, left: 0,
-            bottom: Spacing.l, right: 0
+            top: Spacing.xxs, left: 0,
+            bottom: Spacing.xxs, right: 0
         )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(contentStack)
@@ -194,13 +191,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         v.setContentHuggingPriority(.required, for: .vertical)
         v.setContentCompressionResistancePriority(.required, for: .vertical)
         contentStack.addArrangedSubview(v)
-        // Single horizontal source of truth — pinned to stack anchors at
-        // required priority. Stack's alignment is `.notAnAttribute`, so no
-        // implicit horizontal constraint competes with these. Matches the
-        // top/bottom `edgeInsets` (Spacing.l) so the outer gutter is uniform
-        // on all four sides — cards clear the popover's rounded corners and
-        // read as floating inside it, not fused to the outer edge.
-        let pad: CGFloat = Spacing.l
+        // Single horizontal source of truth. Keep this intentionally tight:
+        // wider card gutters have repeatedly read as dead space on the right
+        // side of the popover once the app is packaged and shown from the
+        // menubar chrome.
+        let pad: CGFloat = Spacing.xs
         NSLayoutConstraint.activate([
             v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
             v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),

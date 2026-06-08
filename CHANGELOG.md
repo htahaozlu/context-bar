@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.3] - 2026-06-08
+
+### Added
+
+- **Per-day session list.** Selecting a day (or clicking a heatmap cell) in the Stats breakdown now lists that day's sessions — start time, duration, model · project, and tokens · cost per session.
+- **Codex reasoning-effort tile.** When Codex transcripts record a reasoning effort, Stats shows the most-used one (`X-High`/`High`/…). Claude transcripts don't carry an effort, so the tile only appears for Codex.
+
+### Changed
+
+- **About is its own tab again.** Split back out of Privacy (Usage · Stats · Value · General · Privacy · About) so the update controls — Check for Updates / View Changelog — stand on their own.
+- **Native date picker.** The daily breakdown's date field is now a compact pill that opens the native macOS calendar in a popover (single day or range), instead of a flat stepper field.
+- **Correct model labels.** `claude-opus-4-8` now reads "Opus 4.8" (was "Opus 4"); added 4.9 / Sonnet 4.7 / GPT-5.5 mappings.
+
+### Fixed
+
+- **Stale "active session."** A session left idle now stops reading as live: past the 30-minute activity window the menubar dot greys, the context % blanks, and the card shows "last active …" instead of a fake running duration. A refresh on an idle machine no longer looks like it "did nothing."
+- **Menubar popover top/right dead space.** v0.7.2 still shipped a 20pt uniform outer gutter; the popover now uses a tight 4pt vertical outer inset and 8pt horizontal card gutter.
+
 ## [0.7.2] - 2026-06-07
 
 ### Added
