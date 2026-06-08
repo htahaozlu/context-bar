@@ -976,7 +976,15 @@ final class StatsViewController: PreferencePaneViewController {
         f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = .current; return f
     }()
     private func parseISO(_ s: String) -> Date? {
-        Self.isoParserFull.date(from: s) ?? Self.isoParserBasic.date(from: s)
+        if let d = Self.isoParserFull.date(from: s) ?? Self.isoParserBasic.date(from: s) {
+            return d
+        }
+        // recent_sessions timestamps carry MICROSECONDS ("…:24.188000Z"), which
+        // ISO8601DateFormatter rejects (it only accepts 3 fractional digits).
+        // Strip the fractional part and retry so the session list populates.
+        let stripped = s.replacingOccurrences(
+            of: #"\.\d+"#, with: "", options: .regularExpression)
+        return Self.isoParserBasic.date(from: stripped)
     }
 
     /// Rows for the per-day session list: recent_sessions whose start day falls
