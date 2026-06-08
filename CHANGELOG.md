@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.4] - 2026-06-08
+
+### Fixed
+
+- **Per-day session list stayed empty.** Session timestamps carry microsecond precision (`…:24.188000Z`), which `ISO8601DateFormatter` rejects (it only accepts 3 fractional digits), so no session matched the selected day. The parser now strips sub-seconds and retries — selecting a day (or clicking a heatmap cell) lists that day's sessions as intended.
+
 ## [0.7.3] - 2026-06-08
 
 ### Added
