@@ -341,7 +341,9 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         // (dot is inline in projectLbl — no wrapper container needed)
 
-        let pct = a.ctxPct
+        // Context % is a live-session signal — blank it when the session is
+        // idle so an old fill level doesn't read as the current one.
+        let pct = isActive ? a.ctxPct : nil
         let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
         let pctColor: NSColor = pct.map { ContextSnapshot.ctxColor($0) } ?? .tertiaryLabelColor
         // Use the IDENTICAL font as projectLbl — same family, weight, AND
@@ -385,8 +387,10 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         metaParts.append(a.name)
         if let m = a.model { metaParts.append(m) }
         if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
+        // Only claim the session is "running" when it is genuinely live; an
+        // idle agent shows just its last-active time, not a fake live duration.
         let duration = ContextSnapshot.formatDuration(a.sessionStarted, a.lastTurn)
-        if duration != "—" {
+        if isActive, duration != "—" {
             metaParts.append(L10n.text("\(duration) running", "\(duration) aktif"))
         }
         let metaText = metaParts.joined(separator: "  ·  ")
@@ -428,7 +432,14 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // label, leaving users confused about what 27% measured.
         let ctxLabel = L10n.text("Context", "Bağlam")
         var detailText: String
-        if let w = a.ctxWindow {
+        if !isActive {
+            // No live session — report when it was last active instead of a
+            // stale context fill that would read as the current one.
+            detailText = a.lastTurn.map {
+                L10n.text("Last active \(ContextSnapshot.relative($0))",
+                          "Son aktif \(ContextSnapshot.relative($0))")
+            } ?? L10n.text("No active session", "Aktif oturum yok")
+        } else if let w = a.ctxWindow {
             detailText =
                 "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
         } else if used > 0 {

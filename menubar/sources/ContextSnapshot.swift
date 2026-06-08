@@ -41,6 +41,10 @@ final class ContextSnapshot {
         return fm.fileExists(atPath: legacy) ? legacy : primary
     }
 
+    /// A session counts as live only if its last turn landed within this
+    /// window (matches the 30-min idle gap the popover uses for other tools).
+    static let activeSessionWindow: TimeInterval = 30 * 60
+
     func load() -> (active: Agent?, all: [Agent], others: [ToolSummary]) {
         guard
             let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
@@ -52,9 +56,19 @@ final class ContextSnapshot {
         let claude = parse(root["claude"] as? [String: Any], name: "Claude", overlay: parseClaudeUsageCache())
         let codex = parse(root["codex"] as? [String: Any], name: "Codex")
         let all = [claude, codex].compactMap { $0 }
-        let active = all.max(by: {
+        // "Active" means a session is genuinely live — its last turn is within
+        // the activity window. Without this gate the most-recent agent reads as
+        // active forever, so a session left idle for hours/days kept showing a
+        // green dot + live context, and a refresh appeared to "do nothing"
+        // because the stale session was re-reported every tick.
+        let mostRecent = all.max(by: {
             ($0.lastTurn ?? .distantPast) < ($1.lastTurn ?? .distantPast)
         })
+        let active = mostRecent.flatMap { agent -> Agent? in
+            guard let t = agent.lastTurn,
+                  Date().timeIntervalSince(t) <= Self.activeSessionWindow else { return nil }
+            return agent
+        }
         let others = parseOthers(root["others"] as? [[String: Any]])
         return (active, all, others)
     }

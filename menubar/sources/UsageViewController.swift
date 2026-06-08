@@ -51,7 +51,7 @@ final class UsageViewController: NSViewController {
             return
         }
         let primary = active ?? all[0]
-        let card = buildAgentCard(agent: primary, isActive: true, showsHeader: true)
+        let card = buildAgentCard(agent: primary, isActive: active != nil, showsHeader: true)
         container.addArrangedSubview(card)
         card.widthAnchor.constraint(equalTo: container.widthAnchor).isActive = true
 
@@ -107,6 +107,12 @@ final class UsageViewController: NSViewController {
         let ctxPctStr = a.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
         let ctxSub = a.ctxWindow.map { L10n.text("\(ContextSnapshot.formatTokens($0)) window", "\(ContextSnapshot.formatTokens($0)) pencere") } ?? "—"
         let sessDur = ContextSnapshot.formatDuration(a.sessionStarted, a.lastTurn)
+        // When idle, drop the "running" framing — say when it was last active.
+        let sessionSub = isActive
+            ? L10n.text("\(sessDur) running", "\(sessDur) süredir aktif")
+            : (a.lastTurn.map { L10n.text("last active \(ContextSnapshot.relative($0))",
+                                          "son aktif \(ContextSnapshot.relative($0))") }
+               ?? L10n.text("no active session", "aktif oturum yok"))
         let showsRemaining = a.name.caseInsensitiveCompare("Codex") == .orderedSame
         let fiveHourValue = showsRemaining
             ? ContextSnapshot.formatRemainingValue(percentUsed: a.session5hPercent, tokens: a.session5h)
@@ -117,11 +123,13 @@ final class UsageViewController: NSViewController {
 
         let tiles = NSStackView(views: [
             DualStatTileView(caption: L10n.text("context", "bağlam"),
-                             value: ctxPctStr, valueColor: ContextSnapshot.ctxColor(a.ctxPct),
-                             sub: ctxSub, mono: false),
+                             value: isActive ? ctxPctStr : "—",
+                             valueColor: isActive ? ContextSnapshot.ctxColor(a.ctxPct) : .tertiaryLabelColor,
+                             sub: isActive ? ctxSub : L10n.text("no active session", "aktif oturum yok"),
+                             mono: false),
             DualStatTileView(caption: L10n.text("session", "oturum"),
                              value: ContextSnapshot.formatTokens(a.activeSession),
-                             sub: L10n.text("\(sessDur) running", "\(sessDur) süredir aktif")),
+                             sub: sessionSub),
             DualStatTileView(caption: L10n.text("5h window", "5s pencere"),
                              value: fiveHourValue,
                              sub: L10n.text("resets in \(ContextSnapshot.resetsIn(a.session5hResetsAt))", "\(ContextSnapshot.resetsIn(a.session5hResetsAt)) sonra sıfırlanır")),
