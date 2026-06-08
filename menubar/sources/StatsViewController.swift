@@ -1016,43 +1016,62 @@ final class StatsViewController: PreferencePaneViewController {
 
     private func buildSessionContextView(_ r: SessionListView.Row) -> NSView {
         let accent = ThemeStore.current.accent
-        let total = r.input + r.output + r.cacheCreation + r.cacheRead
+        let fresh = r.input + r.output
 
         let title = NSTextField(labelWithString: r.time)
         title.font = Typography.title(13)
-        let sub = NSTextField(labelWithString: r.detail)
+        let subParts = [r.detail, r.duration].filter { !$0.isEmpty }
+        let sub = NSTextField(labelWithString: subParts.joined(separator: "  ·  "))
         sub.font = NSFont.systemFont(ofSize: 11); sub.textColor = .secondaryLabelColor
 
-        let totalLbl = NSTextField(labelWithAttributedString:
-            Typography.displayNumberAttributed(ContextSnapshot.formatTokens(total), size: 22, weight: .semibold))
-        let totalCap = NSTextField(labelWithAttributedString:
-            Typography.captionAttributed(L10n.text("context tokens handled", "işlenen bağlam token"), color: .tertiaryLabelColor))
+        // Headline: estimated cost + fresh tokens — the two numbers that mean
+        // something at a glance. (No "context tokens handled" sum — it conflated
+        // fresh work with replayed cache and read as noise.)
+        let costLbl = NSTextField(labelWithAttributedString:
+            Typography.displayNumberAttributed(ContextSnapshot.formatUSD(r.cost), size: 22, weight: .semibold, color: accent))
+        let costCap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("estimated cost  ·  \(ContextSnapshot.formatTokens(fresh)) fresh tokens",
+                                                   "tahmini maliyet  ·  \(ContextSnapshot.formatTokens(fresh)) taze token"),
+                                         color: .tertiaryLabelColor))
+        let header = NSStackView(views: [costLbl, costCap])
+        header.orientation = .vertical; header.alignment = .leading; header.spacing = 0
 
+        // Fresh work split — Input vs Output. Simple, meaningful (the actual
+        // back-and-forth), not mixed with cache.
+        let workCap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("Fresh work", "Taze iş"), color: .secondaryLabelColor))
         let comp = TokenCompositionView()
         comp.translatesAutoresizingMaskIntoConstraints = false
         comp.segments = [
-            .init(label: L10n.text("In", "Girdi"), value: r.input, color: accent),
-            .init(label: L10n.text("Out", "Çıktı"), value: r.output, color: accent.withAlphaComponent(0.6)),
-            .init(label: L10n.text("Cache+", "Önbellek+"), value: r.cacheCreation, color: accent.withAlphaComponent(0.32)),
-            .init(label: L10n.text("Cache↻", "Önbellek↻"), value: r.cacheRead, color: .tertiaryLabelColor),
+            .init(label: L10n.text("Input", "Girdi"), value: r.input, color: accent),
+            .init(label: L10n.text("Output", "Çıktı"), value: r.output, color: accent.withAlphaComponent(0.5)),
         ]
         comp.widthAnchor.constraint(equalToConstant: 312).isActive = true
 
+        // Cache as its own honest line — the replayed conversation, cheap but
+        // most of the volume.
+        let mult = fresh > 0 ? Double(r.cacheRead) / Double(fresh) : 0
+        let multStr = mult >= 1 ? "  (≈\(Int(mult.rounded()))×)" : ""
+        let cacheLbl = NSTextField(labelWithString:
+            "↻ \(ContextSnapshot.formatTokens(r.cacheRead)) " +
+            L10n.text("cached context replayed\(multStr)", "tekrar oynatılan önbellekli bağlam\(multStr)"))
+        cacheLbl.font = Typography.bodyMono(11, weight: .regular); cacheLbl.textColor = .secondaryLabelColor
+
         let note = NSTextField(wrappingLabelWithString: L10n.text(
-            "Cache-read is the context re-sent every turn (system prompt + tools + history); cache-write is what got newly cached this session. Claude's live /context per-component split isn't recorded per past session.",
-            "Önbellek-oku her tur yeniden gönderilen bağlam (system prompt + araçlar + geçmiş); önbellek-yaz bu oturumda yeni önbelleğe alınan. Claude'un canlı /context bileşen ayrımı geçmiş oturum başına kaydedilmez."))
+            "Cache = the conversation re-sent each turn (system prompt + tools + history) — cheap to bill, but most of the tokens. Claude's live /context component split exists only inside Claude Code.",
+            "Önbellek = her tur yeniden gönderilen konuşma (system prompt + araçlar + geçmiş) — faturada ucuz ama tokenlerin çoğu. Claude'un canlı /context bileşen ayrımı yalnızca Claude Code içinde var."))
         note.font = NSFont.systemFont(ofSize: 10); note.textColor = .tertiaryLabelColor
-        note.preferredMaxLayoutWidth = 300
+        note.preferredMaxLayoutWidth = 312
 
-        let header = NSStackView(views: [totalLbl, totalCap])
-        header.orientation = .vertical; header.alignment = .leading; header.spacing = 0
-
-        let stack = NSStackView(views: [title, sub, header, comp, note])
+        let stack = NSStackView(views: [title, sub, header, workCap, comp, cacheLbl, note])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.setCustomSpacing(12, after: sub)
         stack.setCustomSpacing(12, after: header)
+        stack.setCustomSpacing(4, after: workCap)
+        stack.setCustomSpacing(12, after: comp)
+        stack.setCustomSpacing(12, after: cacheLbl)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         let container = NSView()

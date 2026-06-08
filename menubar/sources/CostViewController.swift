@@ -205,27 +205,56 @@ final class CostViewController: PreferencePaneViewController {
             l.textColor = color
             return l
         }
+        // PLANE 1 — Account · all machines · live. Rolling 5h/7d limits come
+        // from the account usage API, so they already count every machine in
+        // real time (no shared folder needed). This is the honest "account
+        // overall" view; cross-machine token/cost TOTALS aren't exposed by the
+        // API, only these utilization windows.
+        machinesHost.addArrangedSubview(line(
+            L10n.text("Account · all machines · live", "Hesap · tüm makineler · canlı"),
+            color: .labelColor, bold: true))
+        let (_, agents, _) = ContextSnapshot().load()
+        var anyLimit = false
+        for ag in agents {
+            let p5 = ag.session5hPercent.map { "\(Int($0.rounded()))%" }
+            let p7 = ag.week7dPercent.map { "\(Int($0.rounded()))%" }
+            guard p5 != nil || p7 != nil else { continue }
+            anyLimit = true
+            machinesHost.addArrangedSubview(line("  \(ag.name) — "
+                + L10n.text("5h ", "5sa ") + (p5 ?? "—") + "  ·  "
+                + L10n.text("7d ", "7g ") + (p7 ?? "—")))
+        }
+        machinesHost.addArrangedSubview(line(anyLimit
+            ? L10n.text("Rolling limits — count every machine, in real time.",
+                        "Yuvarlanan limitler — her makineyi gerçek zamanlı sayar.")
+            : L10n.text("Sign in to Claude/Codex to see account-wide limits.",
+                        "Hesap-geneli limitler için Claude/Codex'e giriş yap."),
+            color: .tertiaryLabelColor))
+
+        // PLANE 2 — Per machine · local 30-day cost (optional, via a synced
+        // folder; the API can't break cost down by machine).
+        machinesHost.addArrangedSubview(line(
+            L10n.text("Per machine · local 30-day", "Makine başına · yerel 30 gün"),
+            color: .labelColor, bold: true))
         if DisplayPrefs.syncFolder.isEmpty {
             machinesHost.addArrangedSubview(line(L10n.text(
-                "Not set up. Choose a synced folder in Settings → Privacy → Across your Macs.",
-                "Kurulmadı. Ayarlar → Gizlilik → Mac'lerin arasında'dan senkron klasör seç."), color: .tertiaryLabelColor))
+                "Optional. Pick a folder you already sync (Settings → Privacy) so each Mac shows separately.",
+                "İsteğe bağlı. Zaten senkronladığın bir klasör seç (Ayarlar → Gizlilik) ki her Mac ayrı görünsün."),
+                color: .tertiaryLabelColor))
             return
         }
         let machines = MachineSync.readAll()
         if machines.isEmpty {
             machinesHost.addArrangedSubview(line(L10n.text(
-                "No machine data yet — it appears once each Mac has written + synced.",
+                "No machine data yet — appears once each Mac has written + synced.",
                 "Henüz makine verisi yok — her Mac yazıp senkronlayınca görünür."), color: .tertiaryLabelColor))
             return
         }
         let combined = machines.reduce(0.0) { $0 + $1.grandCost }
         machinesHost.addArrangedSubview(line(
-            L10n.text("Combined 30-day: ", "Birleşik 30 gün: ") + ContextSnapshot.formatUSD(combined)
-                + "  ·  \(machines.count) " + L10n.text("Macs", "Mac"),
-            color: .labelColor, bold: true))
-
-        // Per-machine bars — "This Mac" first, then by cost; bar = share of the
-        // busiest Mac. Answers "which computer used how much" at a glance.
+            L10n.text("Combined: ", "Birleşik: ") + ContextSnapshot.formatUSD(combined)
+                + "  ·  \(machines.count) " + L10n.text("Macs", "Mac")))
+        // "This Mac" first, then by cost; bar = share of the busiest Mac.
         let sorted = machines.sorted {
             ($0.isSelf ? 1 : 0, $0.grandCost) > ($1.isSelf ? 1 : 0, $1.grandCost)
         }
@@ -242,13 +271,6 @@ final class CostViewController: PreferencePaneViewController {
         }
         machinesHost.addArrangedSubview(bars)
         bars.widthAnchor.constraint(equalTo: machinesHost.widthAnchor).isActive = true
-
-        // Tie the 3-tier model together: account-wide rolling limits live on
-        // the Usage tab; this section is the per-machine local cost rollup.
-        machinesHost.addArrangedSubview(line(L10n.text(
-            "Account 5h/7d limits (all machines) are on the Usage tab.",
-            "Hesabın 5sa/7g limitleri (tüm makineler) Kullanım sekmesinde."),
-            color: .tertiaryLabelColor))
     }
 
     /// Switch the AI button between "connect a key" (discovery) and "analyze".

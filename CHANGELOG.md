@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.7] - 2026-06-08
+
+### Changed
+
+- **Clearer per-session Context popover.** Reworked the confusing four-way "context tokens handled" split. It now leads with estimated cost + fresh tokens, shows a simple Input/Output "fresh work" bar, and states cached context as one plain line ("↻ N replayed each turn (≈M×)") with a short note. (Researched with Codex: Claude's `/context` per-component breakdown is computed live inside Claude Code and is not persisted anywhere a third-party app can read — confirmed against ccusage/statusline/OTel — so the categories shown are measured, never fabricated.)
+- **"Across your Macs" → two honest planes.** Now shows **Account · all machines · live** (the rolling 5h/7d limits, which already count every machine in real time via the account API — no shared folder) and **Per machine · local 30-day** (optional, via a synced folder, since the API can't split cost by machine). Replaces the folder-only framing.
+
 ## [0.7.6] - 2026-06-08
 
 ### Added
