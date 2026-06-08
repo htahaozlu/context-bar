@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.9] - 2026-06-08
+
+### Fixed
+
+- **AI Advisor Gemini model updated.** Default Gemini model changed from `gemini-2.0-flash` (removed by Google) to `gemini-2.5-flash`.
+
 ## [0.7.8] - 2026-06-08
 
 ### Fixed

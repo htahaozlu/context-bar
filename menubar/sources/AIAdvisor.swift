@@ -22,7 +22,7 @@ enum AIProvider: String, CaseIterable {
     var model: String {
         switch self {
         case .openai: return "gpt-4o-mini"
-        case .gemini: return "gemini-2.0-flash"
+        case .gemini: return "gemini-2.5-flash"
         case .off: return ""
         }
     }
