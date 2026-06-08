@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.10] - 2026-06-08
+
+### Fixed
+
+- **AI Advisor retries on 503.** When the provider returns "high demand / temporarily unavailable", the advisor now retries up to 2 times (2 s apart) before surfacing the error.
+
 ## [0.7.9] - 2026-06-08
 
 ### Fixed

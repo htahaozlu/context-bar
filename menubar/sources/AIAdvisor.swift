@@ -176,11 +176,24 @@ enum AIAdvisor {
             completion(.failure(AIAdvisorError.noKey)); return
         }
 
+        performRequest(session: session, req: req, parse: parse, retries: 2, completion: completion)
+    }
+
+    private static func performRequest(
+        session: URLSession, req: URLRequest, parse: @escaping (Data) -> String?,
+        retries: Int, completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        let done: (Result<String, Error>) -> Void = { r in DispatchQueue.main.async { completion(r) } }
         session.dataTask(with: req) { data, resp, err in
-            let done: (Result<String, Error>) -> Void = { r in DispatchQueue.main.async { completion(r) } }
             if let err { done(.failure(err)); return }
             guard let data else { done(.failure(AIAdvisorError.badResponse("empty"))); return }
             if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                if http.statusCode == 503 && retries > 0 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                        performRequest(session: session, req: req, parse: parse, retries: retries - 1, completion: completion)
+                    }
+                    return
+                }
                 let body = String(data: data, encoding: .utf8) ?? ""
                 done(.failure(AIAdvisorError.badResponse("HTTP \(http.statusCode): \(body.prefix(300))"))); return
             }
