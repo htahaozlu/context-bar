@@ -423,23 +423,62 @@ final class SessionListView: NSView {
         let detail: String // model · project
         let tokens: UInt64
         let cost: Double
+        // Token composition for the per-session Context drill-down.
+        let input: UInt64
+        let output: UInt64
+        let cacheCreation: UInt64
+        let cacheRead: UInt64
     }
 
     var rows: [Row] = [] {
         didSet { invalidateIntrinsicContentSize(); needsDisplay = true }
     }
+    /// Click a row → show its Context composition. Rect is in view coords.
+    var onRowClick: ((Int, NSRect) -> Void)?
 
     override var isFlipped: Bool { true }
     private let rowH: CGFloat = 42
+    private var hovered: Int? {
+        didSet { if oldValue != hovered { needsDisplay = true } }
+    }
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: max(1, CGFloat(rows.count) * rowH))
+    }
+
+    private func rowRect(_ i: Int) -> NSRect { NSRect(x: 0, y: CGFloat(i) * rowH, width: bounds.width, height: rowH) }
+    private func rowIndex(at p: NSPoint) -> Int? {
+        guard bounds.contains(p) else { return nil }
+        let i = Int(p.y / rowH)
+        return (i >= 0 && i < rows.count) ? i : nil
+    }
+
+    private var tracking: NSTrackingArea?
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let a = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(a); tracking = a
+    }
+    override func mouseMoved(with e: NSEvent) { hovered = rowIndex(at: convert(e.locationInWindow, from: nil)) }
+    override func mouseExited(with e: NSEvent) { hovered = nil }
+    override func mouseDown(with e: NSEvent) {
+        let p = convert(e.locationInWindow, from: nil)
+        if let i = rowIndex(at: p) { onRowClick?(i, rowRect(i)) } else { super.mouseDown(with: e) }
+    }
+    override func resetCursorRects() {
+        if !rows.isEmpty { addCursorRect(bounds, cursor: .pointingHand) }
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard !rows.isEmpty else { return }
         let w = bounds.width
+        let accent = ThemeStore.current.accent
         for (i, row) in rows.enumerated() {
             let y = CGFloat(i) * rowH
+            if hovered == i {
+                let bg = NSBezierPath(roundedRect: NSRect(x: -2, y: y + 1, width: w + 4, height: rowH - 2), xRadius: 6, yRadius: 6)
+                accent.withAlphaComponent(0.10).setFill(); bg.fill()
+            }
             if i > 0 {
                 NSColor.separatorColor.withAlphaComponent(0.4).setStroke()
                 let line = NSBezierPath()
@@ -449,13 +488,20 @@ final class SessionListView: NSView {
                 line.stroke()
             }
 
+            // Right edge: value + a chevron hinting the row opens a detail.
+            let chev = NSAttributedString(string: "›", attributes: [
+                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+                .foregroundColor: NSColor.tertiaryLabelColor,
+            ])
+            chev.draw(at: NSPoint(x: w - chev.size().width, y: y + 12))
             let value = "\(ContextSnapshot.formatTokens(row.tokens)) · \(ContextSnapshot.formatUSD(row.cost))"
             let valAttr = NSAttributedString(string: value, attributes: [
                 .font: Typography.bodyMono(11, weight: .medium),
                 .foregroundColor: NSColor.secondaryLabelColor,
             ])
             let vs = valAttr.size()
-            valAttr.draw(at: NSPoint(x: w - vs.width, y: y + 8))
+            let valRight = w - chev.size().width - 8
+            valAttr.draw(at: NSPoint(x: valRight - vs.width, y: y + 8))
 
             let head = NSMutableAttributedString(string: row.time, attributes: [
                 .font: Typography.bodyMono(12, weight: .semibold),
@@ -476,7 +522,7 @@ final class SessionListView: NSView {
                 .foregroundColor: NSColor.tertiaryLabelColor,
                 .paragraphStyle: para,
             ])
-            det.draw(in: NSRect(x: 0, y: y + 23, width: max(20, w - vs.width - 12), height: 14))
+            det.draw(in: NSRect(x: 0, y: y + 23, width: max(20, valRight - vs.width - 12), height: 14))
         }
     }
 }

@@ -223,11 +223,32 @@ final class CostViewController: PreferencePaneViewController {
             L10n.text("Combined 30-day: ", "Birleşik 30 gün: ") + ContextSnapshot.formatUSD(combined)
                 + "  ·  \(machines.count) " + L10n.text("Macs", "Mac"),
             color: .labelColor, bold: true))
-        for m in machines {
-            let tag = m.isSelf ? " (" + L10n.text("this Mac", "bu Mac") + ")" : ""
-            machinesHost.addArrangedSubview(line(
-                "  \(m.machine)\(tag) — \(ContextSnapshot.formatUSD(m.grandCost))  ·  \(ContextSnapshot.formatTokens(m.grandTokens)) " + L10n.text("tok", "tok")))
+
+        // Per-machine bars — "This Mac" first, then by cost; bar = share of the
+        // busiest Mac. Answers "which computer used how much" at a glance.
+        let sorted = machines.sorted {
+            ($0.isSelf ? 1 : 0, $0.grandCost) > ($1.isSelf ? 1 : 0, $1.grandCost)
         }
+        let maxCost = machines.map(\.grandCost).max() ?? 0
+        let bars = ProjectBreakdownView()
+        bars.translatesAutoresizingMaskIntoConstraints = false
+        bars.rows = sorted.map { m in
+            let tag = m.isSelf ? "  ·  " + L10n.text("this Mac", "bu Mac") : ""
+            return ProjectBreakdownView.Row(
+                name: m.machine + tag,
+                tokens: m.grandTokens,
+                cost: m.grandCost,
+                share: maxCost > 0 ? m.grandCost / maxCost : 0)
+        }
+        machinesHost.addArrangedSubview(bars)
+        bars.widthAnchor.constraint(equalTo: machinesHost.widthAnchor).isActive = true
+
+        // Tie the 3-tier model together: account-wide rolling limits live on
+        // the Usage tab; this section is the per-machine local cost rollup.
+        machinesHost.addArrangedSubview(line(L10n.text(
+            "Account 5h/7d limits (all machines) are on the Usage tab.",
+            "Hesabın 5sa/7g limitleri (tüm makineler) Kullanım sekmesinde."),
+            color: .tertiaryLabelColor))
     }
 
     /// Switch the AI button between "connect a key" (discovery) and "analyze".

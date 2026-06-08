@@ -41,6 +41,7 @@ final class StatsViewController: PreferencePaneViewController {
     private let breakdownView = ProjectBreakdownView()
     private let sessionsLabel = NSTextField(labelWithString: "")
     private let sessionListView = SessionListView()
+    private var sessionPopover: NSPopover?
     private let breakdownNote = NSTextField(wrappingLabelWithString: "")
 
     /// Currently selected day (day mode) or range bounds — start-of-day, local.
@@ -237,6 +238,7 @@ final class StatsViewController: PreferencePaneViewController {
             L10n.text("Sessions", "Oturumlar"), color: .secondaryLabelColor)
         sessionsLabel.translatesAutoresizingMaskIntoConstraints = false
         sessionListView.translatesAutoresizingMaskIntoConstraints = false
+        sessionListView.onRowClick = { [weak self] i, rect in self?.showSessionContext(i, rect) }
 
         breakdownNote.font = NSFont.systemFont(ofSize: 11)
         breakdownNote.textColor = .tertiaryLabelColor
@@ -636,6 +638,10 @@ final class StatsViewController: PreferencePaneViewController {
         let model: String
         let project: String
         let cost: Double
+        let input: UInt64
+        let output: UInt64
+        let cacheCreation: UInt64
+        let cacheRead: UInt64
     }
     private struct ProjInst { let date: String; let project: String; let tokens: UInt64; let cost: Double }
 
@@ -726,7 +732,11 @@ final class StatsViewController: PreferencePaneViewController {
                 tokens: u64(o["tokens"]),
                 model: (o["model"] as? String) ?? "",
                 project: (o["project"] as? String) ?? "",
-                cost: dbl(o["cost"])
+                cost: dbl(o["cost"]),
+                input: u64(o["input"]),
+                output: u64(o["output"]),
+                cacheCreation: u64(o["cache_creation"]),
+                cacheRead: u64(o["cache_read"])
             )
         }
         return snap
@@ -990,6 +1000,72 @@ final class StatsViewController: PreferencePaneViewController {
     /// Rows for the per-day session list: recent_sessions whose start day falls
     /// inside the selection, newest-first, capped. (recent_sessions is the last
     /// ~20, so older days show none — totals/projects still cover the full year.)
+    /// Click a session row → a transient popover with that session's honest
+    /// "Context" composition (token categories — no fabricated /context split).
+    private func showSessionContext(_ i: Int, _ rect: NSRect) {
+        guard i < sessionListView.rows.count else { return }
+        let content = buildSessionContextView(sessionListView.rows[i])
+        let vc = NSViewController()
+        vc.view = content
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.contentViewController = vc
+        sessionPopover = pop
+        pop.show(relativeTo: rect, of: sessionListView, preferredEdge: .maxY)
+    }
+
+    private func buildSessionContextView(_ r: SessionListView.Row) -> NSView {
+        let accent = ThemeStore.current.accent
+        let total = r.input + r.output + r.cacheCreation + r.cacheRead
+
+        let title = NSTextField(labelWithString: r.time)
+        title.font = Typography.title(13)
+        let sub = NSTextField(labelWithString: r.detail)
+        sub.font = NSFont.systemFont(ofSize: 11); sub.textColor = .secondaryLabelColor
+
+        let totalLbl = NSTextField(labelWithAttributedString:
+            Typography.displayNumberAttributed(ContextSnapshot.formatTokens(total), size: 22, weight: .semibold))
+        let totalCap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("context tokens handled", "işlenen bağlam token"), color: .tertiaryLabelColor))
+
+        let comp = TokenCompositionView()
+        comp.translatesAutoresizingMaskIntoConstraints = false
+        comp.segments = [
+            .init(label: L10n.text("In", "Girdi"), value: r.input, color: accent),
+            .init(label: L10n.text("Out", "Çıktı"), value: r.output, color: accent.withAlphaComponent(0.6)),
+            .init(label: L10n.text("Cache+", "Önbellek+"), value: r.cacheCreation, color: accent.withAlphaComponent(0.32)),
+            .init(label: L10n.text("Cache↻", "Önbellek↻"), value: r.cacheRead, color: .tertiaryLabelColor),
+        ]
+        comp.widthAnchor.constraint(equalToConstant: 312).isActive = true
+
+        let note = NSTextField(wrappingLabelWithString: L10n.text(
+            "Cache-read is the context re-sent every turn (system prompt + tools + history); cache-write is what got newly cached this session. Claude's live /context per-component split isn't recorded per past session.",
+            "Önbellek-oku her tur yeniden gönderilen bağlam (system prompt + araçlar + geçmiş); önbellek-yaz bu oturumda yeni önbelleğe alınan. Claude'un canlı /context bileşen ayrımı geçmiş oturum başına kaydedilmez."))
+        note.font = NSFont.systemFont(ofSize: 10); note.textColor = .tertiaryLabelColor
+        note.preferredMaxLayoutWidth = 300
+
+        let header = NSStackView(views: [totalLbl, totalCap])
+        header.orientation = .vertical; header.alignment = .leading; header.spacing = 0
+
+        let stack = NSStackView(views: [title, sub, header, comp, note])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.setCustomSpacing(12, after: sub)
+        stack.setCustomSpacing(12, after: header)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let container = NSView()
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 16),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -16),
+        ])
+        return container
+    }
+
     private func sessionRowsForSelection(_ keys: Set<String>) -> [SessionListView.Row] {
         let matched: [(Date, Session)] = snapshot.recent.compactMap { s in
             guard let d = parseISO(s.startedAt), keys.contains(dayKey(d)) else { return nil }
@@ -1007,7 +1083,11 @@ final class StatsViewController: PreferencePaneViewController {
                     duration: s.durationMinutes > 0 ? durationString(minutes: s.durationMinutes) : "",
                     detail: detail,
                     tokens: s.tokens,
-                    cost: s.cost
+                    cost: s.cost,
+                    input: s.input,
+                    output: s.output,
+                    cacheCreation: s.cacheCreation,
+                    cacheRead: s.cacheRead
                 )
             }
     }

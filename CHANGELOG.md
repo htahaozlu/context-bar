@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.6] - 2026-06-08
+
+### Added
+
+- **Click a session → its Context composition.** Session rows in the Stats daily breakdown are now clickable; each opens a popover with that session's honest token composition — Input / Output / Cache-write / Cache-read with counts and %, plus total context tokens handled. (Claude's live `/context` per-component split — system prompt / tools / MCP / messages — is not recorded per past session, so it is deliberately not fabricated; the cache-read share is the context re-sent each turn.)
+- **Per-machine breakdown in "Across your Macs".** The Value tab now shows each Mac as a bar (This Mac first) with its 30-day tokens + cost and a combined total, answering "which computer used how much." Account-wide 5h/7d rolling limits remain on the Usage tab (they are already cross-machine); this section is the per-machine local cost rollup synced via your shared folder.
+
 ## [0.7.5] - 2026-06-08
 
 ### Fixed
