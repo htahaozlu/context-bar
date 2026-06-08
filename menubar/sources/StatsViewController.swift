@@ -651,6 +651,7 @@ final class StatsViewController: PreferencePaneViewController {
         var subagent30dCost: Double = 0
         var total30dSessions: Int = 0
         var maxSessionMinutes: Double = 0
+        var favoriteEffort: String? = nil   // Codex reasoning effort, if recorded
         // Insight inputs.
         var input30d: UInt64 = 0
         var output30d: UInt64 = 0
@@ -696,6 +697,7 @@ final class StatsViewController: PreferencePaneViewController {
         snap.lastContextPct = dbl(c["last_context_pct"])
         snap.activeSessionTokens = u64(c["active_session_tokens"])
         snap.activeSessionSubagentTokens = u64(c["active_session_subagent_tokens"])
+        snap.favoriteEffort = (c["favorite_effort"] as? String)?.trimmingCharacters(in: .whitespaces)
         snap.byDay = ((c["by_day"] as? [[String: Any]]) ?? []).compactMap { o in
             guard let d = o["date"] as? String else { return nil }
             return Day(date: d, tokens: u64(o["tokens"]), sessions: (o["sessions"] as? Int) ?? 0, cost: dbl(o["cost"]))
@@ -817,21 +819,37 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     /// Map Anthropic / OpenAI model IDs to the short labels each vendor shows
+    /// Pretty label for a Codex reasoning-effort value.
+    private func prettyEffort(_ raw: String) -> String {
+        switch raw.lowercased() {
+        case "xhigh", "x-high": return L10n.text("X-High", "Çok Yüksek")
+        case "high":            return L10n.text("High", "Yüksek")
+        case "medium":          return L10n.text("Medium", "Orta")
+        case "low":             return L10n.text("Low", "Düşük")
+        case "minimal":         return L10n.text("Minimal", "Minimal")
+        default:                return raw.capitalized
+        }
+    }
+
     /// in its own UI. Unknown IDs fall back to the raw string.
     private func prettyModelName(_ id: String) -> String {
         let m = id.lowercased()
         let suffix = m.contains("[1m]") || m.contains("-1m") ? " (1M)" : ""
         let base: String
         switch true {
+        case m.contains("opus-4-9"):    base = "Opus 4.9"
+        case m.contains("opus-4-8"):    base = "Opus 4.8"
         case m.contains("opus-4-7"):    base = "Opus 4.7"
         case m.contains("opus-4-6"):    base = "Opus 4.6"
         case m.contains("opus-4-5"):    base = "Opus 4.5"
         case m.contains("opus-4"):      base = "Opus 4"
+        case m.contains("sonnet-4-7"):  base = "Sonnet 4.7"
         case m.contains("sonnet-4-6"):  base = "Sonnet 4.6"
         case m.contains("sonnet-4-5"):  base = "Sonnet 4.5"
         case m.contains("sonnet-4"):    base = "Sonnet 4"
         case m.contains("haiku-4-5"):   base = "Haiku 4.5"
         case m.contains("haiku-4"):     base = "Haiku 4"
+        case m.contains("gpt-5-5"), m.contains("gpt-5.5"): base = "GPT-5.5"
         case m.contains("gpt-5"):       base = "GPT-5"
         case m.contains("gpt-4"):       base = "GPT-4"
         case m.contains("mythos"):      base = "Claude Mythos"
@@ -852,7 +870,7 @@ final class StatsViewController: PreferencePaneViewController {
         let sessions = sessionsInRange(snap)
         let (active, total) = activeDaysInRange(snap)
 
-        let tiles: [NSView] = [
+        var tiles: [NSView] = [
             StatTileView(
                 caption: L10n.text("sessions", "oturum"),
                 value: numberString(sessions)
@@ -899,6 +917,15 @@ final class StatsViewController: PreferencePaneViewController {
                 mono: false
             ),
         ]
+        // Codex records a reasoning effort per turn; Claude does not — only show
+        // the tile when the transcripts actually carried one.
+        if let eff = snap.favoriteEffort, !eff.isEmpty {
+            tiles.append(StatTileView(
+                caption: L10n.text("favorite effort", "favori effort"),
+                value: prettyEffort(eff),
+                mono: false
+            ))
+        }
 
         let rows = stride(from: 0, to: tiles.count, by: 4).map { start -> NSStackView in
             let end = min(start + 4, tiles.count)

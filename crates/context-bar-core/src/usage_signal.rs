@@ -78,6 +78,11 @@ pub struct AgentUsage {
     pub last_turn_output_tokens: u64,
     #[serde(default)]
     pub last_model: Option<String>,
+    /// Most-used reasoning effort across this agent's transcripts (Codex only —
+    /// `xhigh`/`high`/`medium`/`low`). Omitted when the transcripts don't carry
+    /// an effort (e.g. Claude), so it never shows an empty value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub favorite_effort: Option<String>,
     #[serde(default)]
     pub last_context_window: Option<u64>,
     #[serde(default)]

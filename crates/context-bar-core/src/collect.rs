@@ -565,6 +565,9 @@ fn collect_codex_inner(home: &Path, now: f64, table: &Table) -> (AgentUsage, Opt
     let mut week_7d_oldest: Option<f64> = None;
     let mut latest_rate_ts = 0.0f64;
     let mut latest_rate_limits: Option<Value> = None;
+    // Count reasoning-effort values across turns to surface the dominant one
+    // (Codex transcripts carry `effort` in each turn_context record).
+    let mut effort_counts: BTreeMap<String, u32> = BTreeMap::new();
 
     let sessions_dir = home.join(".codex").join("sessions");
     let mut files = Vec::new();
@@ -597,6 +600,9 @@ fn collect_codex_inner(home: &Path, now: f64, table: &Table) -> (AgentUsage, Opt
                 }
                 if let Some(c) = str_field(payload, "cwd") {
                     current_cwd = Some(c);
+                }
+                if let Some(e) = str_field(payload, "effort") {
+                    *effort_counts.entry(e).or_insert(0) += 1;
                 }
                 continue;
             }
@@ -712,6 +718,13 @@ fn collect_codex_inner(home: &Path, now: f64, table: &Table) -> (AgentUsage, Opt
             }
         }
     }
+
+    // Dominant effort across all turns (ties broken by the highest count's key
+    // order; good enough for a "favorite"). Omitted when no turn carried one.
+    out.favorite_effort = effort_counts
+        .into_iter()
+        .max_by_key(|(_, c)| *c)
+        .map(|(e, _)| e);
 
     let out = finish(out, per_session, now, session_5h_oldest, week_7d_oldest);
     (out, latest_rate_limits)
