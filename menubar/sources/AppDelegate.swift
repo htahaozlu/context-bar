@@ -438,9 +438,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.animates = true
         popover.contentViewController = popoverVC
         popover.delegate = self
-        if #available(macOS 14.0, *) {
-            popover.hasFullSizeContent = true
-        }
+        // NOTE: deliberately NOT setting hasFullSizeContent — letting NSPopover
+        // inset the content itself clears the arrow at the top and keeps left/
+        // right margins symmetric. hasFullSizeContent=true pushed content under
+        // the arrow (top gap) and into the rounded corners (left edge clipped).
         // NSPopover grows to a larger preferredContentSize but won't shrink back
         // while shown — it keeps its tallest frame, leaving a blank band below
         // the footer when a card disappears on a refresh tick. Assigning

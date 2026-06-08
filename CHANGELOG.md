@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.7.5] - 2026-06-08
+
+### Fixed
+
+- **Menubar popover cards shifted left / clipped, with top & right gaps.** `hasFullSizeContent = true` pushed the content under the popover's arrow (the top band) and into its rounded corners (the left edge clipped, asymmetric right gap). Letting NSPopover inset the content itself restores symmetric left/right margins and clears the arrow — cards now sit flush and centered. Verified against a real popover capture.
+
 ## [0.7.4] - 2026-06-08
 
 ### Fixed
