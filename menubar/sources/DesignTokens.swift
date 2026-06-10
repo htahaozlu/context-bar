@@ -69,17 +69,80 @@ enum Typography {
     }
 }
 
+// Signature design language: ONE warm clay accent over a neutral gray scale.
+// Numbers are always mono + tabular. Values mirror the redesign tokens exactly
+// (clay #C2553A/#E68A66, neutral surfaces, amber/red reserved for urgency).
 enum Palette {
+    // ---- text tiers ----
     static let primaryText = dynamicColor(name: "ContextBarPrimaryText") { isDark in
-        isDark ? NSColor(calibratedWhite: 0.96, alpha: 1) : NSColor(calibratedWhite: 0.08, alpha: 1)
+        isDark ? srgb(0xF5F5F5) : srgb(0x141414)
     }
-
     static let secondaryText = dynamicColor(name: "ContextBarSecondaryText") { isDark in
-        isDark ? NSColor(calibratedWhite: 0.74, alpha: 1) : NSColor(calibratedWhite: 0.38, alpha: 1)
+        isDark ? NSColor(srgbRed: 0.961, green: 0.961, blue: 0.961, alpha: 0.58)
+               : NSColor(srgbRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.56)
+    }
+    static let tertiaryText = dynamicColor(name: "ContextBarTertiaryText") { isDark in
+        isDark ? NSColor(srgbRed: 0.961, green: 0.961, blue: 0.961, alpha: 0.40)
+               : NSColor(srgbRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.40)
     }
 
-    static let tertiaryText = dynamicColor(name: "ContextBarTertiaryText") { isDark in
-        isDark ? NSColor(calibratedWhite: 0.56, alpha: 1) : NSColor(calibratedWhite: 0.55, alpha: 1)
+    // ---- signature accent (clay / terracotta) ----
+    static let accent = dynamicColor(name: "ContextBarAccent") { isDark in
+        isDark ? srgb(0xE68A66) : srgb(0xC2553A)
+    }
+    /// 16% (light) / 22% (dark) accent — chips, glyph wells, hot-bar wash.
+    static let accentSoft = dynamicColor(name: "ContextBarAccentSoft") { isDark in
+        isDark ? srgb(0xE68A66).withAlphaComponent(0.22) : srgb(0xC2553A).withAlphaComponent(0.16)
+    }
+    /// 8% (light) / 11% (dark) accent — insight-card fills, faint tints.
+    static let accentSofter = dynamicColor(name: "ContextBarAccentSofter") { isDark in
+        isDark ? srgb(0xE68A66).withAlphaComponent(0.11) : srgb(0xC2553A).withAlphaComponent(0.08)
+    }
+
+    // ---- surfaces ----
+    /// Window / pane backdrop (Stats/Cost/Settings).
+    static let window = dynamicColor(name: "ContextBarWindow") { isDark in
+        isDark ? srgb(0x1C1B19) : srgb(0xECEAE6)
+    }
+    /// Translucent card fill — floats over vibrancy. Falls back to solid when
+    /// reduce-transparency is on (handled in Surface).
+    static let cardFill = dynamicColor(name: "ContextBarCardFill") { isDark in
+        isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.055) : NSColor(calibratedWhite: 1.0, alpha: 0.72)
+    }
+    /// Opaque card — the hero and any solid surface.
+    static let cardSolid = dynamicColor(name: "ContextBarCardSolid") { isDark in
+        isDark ? srgb(0x2B2A28) : srgb(0xFFFFFF)
+    }
+
+    // ---- hairlines / tracks ----
+    static let hairline = dynamicColor(name: "ContextBarHairline") { isDark in
+        isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.10) : NSColor(calibratedWhite: 0.0, alpha: 0.09)
+    }
+    static let hairlineStrong = dynamicColor(name: "ContextBarHairlineStrong") { isDark in
+        isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.16) : NSColor(calibratedWhite: 0.0, alpha: 0.14)
+    }
+    static let track = dynamicColor(name: "ContextBarTrack") { isDark in
+        isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.11) : NSColor(calibratedWhite: 0.0, alpha: 0.08)
+    }
+
+    // ---- semantic ----
+    static let positive = dynamicColor(name: "ContextBarPositive") { isDark in
+        isDark ? srgb(0x3FCB7E) : srgb(0x1E8A4C)
+    }
+    /// Urgency ramp — used ONLY by the menubar gauge / limit pressure, never as
+    /// general chrome. Calm work stays on the accent; amber = attention, red =
+    /// at the limit.
+    static let urgencyAmber = dynamicColor(name: "ContextBarUrgencyAmber") { isDark in
+        isDark ? srgb(0xF2B33D) : srgb(0xD98A0B)
+    }
+    static let urgencyRed = dynamicColor(name: "ContextBarUrgencyRed") { isDark in
+        isDark ? srgb(0xFF6B5E) : srgb(0xE0452F)
+    }
+
+    private static func srgb(_ hex: UInt32) -> NSColor {
+        NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255.0,
+                green: CGFloat((hex >> 8) & 0xFF) / 255.0,
+                blue: CGFloat(hex & 0xFF) / 255.0, alpha: 1)
     }
 
     private static func dynamicColor(name: String, provider: @escaping (Bool) -> NSColor) -> NSColor {
@@ -132,9 +195,21 @@ enum Surface {
 
     static func refreshCardColors(_ view: NSView) {
         let isDark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let alpha: CGFloat = MotionPrefs.reduceTransparency ? 1.0 : (isDark ? 0.35 : 0.55)
-        view.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(alpha).cgColor
-        view.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
+        // Translucent card that floats over the popover/window material. When
+        // reduce-transparency is on, fall back to the opaque card so contrast
+        // survives.
+        let fill: NSColor
+        if MotionPrefs.reduceTransparency {
+            fill = isDark ? NSColor(srgbRed: 0.169, green: 0.165, blue: 0.157, alpha: 1)  // #2B2A28
+                          : NSColor(calibratedWhite: 1.0, alpha: 1)
+        } else {
+            fill = isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.055)
+                          : NSColor(calibratedWhite: 1.0, alpha: 0.72)
+        }
+        let border = isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.10)
+                            : NSColor(calibratedWhite: 0.0, alpha: 0.09)
+        view.layer?.backgroundColor = fill.cgColor
+        view.layer?.borderColor = border.cgColor
     }
 
     /// Hero card recipe — larger radius, subtle elevation shadow,
@@ -149,12 +224,14 @@ enum Surface {
 
     static func refreshHeroChrome(_ view: NSView) {
         let isDark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        view.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
+        let border = isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.10)
+                            : NSColor(calibratedWhite: 0.0, alpha: 0.09)
+        view.layer?.borderColor = border.cgColor
         // Subtle elevation shadow
         view.layer?.shadowColor = NSColor.black.cgColor
         view.layer?.shadowOffset = CGSize(width: 0, height: -4)
         view.layer?.shadowRadius = 9 // ~ blur 18 / 2
-        view.layer?.shadowOpacity = MotionPrefs.reduceTransparency ? 0 : (isDark ? 0.30 : 0.10)
+        view.layer?.shadowOpacity = MotionPrefs.reduceTransparency ? 0 : (isDark ? 0.36 : 0.10)
         view.layer?.masksToBounds = false
     }
 }

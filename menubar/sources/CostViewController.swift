@@ -34,6 +34,7 @@ final class CostViewController: PreferencePaneViewController {
     private let aiSpinner = NSProgressIndicator()
     private let aiResult = NSTextField(wrappingLabelWithString: "")
     private let machinesHost = NSStackView()
+    private let modelsHost = NSStackView()
     /// Host opens Settings → Privacy (where the AI key lives) — a gentle,
     /// one-click discovery path, not a nag.
     var onShowPrivacy: (() -> Void)?
@@ -140,6 +141,25 @@ final class CostViewController: PreferencePaneViewController {
             symbol: "chart.xyaxis.line",
             body: sparkHost
         )
+
+        // Per-model cost — REAL `by_model` dollars (Claude only), each tagged
+        // with its plan/API availability, over a compact "how this is
+        // calculated" note. Mirrors the redesign's model-filter surface.
+        modelsHost.orientation = .vertical
+        modelsHost.alignment = .leading
+        modelsHost.spacing = Spacing.s
+        modelsHost.translatesAutoresizingMaskIntoConstraints = false
+        addSection(
+            title: L10n.text("Cost by model", "Modele göre maliyet"),
+            subtitle: L10n.text("Where the estimate comes from, model by model.",
+                                "Tahminin model model nereden geldiği."),
+            symbol: "square.stack.3d.up",
+            info: L10n.text(
+                "Per-model API-equivalent cost from your transcripts. Plan models show value your flat plan covers; models removed from the plan (or API-only) show real spend billed to your key.",
+                "Transkriptlerinden model başına API-eşdeğeri maliyet. Plan modelleri planının karşıladığı değeri gösterir; plandan çıkan (veya yalnızca-API) modeller anahtarına faturalanan gerçek harcamayı gösterir."),
+            body: modelsHost
+        )
+        modelsHost.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
 
         instancesStack.orientation = .vertical
         instancesStack.alignment = .leading
@@ -337,9 +357,14 @@ final class CostViewController: PreferencePaneViewController {
     }
 
     private struct DailyPoint { let date: String; let cost: Double; let tokens: UInt64 }
+    /// One row of REAL per-model cost from the snapshot's `by_model` bucket
+    /// (all-time within the scanned window). `cost` and `tokens` are exact;
+    /// nothing here is fabricated.
+    private struct ModelCost { let model: String; let tokens: UInt64; let cost: Double }
     private struct CostData {
         var instances: [Instance] = []
         var dailyPoints: [DailyPoint] = []   // last 30 days, oldest → newest
+        var byModel: [ModelCost] = []        // real per-model cost, tokens-desc
         var costToday: Double = 0
         var cost7d: Double = 0
         var cost30d: Double = 0
@@ -398,6 +423,13 @@ final class CostViewController: PreferencePaneViewController {
                 cost: dbl(o["cost"])
             )
         }
+        // Real per-model cost (all-time within scanned files), tokens-desc as
+        // the engine emits it. Carries an exact `cost` — never synthesized.
+        out.byModel = ((c["by_model"] as? [[String: Any]]) ?? []).compactMap { o in
+            guard let m = o["model"] as? String else { return nil }
+            return ModelCost(model: m, tokens: u64(o["tokens"]), cost: dbl(o["cost"]))
+        }
+
         // by_day arrives newest-first (padded to the history window). Take the
         // last 30 calendar days and flip to oldest→newest for the trend chart.
         let byDay = (c["by_day"] as? [[String: Any]]) ?? []
@@ -474,6 +506,7 @@ final class CostViewController: PreferencePaneViewController {
 
         renderSavings(data)
         renderTrend(data.dailyPoints)
+        renderModels(data.byModel)
         renderInstances(visible)
 
         let src = data.pricingSource.map { srcLabel($0) } ?? "—"
@@ -555,6 +588,123 @@ final class CostViewController: PreferencePaneViewController {
         ])
     }
 
+    // MARK: - Per-model cost
+
+    /// Static availability for a prettified Claude model name. Mirrors the
+    /// redesign's `models.jsx`: Sonnet 3.7 sunsets Jun 22 (API-only after),
+    /// Opus 4.8 is API-only, everything else is covered by the plan.
+    private func availability(for pretty: String) -> ModelAvail {
+        let p = pretty.lowercased()
+        if p.hasPrefix("sonnet 3.7") { return .sunset("Jun 22") }
+        if p.hasPrefix("opus 4.8") { return .api }
+        return .plan
+    }
+
+    /// Per-model cost card — REAL `by_model` dollars, Claude-only (the per-plan
+    /// vs API-only distinction is an Anthropic concept; Codex has no plan), a
+    /// thin accent bar for share of the top model, and an availability badge.
+    /// Always followed by the "how this is calculated" note. When there's no
+    /// Claude per-model data we still show the note — never a fabricated row.
+    private func renderModels(_ models: [ModelCost]) {
+        modelsHost.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        // Claude only: collapse repeated-suffix variants under one pretty name,
+        // keep tokens-desc, drop empties. Codex/GPT rows are excluded entirely.
+        var byName: [(name: String, tokens: UInt64, cost: Double)] = []
+        var index: [String: Int] = [:]
+        for m in models where m.cost > 0 || m.tokens > 0 {
+            let lower = m.model.lowercased()
+            guard !(lower.contains("gpt") || lower.contains("codex")
+                    || lower.contains("gemini") || lower.contains("o1")
+                    || lower.contains("o3") || lower.contains("o4")) else { continue }
+            let pretty = prettyModel(m.model)
+            if let i = index[pretty] {
+                byName[i].tokens += m.tokens
+                byName[i].cost += m.cost
+            } else {
+                index[pretty] = byName.count
+                byName.append((pretty, m.tokens, m.cost))
+            }
+        }
+        byName.sort { $0.cost > $1.cost }
+
+        let card = NSView()
+        Surface.applyCard(card)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        let inner = NSStackView()
+        inner.orientation = .vertical
+        inner.alignment = .leading
+        inner.spacing = 0
+        inner.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(inner)
+        NSLayoutConstraint.activate([
+            inner.topAnchor.constraint(equalTo: card.topAnchor, constant: Spacing.s),
+            inner.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: Spacing.m),
+            inner.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -Spacing.m),
+            inner.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -Spacing.s),
+        ])
+
+        // Caption strip — "value · billed", the right-side meaning legend.
+        let head = NSStackView()
+        head.orientation = .horizontal
+        head.distribution = .fill
+        head.alignment = .firstBaseline
+        let headL = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("Cost by model · 30d", "Modele göre maliyet · 30g"),
+                                         color: Palette.secondaryText))
+        headL.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let headR = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("value · billed", "değer · faturalı"),
+                                         color: Palette.tertiaryText))
+        headR.setContentHuggingPriority(.required, for: .horizontal)
+        head.addArrangedSubview(headL)
+        head.addArrangedSubview(headR)
+        inner.addArrangedSubview(head)
+        head.widthAnchor.constraint(equalTo: inner.widthAnchor).isActive = true
+        inner.setCustomSpacing(Spacing.xs, after: head)
+
+        if byName.isEmpty {
+            let empty = NSTextField(labelWithString: L10n.text(
+                "No Claude per-model cost yet.", "Henüz Claude model maliyeti yok."))
+            empty.font = Typography.body(12)
+            empty.textColor = Palette.secondaryText
+            inner.addArrangedSubview(empty)
+        } else {
+            let maxCost = byName.map(\.cost).max() ?? 0
+            for (i, m) in byName.enumerated() {
+                let row = ModelCostRowView(
+                    name: m.name,
+                    avail: availability(for: m.name),
+                    tokens: m.tokens,
+                    cost: m.cost,
+                    share: maxCost > 0 ? CGFloat(m.cost / maxCost) : 0,
+                    tokensFmt: { ContextSnapshot.formatTokens($0) },
+                    usd: formatUSD)
+                row.translatesAutoresizingMaskIntoConstraints = false
+                inner.addArrangedSubview(row)
+                row.widthAnchor.constraint(equalTo: inner.widthAnchor).isActive = true
+                if i < byName.count - 1 {
+                    let hair = NSView()
+                    hair.wantsLayer = true
+                    hair.layer?.backgroundColor = Palette.hairline.cgColor
+                    hair.translatesAutoresizingMaskIntoConstraints = false
+                    hair.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
+                    inner.addArrangedSubview(hair)
+                    hair.widthAnchor.constraint(equalTo: inner.widthAnchor).isActive = true
+                }
+            }
+        }
+
+        modelsHost.addArrangedSubview(card)
+        card.widthAnchor.constraint(equalTo: modelsHost.widthAnchor).isActive = true
+
+        // "How this is calculated" — always present (legend + Σ formula).
+        let note = CostCalcNoteView()
+        note.translatesAutoresizingMaskIntoConstraints = false
+        modelsHost.addArrangedSubview(note)
+        note.widthAnchor.constraint(equalTo: modelsHost.widthAnchor).isActive = true
+    }
+
     /// Monthly USD price of the active Anthropic plan (for the API comparison).
     /// Confirmed list prices; nil when unknown (free / no account).
     private func planMonthlyPrice(_ type: String?, _ tier: String?) -> Double? {
@@ -594,10 +744,12 @@ final class CostViewController: PreferencePaneViewController {
             return
         }
 
-        // Build a flat row model (header → per-day aggregate + indented project
-        // sub-rows → grand Total) and hand it to a single custom view that draws
-        // only the rows intersecting the dirty rect — no per-cell NSViews or
-        // constraints, so the tab opens instantly regardless of row count.
+        // Build a flat, lightened row model: a caption header, one row per
+        // project-per-day (date · project · input/output/cache segmented bar ·
+        // total · chevron), then a grand Total. A single custom view draws only
+        // the rows intersecting the dirty rect — no per-cell NSViews, so the tab
+        // opens instantly regardless of row count. The date column repeats only
+        // when the day changes, so a busy day reads as one dated group.
         var order: [String] = []
         var byDay: [String: [Instance]] = [:]
         for it in items {
@@ -606,42 +758,47 @@ final class CostViewController: PreferencePaneViewController {
         }
 
         var modelRows: [CostRow] = [
-            CostRow(kind: .header, leading: L10n.text("Project", "Proje"), sub: "",
-                    values: [L10n.text("Input", "Girdi"), L10n.text("Output", "Çıktı"),
-                             L10n.text("Cache+", "Önbel+"), L10n.text("Cache↻", "Önbel↻"),
-                             L10n.text("Total", "Toplam"), L10n.text("Cost", "Maliyet")]),
+            CostRow(kind: .header, date: "",
+                    project: L10n.text("Daily breakdown", "Günlük dağılım"),
+                    cost: L10n.text("input · output · cache", "girdi · çıktı · önbellek"),
+                    segments: []),
         ]
-        var gIn: UInt64 = 0, gOut: UInt64 = 0, gCw: UInt64 = 0, gCr: UInt64 = 0
+        var gIn: UInt64 = 0, gOut: UInt64 = 0, gCache: UInt64 = 0
         var gCost = 0.0
-        for (di, day) in order.enumerated() {
+        for day in order {
             let dayRows = (byDay[day] ?? []).sorted { $0.cost > $1.cost }
-            let dIn = dayRows.reduce(UInt64(0)) { $0 + $1.input }
-            let dOut = dayRows.reduce(UInt64(0)) { $0 + $1.output }
-            let dCw = dayRows.reduce(UInt64(0)) { $0 + $1.cacheCreate }
-            let dCr = dayRows.reduce(UInt64(0)) { $0 + $1.cacheRead }
-            let dCost = dayRows.reduce(0.0) { $0 + $1.cost }
-            gIn += dIn; gOut += dOut; gCw += dCw; gCr += dCr; gCost += dCost
-            modelRows.append(CostRow(kind: .day, leading: formatDay(day), sub: "",
-                values: [tk(dIn), tk(dOut), tk(dCw), tk(dCr), tk(dIn + dOut + dCw + dCr), formatUSD(dCost)]))
-            for it in dayRows {
-                // Total = all four token buckets (ccusage "Total Tokens"),
-                // distinct from the Stats tab's fresh-work total.
-                let rowTotal = it.input + it.output + it.cacheCreate + it.cacheRead
-                modelRows.append(CostRow(kind: .data, leading: it.project,
-                    sub: it.models.map(prettyModel).joined(separator: ", "),
-                    values: [tk(it.input), tk(it.output), tk(it.cacheCreate), tk(it.cacheRead), tk(rowTotal), formatUSD(it.cost)],
+            let shortDay = shortDayLabel(day)
+            for (j, it) in dayRows.enumerated() {
+                // Total = all four token buckets (ccusage "Total Tokens"); the
+                // bar collapses the two cache buckets into one "cache" segment.
+                let cacheTok = it.cacheCreate + it.cacheRead
+                let rowTotal = it.input + it.output + cacheTok
+                gIn += it.input; gOut += it.output; gCache += cacheTok; gCost += it.cost
+                let denom = Double(rowTotal)
+                let seg: [CGFloat] = denom > 0
+                    ? [CGFloat(Double(it.input) / denom),
+                       CGFloat(Double(it.output) / denom),
+                       CGFloat(Double(cacheTok) / denom)]
+                    : []
+                modelRows.append(CostRow(kind: .data,
+                    date: j == 0 ? shortDay : "",   // show the date once per day
+                    project: it.project,
+                    cost: formatUSD(it.cost),
+                    segments: seg,
                     detail: CostRowDetail(dayLabel: formatDay(day), project: it.project,
                         models: it.models.map(prettyModel), input: it.input, output: it.output,
                         cacheCreate: it.cacheCreate, cacheRead: it.cacheRead,
-                        totalTokens: rowTotal, totalCost: it.cost)))
-            }
-            if di < order.count - 1 {
-                modelRows.append(CostRow(kind: .separator, leading: "", sub: "", values: []))
+                        totalTokens: it.input + it.output + it.cacheCreate + it.cacheRead,
+                        totalCost: it.cost)))
             }
         }
-        modelRows.append(CostRow(kind: .separatorStrong, leading: "", sub: "", values: []))
-        modelRows.append(CostRow(kind: .total, leading: L10n.text("Total", "Toplam"), sub: "",
-            values: [tk(gIn), tk(gOut), tk(gCw), tk(gCr), tk(gIn + gOut + gCw + gCr), formatUSD(gCost)]))
+        let gTotal = gIn + gOut + gCache
+        let gDenom = Double(gTotal)
+        let gSeg: [CGFloat] = gDenom > 0
+            ? [CGFloat(Double(gIn) / gDenom), CGFloat(Double(gOut) / gDenom), CGFloat(Double(gCache) / gDenom)]
+            : []
+        modelRows.append(CostRow(kind: .total, date: "",
+            project: L10n.text("Total", "Toplam"), cost: formatUSD(gCost), segments: gSeg))
 
         instancesView.onRowClick = { [weak self] detail, rowRect in
             self?.presentCostDetail(detail, relativeTo: rowRect)
@@ -662,8 +819,6 @@ final class CostViewController: PreferencePaneViewController {
         instancesStack.addArrangedSubview(card)
         card.widthAnchor.constraint(equalTo: instancesStack.widthAnchor).isActive = true
     }
-
-    private func tk(_ v: UInt64) -> String { ContextSnapshot.formatTokens(v) }
 
     /// Row click → drill-down popover with the 4-bucket breakdown + a
     /// plain-language cache explainer (the "tıklayınca detay" + "öğretici"
@@ -716,6 +871,15 @@ final class CostViewController: PreferencePaneViewController {
         let out = DateFormatter()
         out.locale = Locale(identifier: L10n.lang == .tr ? "tr_TR" : "en_US")
         out.dateFormat = L10n.lang == .tr ? "d MMMM EEEE" : "EEEE, MMM d"
+        return out.string(from: date)
+    }
+
+    /// Compact mono date for the daily-breakdown rows ("Jun 9" / "9 Haz").
+    private func shortDayLabel(_ iso: String) -> String {
+        guard let date = dateFromKey(iso) else { return iso }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: L10n.lang == .tr ? "tr_TR" : "en_US")
+        out.dateFormat = L10n.lang == .tr ? "d MMM" : "MMM d"
         return out.string(from: date)
     }
 
@@ -926,11 +1090,17 @@ struct CostRowDetail {
 }
 
 private struct CostRow {
-    enum Kind { case header, day, data, total, separator, separatorStrong }
+    enum Kind { case header, data, total }
     let kind: Kind
-    let leading: String
-    let sub: String          // model list, for `.data` rows
-    let values: [String]     // [input, output, cache+, cache↻, total, cost]
+    /// `.data`: short mono date (e.g. "Jun 9"). `.total`: "Total". `.header`: "".
+    let date: String
+    /// `.data`: project name. `.header`/`.total`: a leading caption.
+    let project: String
+    /// Formatted cost (mono), right-aligned. Empty for the header row.
+    let cost: String
+    /// Segment fractions [input, output, cache] for the bar (sum ≤ 1). The
+    /// header carries an empty array; rows draw the accent/58%/26% segments.
+    let segments: [CGFloat]
     var detail: CostRowDetail? = nil  // present on clickable `.data` rows only
 }
 
@@ -1008,22 +1178,19 @@ private final class CostInstancesView: NSView {
         return .zero
     }
 
-    // Fixed numeric grid: [input, output, cache+, cache↻, TOTAL, COST]. The
-    // numeric block is right-anchored to the view. Earlier versions capped the
-    // project column at 300pt and left the remaining width blank on the right,
-    // which looked like a layout regression in wider windows.
-    private let colGap: CGFloat = 14
-    private let numW: [CGFloat] = [60, 60, 60, 60, 66, 92]
-    private let projMin: CGFloat = 130
-    private var numericBlock: CGFloat { numW.reduce(0, +) + colGap * CGFloat(numW.count) }
+    // Fixed left columns: a short mono date, then the project name; the
+    // segmented bar flexes to fill the middle; cost + chevron are right-anchored.
+    private let dateW: CGFloat = 50
+    private let projW: CGFloat = 124
+    private let costW: CGFloat = 56
+    private let chevW: CGFloat = 16
+    private let colGap: CGFloat = 12
 
     private func rowHeight(_ k: CostRow.Kind) -> CGFloat {
         switch k {
-        case .header: return 22
-        case .day: return 26
+        case .header: return 26
         case .data: return 36
-        case .total: return 28
-        case .separator, .separatorStrong: return 10
+        case .total: return 38
         }
     }
 
@@ -1035,20 +1202,11 @@ private final class CostInstancesView: NSView {
 
     override func layout() {
         super.layout()
-        // Width changes (window resize) shift the right-aligned columns.
+        // Width changes (window resize) reflow the flexible segmented bar.
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Project column takes all remaining width once the fixed numeric grid
-        // is seated. On narrow widths the table may clip at the far right, but
-        // normal/detail-window widths keep every column visible without a dead
-        // trailing band.
-        let projectColW = max(projMin, bounds.width - numericBlock)
-        let tableW = max(bounds.width, projectColW + numericBlock)
-        var gx = projectColW
-        var colX: [CGFloat] = []
-        for w in numW { gx += colGap; colX.append(gx); gx += w }
         var y: CGFloat = 0
         for (i, row) in rows.enumerated() {
             let h = rowHeight(row.kind)
@@ -1056,101 +1214,107 @@ private final class CostInstancesView: NSView {
             if rect.intersects(dirtyRect) {
                 // Hover affordance on clickable rows.
                 if i == hoveredRowIndex, row.detail != nil {
-                    ThemeStore.current.accent.withAlphaComponent(0.10).setFill()
-                    NSBezierPath(roundedRect: rect.insetBy(dx: 0, dy: 1), xRadius: 5, yRadius: 5).fill()
+                    ThemeStore.current.accent.withAlphaComponent(0.08).setFill()
+                    NSBezierPath(roundedRect: rect.insetBy(dx: -4, dy: 1), xRadius: 6, yRadius: 6).fill()
                 }
-                drawRow(row, rect: rect, projectColW: projectColW, colX: colX, tableW: tableW)
+                // Top hairline between rows (not before the header).
+                if i > 0 {
+                    let line = NSBezierPath()
+                    line.move(to: NSPoint(x: 0, y: rect.minY + 0.25))
+                    line.line(to: NSPoint(x: bounds.width, y: rect.minY + 0.25))
+                    Palette.hairline.setStroke()
+                    line.lineWidth = 0.5
+                    line.stroke()
+                }
+                drawRow(row, rect: rect)
             }
             y += h
         }
     }
 
-    private func drawRow(_ row: CostRow, rect: NSRect, projectColW: CGFloat, colX: [CGFloat], tableW: CGFloat) {
-        if row.kind == .separator || row.kind == .separatorStrong {
-            let line = NSBezierPath()
-            line.move(to: NSPoint(x: 0, y: rect.midY))
-            line.line(to: NSPoint(x: tableW, y: rect.midY))
-            NSColor.separatorColor
-                .withAlphaComponent(row.kind == .separatorStrong ? 1.0 : 0.45)
-                .setStroke()
-            line.lineWidth = 1
-            line.stroke()
-            return
-        }
-
+    private func drawRow(_ row: CostRow, rect: NSRect) {
         let accent = ThemeStore.current.accent
-        let leadFont: NSFont
-        let leadColor: NSColor
-        let valFont: NSFont        // four component columns: input/output/cache+/cache↻
-        let valColor: NSColor
-        let totalFont: NSFont      // TOTAL column (index 4)
-        let totalColor: NSColor
-        let costFont: NSFont       // COST column (index 5) — the figure users scan
-        let costColor: NSColor
+
+        // Geometry: date | project | [flex bar] | cost | chevron.
+        let barLeft = rect.minX + dateW + colGap + projW + colGap
+        let chevX = rect.maxX - chevW
+        let costX = chevX - costW
+        let barRight = costX - colGap
+        let barW = max(0, barRight - barLeft)
+
         switch row.kind {
         case .header:
-            leadFont = .systemFont(ofSize: 9.5, weight: .semibold); leadColor = .tertiaryLabelColor
-            valFont = leadFont; valColor = .tertiaryLabelColor
-            totalFont = leadFont; totalColor = .tertiaryLabelColor
-            costFont = leadFont; costColor = .tertiaryLabelColor
-        case .day:
-            leadFont = .systemFont(ofSize: 12.5, weight: .semibold); leadColor = .labelColor
-            valFont = Typography.bodyMono(11.5, weight: .semibold); valColor = .secondaryLabelColor
-            totalFont = valFont; totalColor = .labelColor
-            costFont = valFont; costColor = accent
-        case .total:
-            leadFont = .systemFont(ofSize: 12.5, weight: .bold); leadColor = .labelColor
-            valFont = Typography.bodyMono(11.5, weight: .semibold); valColor = .secondaryLabelColor
-            totalFont = valFont; totalColor = .labelColor
-            costFont = valFont; costColor = accent
-        default: // .data
-            leadFont = .systemFont(ofSize: 12, weight: .regular); leadColor = .labelColor
-            valFont = Typography.bodyMono(11, weight: .regular); valColor = .tertiaryLabelColor
-            totalFont = Typography.bodyMono(11, weight: .medium); totalColor = .secondaryLabelColor
-            costFont = Typography.bodyMono(11, weight: .semibold); costColor = .labelColor
+            // Caption row — leading label left, "input · output · cache" right.
+            drawText(row.project.uppercased(),
+                     in: vCenter(NSRect(x: rect.minX, y: rect.minY, width: rect.width * 0.5, height: rect.height), lineH: 14),
+                     font: Typography.caption(), color: Palette.tertiaryText,
+                     align: .left, mode: .byTruncatingTail, kern: 0.8)
+            drawText(row.cost.uppercased(),
+                     in: vCenter(NSRect(x: rect.maxX - rect.width * 0.5, y: rect.minY, width: rect.width * 0.5, height: rect.height), lineH: 14),
+                     font: Typography.caption(), color: Palette.tertiaryText,
+                     align: .right, mode: .byTruncatingTail, kern: 0.5)
+            return
+        case .data, .total:
+            let isTotal = row.kind == .total
+            // Date (mono) — left.
+            drawText(row.date,
+                     in: vCenter(NSRect(x: rect.minX, y: rect.minY, width: dateW, height: rect.height), lineH: 15),
+                     font: Typography.bodyMono(11, weight: .regular),
+                     color: Palette.secondaryText, align: .left, mode: .byClipping)
+            // Project / "Total" — body.
+            let projX = rect.minX + dateW + colGap
+            drawText(isTotal ? row.project : row.project,
+                     in: vCenter(NSRect(x: projX, y: rect.minY, width: projW, height: rect.height), lineH: 15),
+                     font: isTotal ? Typography.title(12.5) : Typography.body(12),
+                     color: Palette.primaryText, align: .left, mode: .byTruncatingMiddle)
+            // Segmented bar — accent / 58% / 26% over the neutral track.
+            if barW > 4 {
+                drawSegmentedBar(row.segments, in: NSRect(x: barLeft, y: rect.midY - 3.5, width: barW, height: 7), accent: accent)
+            }
+            // Cost (mono) — right.
+            drawText(row.cost,
+                     in: vCenter(NSRect(x: costX, y: rect.minY, width: costW, height: rect.height), lineH: 15),
+                     font: Typography.bodyMono(12.5, weight: isTotal ? .bold : .semibold),
+                     color: Palette.primaryText, align: .right, mode: .byClipping)
+            // Chevron — only on clickable data rows.
+            if !isTotal {
+                drawChevron(at: NSPoint(x: chevX + 3, y: rect.midY), color: Palette.tertiaryText)
+            }
         }
+    }
 
-        // Leading (PROJECT) column — left edge, indented for data rows.
-        let indent: CGFloat = row.kind == .data ? 16 : 0
-        let leadWidth = max(0, projectColW - indent - 4)
-        if row.kind == .data && !row.sub.isEmpty {
-            drawText(row.leading,
-                     in: NSRect(x: rect.minX + indent, y: rect.minY + 3, width: leadWidth, height: 16),
-                     font: leadFont, color: leadColor, align: .left, mode: .byTruncatingMiddle)
-            drawText(row.sub,
-                     in: NSRect(x: rect.minX + indent, y: rect.minY + 19, width: leadWidth, height: 13),
-                     font: .monospacedSystemFont(ofSize: 9.5, weight: .regular),
-                     color: .tertiaryLabelColor, align: .left, mode: .byTruncatingTail)
-        } else {
-            let lead = row.kind == .header ? row.leading.uppercased() : row.leading
-            drawText(lead,
-                     in: vCenter(NSRect(x: rect.minX + indent, y: rect.minY, width: leadWidth, height: rect.height), lineH: 15),
-                     font: leadFont, color: leadColor, align: .left,
-                     mode: .byTruncatingTail, kern: row.kind == .header ? 0.6 : 0)
+    /// Three-segment bar (input · output · cache) tinted accent / 58% / 26% of
+    /// the accent, seated on the neutral track. Mirrors the redesign's `cb-seg`.
+    private func drawSegmentedBar(_ segments: [CGFloat], in rect: NSRect, accent: NSColor) {
+        let track = NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2)
+        Palette.track.setFill(); track.fill()
+        guard segments.count == 3, segments.reduce(0, +) > 0 else { return }
+        let colors = [accent, accent.withAlphaComponent(0.58), accent.withAlphaComponent(0.26)]
+        NSGraphicsContext.current?.saveGraphicsState()
+        track.addClip()
+        var x = rect.minX
+        for (i, frac) in segments.enumerated() {
+            let w = rect.width * max(0, min(1, frac))
+            guard w > 0.3 else { continue }
+            colors[i].setFill()
+            NSBezierPath(rect: NSRect(x: x, y: rect.minY, width: w + 0.5, height: rect.height)).fill()
+            x += w
         }
+        NSGraphicsContext.current?.restoreGraphicsState()
+    }
 
-        // Numeric columns — shared colX/numW, identical across every row kind so
-        // the digits stack vertically. TOTAL + COST styled distinctly.
-        for (i, val) in row.values.enumerated() where i < colX.count {
-            let isTotal = (i == 4), isCost = (i == 5)
-            let f = isCost ? costFont : (isTotal ? totalFont : valFont)
-            let c = isCost ? costColor : (isTotal ? totalColor : valColor)
-            let s = row.kind == .header ? val.uppercased() : val
-            drawText(s,
-                     in: vCenter(NSRect(x: colX[i], y: rect.minY, width: numW[i], height: rect.height), lineH: 15),
-                     font: f, color: c, align: .right,
-                     mode: .byClipping, kern: row.kind == .header ? 0.6 : 0)
-        }
-
-        // Hairline seating the header grid; ends at the table edge, not bounds.
-        if row.kind == .header {
-            let line = NSBezierPath()
-            line.move(to: NSPoint(x: 0, y: rect.maxY - 0.5))
-            line.line(to: NSPoint(x: tableW, y: rect.maxY - 0.5))
-            NSColor.separatorColor.withAlphaComponent(0.6).setStroke()
-            line.lineWidth = 1
-            line.stroke()
-        }
+    /// A small right-pointing chevron (drill-down affordance).
+    private func drawChevron(at center: NSPoint, color: NSColor) {
+        let s: CGFloat = 3.2
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: center.x - s / 2, y: center.y + s))
+        path.line(to: NSPoint(x: center.x + s / 2, y: center.y))
+        path.line(to: NSPoint(x: center.x - s / 2, y: center.y - s))
+        color.setStroke()
+        path.lineWidth = 1.3
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.stroke()
     }
 
     private func vCenter(_ r: NSRect, lineH: CGFloat) -> NSRect {
@@ -1379,6 +1543,9 @@ final class CostDetailViewController: NSViewController {
 // compares to the user's monthly budget (same thresholds as the menubar tint).
 final class CostHeroView: NSView {
     private let stack = NSStackView()
+    /// 2.5pt clay accent stripe seated along the hero's top edge — the redesign
+    /// signature. Drawn as a sublayer so it follows the continuous corner.
+    private let stripe = CALayer()
     /// Last inputs, so a theme switch or light/dark toggle can re-render with
     /// freshly contrast-corrected colors (text colors are baked, not dynamic).
     private var pending: (name: String?, price: Double?, est: Double, budget: Double)?
@@ -1386,6 +1553,13 @@ final class CostHeroView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         Surface.applyHero(self)
+        // Clip the stripe to the rounded top; the elevation shadow still shows
+        // because it's cast by the layer itself (masksToBounds stays false on
+        // the host — the stripe rides a dedicated, clipped sublayer instead).
+        stripe.cornerRadius = Radius.hero
+        stripe.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        stripe.backgroundColor = ThemeStore.current.accent.cgColor
+        layer?.addSublayer(stripe)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 9
@@ -1400,9 +1574,20 @@ final class CostHeroView: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    override func layout() {
+        super.layout()
+        // Top stripe spans the full width; height 2.5pt. Corner radius matches
+        // the hero so the stripe's top corners hug the card.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        stripe.frame = CGRect(x: 0, y: bounds.height - 2.5, width: bounds.width, height: 2.5)
+        CATransaction.commit()
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         Surface.refreshHeroChrome(self)
+        stripe.backgroundColor = ThemeStore.current.accent.cgColor
         render()   // re-bake colors for the new light/dark appearance
     }
 
@@ -1418,101 +1603,116 @@ final class CostHeroView: NSView {
         guard estMonthly > 0 else { isHidden = true; return }
         isHidden = false
         // Theme accents range from system blue to neon yellow / pale lavender;
-        // contrast-correct so the headline stays legible on every theme in both
-        // light and dark — never a near-invisible yellow on a light card.
+        // contrast-correct so a chip/bar accent stays legible on every theme in
+        // both light and dark — never a near-invisible yellow on a light card.
         let accent = readableAccent(ThemeStore.current.accent)
+        stripe.backgroundColor = accent.cgColor
         let usd = ContextSnapshot.formatUSD
         let perMo = L10n.text(" / mo", " / ay")
 
-        // Row A — what you actually pay (Claude plans with a known list price).
+        // Row A — caption + plan chip. "ESTIMATED VALUE · NOT A BILL" on the
+        // left; on the right, the plan pill ("Max 5× · $100/mo") when known.
+        let caption = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(
+                L10n.text("Estimated value · not a bill", "Tahmini değer · fatura değil"),
+                color: Palette.secondaryText))
+        caption.lineBreakMode = .byTruncatingTail
+        caption.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let captionRow: NSStackView
         if let planName, let planPrice {
-            let left = NSTextField(labelWithString: L10n.text("Your plan · ", "Planın · ") + planName)
-            left.font = .systemFont(ofSize: 12, weight: .medium)
-            left.textColor = .secondaryLabelColor
-            left.lineBreakMode = .byTruncatingTail
-            left.setContentHuggingPriority(.defaultLow, for: .horizontal)
-            let right = NSTextField(labelWithString: usd(planPrice) + perMo)
-            right.font = Typography.bodyMono(12.5, weight: .semibold)
-            right.textColor = .labelColor
-            right.alignment = .right
-            right.setContentHuggingPriority(.required, for: .horizontal)
-            right.setContentCompressionResistancePriority(.required, for: .horizontal)
-            let row = NSStackView(views: [symbol("checkmark.seal.fill", accent), left, right])
-            row.orientation = .horizontal
-            row.distribution = .fill
-            row.alignment = .centerY
-            row.spacing = 6
-            stack.addArrangedSubview(row)
-            pin(row)
+            let chip = pill(text: planName + " · " + usd(planPrice) + perMo,
+                            bg: Palette.track, fg: Palette.secondaryText, accentValue: usd(planPrice) + perMo)
+            chip.setContentHuggingPriority(.required, for: .horizontal)
+            captionRow = NSStackView(views: [caption, chip])
+        } else {
+            captionRow = NSStackView(views: [caption])
         }
+        captionRow.orientation = .horizontal
+        captionRow.distribution = .fill
+        captionRow.alignment = .centerY
+        captionRow.spacing = 8
+        stack.addArrangedSubview(captionRow)
+        pin(captionRow)
+        stack.setCustomSpacing(Spacing.s, after: captionRow)
 
-        // Row B — the big "API value" figure (what people misread as a bill).
-        let bigText = "≈ " + usd(estMonthly) + perMo
-        let big = NSTextField(labelWithAttributedString: NSAttributedString(string: bigText, attributes: [
-            .font: Typography.displayMono(24, weight: .semibold),
-            .foregroundColor: accent,
-            .kern: -0.3,
+        // Row B — the big API-equivalent figure in NEUTRAL primaryText (never an
+        // accent that reads as "you owe this"), with a quiet "/mo" tail.
+        let bigStr = NSMutableAttributedString(string: "≈ " + usd(estMonthly), attributes: [
+            .font: Typography.displayMono(40, weight: .semibold),
+            .foregroundColor: Palette.primaryText,
+            .kern: -0.5,
+        ])
+        bigStr.append(NSAttributedString(string: perMo, attributes: [
+            .font: Typography.displayMono(15, weight: .regular),
+            .foregroundColor: Palette.tertiaryText,
         ]))
-        let bigRow = NSStackView(views: [symbol("chart.line.uptrend.xyaxis", accent, size: 15), big])
-        bigRow.orientation = .horizontal
-        bigRow.alignment = .centerY
-        bigRow.spacing = 8
-        stack.addArrangedSubview(bigRow)
-
-        let cap = NSTextField(labelWithString:
-            L10n.text("estimated API value of your usage", "kullanımının tahmini API değeri"))
-        cap.font = .systemFont(ofSize: 11)
-        cap.textColor = .secondaryLabelColor
-        stack.addArrangedSubview(cap)
+        let big = NSTextField(labelWithAttributedString: bigStr)
+        big.lineBreakMode = .byClipping
+        stack.addArrangedSubview(big)
+        pin(big)
 
         // Row C — the reassurance. The single most important line on the tab.
         let disclaimer = NSTextField(wrappingLabelWithString: L10n.text(
             "This is not a bill. You're on a subscription — it's what the same token usage would cost on the pay-per-token API.",
             "Bu bir fatura değil. Aboneliktesin — aynı token kullanımının token başına ödenen API'de tutacağı tahmini tutar."))
-        disclaimer.font = .systemFont(ofSize: 11.5)
-        disclaimer.textColor = .secondaryLabelColor
+        disclaimer.font = .systemFont(ofSize: 12)
+        disclaimer.textColor = Palette.secondaryText
         disclaimer.maximumNumberOfLines = 0
         stack.addArrangedSubview(disclaimer)
         pin(disclaimer)
 
-        // Row D — positive framing: how much the subscription saves vs metered.
+        // Row D — positive framing: an accent-green "N× plan value" pill, then
+        // the plain "$X more than your $Y plan" line beside it.
         if let planPrice, planPrice > 0, estMonthly > planPrice {
             let saved = estMonthly - planPrice
             let mult = estMonthly / planPrice
             let multStr = mult >= 10 ? String(format: "%.0f×", mult) : String(format: "%.1f×", mult)
-            let txt = L10n.text(
-                "≈\(usd(saved))\(perMo) saved vs metered API — about \(multStr) your plan's value.",
-                "Ölçümlü API'ye kıyasla ≈\(usd(saved))\(perMo) tasarruf — planının yaklaşık \(multStr) değeri.")
-            let label = NSTextField(wrappingLabelWithString: txt)
-            label.font = .systemFont(ofSize: 11.5, weight: .semibold)
-            label.textColor = .systemGreen
-            label.maximumNumberOfLines = 0
-            let row = NSStackView(views: [symbol("arrow.down.circle.fill", .systemGreen), label])
+            let chip = pill(
+                text: multStr + " " + L10n.text("plan value", "plan değeri"),
+                bg: Palette.positive.withAlphaComponent(0.16), fg: Palette.positive,
+                glyph: "arrow.up.right")
+            chip.setContentHuggingPriority(.required, for: .horizontal)
+            let line = NSTextField(labelWithString: L10n.text(
+                "\(usd(saved)) more than your \(usd(planPrice)) plan",
+                "\(usd(planPrice)) planından \(usd(saved)) fazla"))
+            line.font = .systemFont(ofSize: 11)
+            line.textColor = Palette.secondaryText
+            line.lineBreakMode = .byTruncatingTail
+            let row = NSStackView(views: [chip, line])
             row.orientation = .horizontal
             row.alignment = .centerY
-            row.spacing = 6
+            row.spacing = 8
             stack.addArrangedSubview(row)
             pin(row)
         }
 
-        // Row E — budget pace (warn ≥ 80%, critical ≥ 100% — matches the menubar
-        // tint), or a one-line hook to set a budget when none is configured.
+        // Row E — billing-cycle pace (accent) vs the monthly budget. Warn ≥ 80%,
+        // critical ≥ 100% — matches the menubar tint. One-line hook when unset.
         if budget > 0 {
             let ratio = estMonthly / budget
-            let tint: NSColor = ratio >= 1.0 ? .systemRed : (ratio >= 0.8 ? .systemYellow : accent)
-            let caption = NSTextField(labelWithString:
-                L10n.text("Budget", "Bütçe") + " · " + usd(estMonthly) + " / " + usd(budget)
+            let tint: NSColor = ratio >= 1.0 ? Palette.urgencyRed
+                : (ratio >= 0.8 ? Palette.urgencyAmber : accent)
+            let capL = NSTextField(labelWithAttributedString:
+                Typography.captionAttributed(L10n.text("Billing cycle pace", "Fatura dönemi hızı"),
+                                             color: Palette.tertiaryText))
+            capL.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            let capR = NSTextField(labelWithString: usd(estMonthly) + " / " + usd(budget)
                 + String(format: " · %.0f%%", min(999, ratio * 100)))
-            caption.font = Typography.bodyMono(10.5, weight: .medium)
-            caption.textColor = .secondaryLabelColor
-            let capRow = NSStackView(views: [symbol("target", tint, size: 11), caption])
+            capR.font = Typography.bodyMono(10.5, weight: .medium)
+            capR.textColor = Palette.secondaryText
+            capR.alignment = .right
+            capR.setContentHuggingPriority(.required, for: .horizontal)
+            let capRow = NSStackView(views: [capL, capR])
             capRow.orientation = .horizontal
-            capRow.alignment = .centerY
+            capRow.distribution = .fill
+            capRow.alignment = .firstBaseline
             capRow.spacing = 6
 
-            let bar = ProportionBar()
-            bar.fraction = CGFloat(min(1.0, ratio))
-            bar.fill = tint
+            let bar = ProgressBarView()
+            bar.value = Double(min(1.0, ratio))
+            bar.tint = tint
+            bar.trackColor = Palette.track
+            bar.corner = 3
             bar.translatesAutoresizingMaskIntoConstraints = false
             bar.heightAnchor.constraint(equalToConstant: 6).isActive = true
 
@@ -1522,17 +1722,70 @@ final class CostHeroView: NSView {
             budgetStack.spacing = 5
             stack.addArrangedSubview(budgetStack)
             pin(budgetStack)
+            pin(capRow)
             pin(bar)
         } else {
             let hint = NSTextField(labelWithString: L10n.text(
                 "Tip: set a monthly budget in Settings → General to track your pace here.",
                 "İpucu: hızını burada izlemek için Ayarlar → Genel'den aylık bütçe gir."))
             hint.font = .systemFont(ofSize: 10.5)
-            hint.textColor = .tertiaryLabelColor
+            hint.textColor = Palette.tertiaryText
             hint.maximumNumberOfLines = 0
             stack.addArrangedSubview(hint)
             pin(hint)
         }
+    }
+
+    /// Small rounded pill — neutral or accent-tinted, optionally led by an SF
+    /// Symbol and with one emphasized value substring (used for the plan chip's
+    /// price). All text baked for the current appearance.
+    private func pill(text: String, bg: NSColor, fg: NSColor,
+                      glyph: String? = nil, accentValue: String? = nil) -> NSView {
+        let host = NSView()
+        host.wantsLayer = true
+        host.layer?.cornerRadius = Radius.chip
+        host.layer?.cornerCurve = .continuous
+        host.layer?.backgroundColor = bg.cgColor
+        host.translatesAutoresizingMaskIntoConstraints = false
+
+        let lbl = NSTextField(labelWithString: text)
+        lbl.font = .systemFont(ofSize: 11.5, weight: .semibold)
+        lbl.textColor = fg
+        lbl.lineBreakMode = .byTruncatingTail
+        if let accentValue, let r = text.range(of: accentValue) {
+            let attr = NSMutableAttributedString(string: text, attributes: [
+                .font: NSFont.systemFont(ofSize: 11.5, weight: .medium),
+                .foregroundColor: fg,
+            ])
+            let ns = NSRange(r, in: text)
+            attr.addAttributes([
+                .font: Typography.bodyMono(11.5, weight: .semibold),
+                .foregroundColor: Palette.primaryText,
+            ], range: ns)
+            lbl.attributedStringValue = attr
+        }
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+
+        let content: NSView
+        if let glyph {
+            let iv = symbol(glyph, fg, size: 11, weight: .bold)
+            let row = NSStackView(views: [iv, lbl])
+            row.orientation = .horizontal
+            row.alignment = .centerY
+            row.spacing = 4
+            row.translatesAutoresizingMaskIntoConstraints = false
+            content = row
+        } else {
+            content = lbl
+        }
+        host.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 10),
+            content.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -10),
+            content.topAnchor.constraint(equalTo: host.topAnchor, constant: 5),
+            content.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -5),
+        ])
+        return host
     }
 
     /// Adapts a theme accent so it always contrasts the frosted card: pulls
@@ -1572,5 +1825,210 @@ final class CostHeroView: NSView {
 
     private func pin(_ v: NSView) {
         v.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+}
+
+// MARK: - Per-model cost row + calc note
+
+/// Plan availability for a model, driving its badge. Static product-level map —
+/// the transcripts don't record which billing mode a session used, so this
+/// describes how the *plan* treats each model, not a per-session fact.
+/// `.sunset` carries the date the model leaves the plan (API-only after).
+enum ModelAvail { case plan, sunset(String), api }
+
+/// One model in the per-model cost card: name + availability sub-line on the
+/// left, a thin accent share-bar in the middle, real USD + "value"/"billed" on
+/// the right, and a small neutral/accent availability badge. Pure AppKit, drawn
+/// with constraints; the dollar figure is the engine's exact `by_model` cost.
+private final class ModelCostRowView: NSView {
+    init(name: String, avail: ModelAvail, tokens: UInt64, cost: Double,
+         share: CGFloat, tokensFmt: (UInt64) -> String, usd: (Double) -> String) {
+        super.init(frame: .zero)
+        let billed: Bool
+        switch avail { case .plan: billed = false; default: billed = true }
+        let accent = ThemeStore.current.accent
+
+        // Left: model name + availability sub-line.
+        let nameLbl = NSTextField(labelWithString: name)
+        nameLbl.font = Typography.body(12)
+        nameLbl.textColor = Palette.primaryText
+        nameLbl.lineBreakMode = .byTruncatingTail
+        let subLbl = NSTextField(labelWithString: availabilitySub(avail))
+        subLbl.font = Typography.body(10)
+        subLbl.textColor = billed ? accent : Palette.tertiaryText
+        subLbl.lineBreakMode = .byTruncatingTail
+        let left = NSStackView(views: [nameLbl, subLbl])
+        left.orientation = .vertical
+        left.alignment = .leading
+        left.spacing = 1
+        left.translatesAutoresizingMaskIntoConstraints = false
+        left.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        // Middle: thin share bar (accent fill over neutral track).
+        let bar = ProgressBarView()
+        bar.value = Double(max(0, min(1, share)))
+        bar.tint = accent
+        bar.trackColor = Palette.track
+        bar.corner = 2
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.heightAnchor.constraint(equalToConstant: 5).isActive = true
+
+        // Right: real USD + value/billed meaning. API-only spend is tinted
+        // accent (it's real money on your key); plan value stays neutral.
+        let isApiOnly: Bool = { if case .api = avail { return true } else { return false } }()
+        let costLbl = NSTextField(labelWithString: usd(cost))
+        costLbl.font = Typography.bodyMono(12, weight: .semibold)
+        costLbl.textColor = isApiOnly ? accent : Palette.primaryText
+        costLbl.alignment = .right
+        let kindLbl = NSTextField(labelWithString: billed
+            ? L10n.text("billed", "faturalı") : L10n.text("value", "değer"))
+        kindLbl.font = Typography.body(9)
+        kindLbl.textColor = Palette.tertiaryText
+        kindLbl.alignment = .right
+        let right = NSStackView(views: [costLbl, kindLbl])
+        right.orientation = .vertical
+        right.alignment = .trailing
+        right.spacing = 1
+        right.translatesAutoresizingMaskIntoConstraints = false
+        right.setContentHuggingPriority(.required, for: .horizontal)
+        right.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let badge = AvailBadgeView(avail: avail)
+        badge.translatesAutoresizingMaskIntoConstraints = false
+
+        [left, bar, right, badge].forEach { addSubview($0) }
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            left.leadingAnchor.constraint(equalTo: leadingAnchor),
+            left.centerYAnchor.constraint(equalTo: centerYAnchor),
+            left.widthAnchor.constraint(equalToConstant: 124),
+            badge.leadingAnchor.constraint(equalTo: left.trailingAnchor, constant: Spacing.xs),
+            badge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            bar.leadingAnchor.constraint(equalTo: badge.trailingAnchor, constant: Spacing.s),
+            bar.centerYAnchor.constraint(equalTo: centerYAnchor),
+            right.leadingAnchor.constraint(equalTo: bar.trailingAnchor, constant: Spacing.s),
+            right.trailingAnchor.constraint(equalTo: trailingAnchor),
+            right.centerYAnchor.constraint(equalTo: centerYAnchor),
+            right.widthAnchor.constraint(equalToConstant: 64),
+        ])
+
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("\(name), \(availabilitySub(avail))")
+        setAccessibilityValue("\(usd(cost)), \(tokensFmt(tokens))")
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func availabilitySub(_ a: ModelAvail) -> String {
+        switch a {
+        case .plan: return L10n.text("In your plan", "Planında")
+        case .sunset(let d): return L10n.text("Plan ends \(d)", "Plan \(d) bitiyor")
+        case .api: return L10n.text("Billed to API key", "API anahtarına faturalı")
+        }
+    }
+}
+
+/// Small availability badge: neutral chip for plan models, an accent-tinted
+/// chip for plan→API (sunset) and API-only. Drawn as a rounded pill.
+private final class AvailBadgeView: NSView {
+    init(avail: ModelAvail) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 6
+        layer?.cornerCurve = .continuous
+        let accent = ThemeStore.current.accent
+        let text: String
+        let fg: NSColor
+        let bg: NSColor
+        var border: NSColor?
+        switch avail {
+        case .plan:
+            text = L10n.text("In plan", "Planda")
+            fg = Palette.tertiaryText; bg = Palette.track
+        case .sunset(let d):
+            text = L10n.text("Plan → API · \(d)", "Plan → API · \(d)")
+            fg = accent; bg = Palette.accentSofter; border = Palette.accentSoft
+        case .api:
+            text = L10n.text("API-only", "Yalnızca API")
+            fg = accent; bg = Palette.accentSoft
+        }
+        layer?.backgroundColor = bg.cgColor
+        if let border {
+            layer?.borderWidth = 0.5
+            layer?.borderColor = border.cgColor
+        }
+        let lbl = NSTextField(labelWithString: text)
+        lbl.font = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        lbl.textColor = fg
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(lbl)
+        NSLayoutConstraint.activate([
+            lbl.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            lbl.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            lbl.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            lbl.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
+        ])
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+/// "How this is calculated" note: info glyph + caption, the per-million-rate
+/// explanation (cache-write ×1.25 / cache-read ×0.1), the plan-value vs
+/// API-only-spend distinction, and the Σ formula. Static — no figures.
+private final class CostCalcNoteView: NSView {
+    init() {
+        super.init(frame: .zero)
+        Surface.applyCard(self)
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let glyph = NSImageView()
+        glyph.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil)
+        glyph.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        glyph.contentTintColor = Palette.secondaryText
+        glyph.translatesAutoresizingMaskIntoConstraints = false
+        glyph.setContentHuggingPriority(.required, for: .horizontal)
+        let head = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("How this is calculated", "Bu nasıl hesaplanıyor"),
+                                         color: Palette.secondaryText))
+        let headRow = NSStackView(views: [glyph, head])
+        headRow.orientation = .horizontal
+        headRow.alignment = .centerY
+        headRow.spacing = 6
+        headRow.translatesAutoresizingMaskIntoConstraints = false
+
+        let body = NSTextField(wrappingLabelWithString: L10n.text(
+            "Tokens are read from your local transcripts and multiplied by each model's published per-million rates — input, output, cache-write (×1.25) and cache-read (×0.1). Plan models show the API-equivalent value your flat plan already covers; API-only models show real spend billed to your key.",
+            "Token'lar yerel transkriptlerinden okunur ve her modelin yayımlanmış milyon-başına oranlarıyla çarpılır — girdi, çıktı, önbellek-yazma (×1.25) ve önbellek-okuma (×0.1). Plan modelleri planının zaten karşıladığı API-eşdeğeri değeri gösterir; yalnızca-API modelleri anahtarına faturalanan gerçek harcamayı gösterir."))
+        body.font = Typography.body(11.5)
+        body.textColor = Palette.secondaryText
+        body.maximumNumberOfLines = 0
+
+        let formula = NSTextField(labelWithString: "Σ ( tokensₘ ÷ 1M × rateₘ )   "
+            + L10n.text("for each model m", "her model m için"))
+        formula.font = Typography.bodyMono(10.5, weight: .regular)
+        formula.textColor = Palette.tertiaryText
+
+        let stack = NSStackView(views: [headRow, body, formula])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = Spacing.xs
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.s),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.m),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.m),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Spacing.s),
+        ])
+        body.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        headRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        Surface.refreshCardColors(self)
     }
 }

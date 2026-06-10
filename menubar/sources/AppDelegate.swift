@@ -548,100 +548,128 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     /// Builds the compact menubar title using the active theme:
-    ///     <Agent> <sep> <project> <sep> <ctx%>
+    ///     <gauge> <Agent> <sep> <project> <sep> <ctx%>
+    ///
+    /// The leading gauge-dot is the ONE unified status signal — its arc shows
+    /// context fill and its color carries urgency (calm accent → amber →
+    /// red). It replaces the three competing badges (incident prefix, budget
+    /// suffix, critical-background suffix); whichever is most urgent now just
+    /// drives the single dot's color.
     private func composeTitle(active: Agent?, theme: Theme = ThemeStore.current) -> NSAttributedString {
         let font = NSFont.menuBarFont(ofSize: 0)
         guard let a = active else {
-            return NSAttributedString(string: L10n.text(" no agent", " ajan yok"),
-                                      attributes: [
-                                          .font: font,
-                                          .foregroundColor: NSColor.secondaryLabelColor,
-                                      ])
+            // Idle — hollow ring, no number.
+            let result = NSMutableAttributedString(
+                attributedString: gaugeAttachment(pct: nil, color: theme.separatorColor, font: font))
+            result.append(NSAttributedString(string: L10n.text(" no agent", " ajan yok"),
+                                             attributes: [
+                                                 .font: font,
+                                                 .foregroundColor: NSColor.secondaryLabelColor,
+                                             ]))
+            return result
         }
-        let base = styleTitle(
+        let gaugeColor = menubarUrgencyColor(active: a, theme: theme)
+        let result = NSMutableAttributedString(
+            attributedString: gaugeAttachment(pct: a.ctxPct, color: gaugeColor, font: font))
+        result.append(styleTitle(
             agent: a.name,
             project: a.project,
             pct: a.ctxPct,
             theme: theme,
             font: font
-        )
-        let result = NSMutableAttributedString(attributedString: base)
-        if let prefix = incidentPrefix(font: font) {
-            result.insert(prefix, at: 0)
-        }
-        if let suffix = criticalBackgroundSuffix(font: font, theme: theme) {
-            result.append(suffix)
-        }
-        if let suffix = budgetSuffix(font: font) {
-            result.append(suffix)
-        }
+        ))
         return result
     }
 
-    /// Trailing budget-pressure dot (C1): yellow at warn, red at critical —
-    /// the worse of the monthly $ run-rate vs the user's budget and the hottest
-    /// 5h limit %. Hidden when calm (tier ok) or no budget/limit signal.
-    private func budgetSuffix(font: NSFont) -> NSAttributedString? {
-        guard let tier = ContextSnapshot.budgetTier(lastAllAgents), tier != .ok else { return nil }
-        let color: NSColor = tier == .critical ? .systemRed : .systemYellow
-        return NSAttributedString(string: "  ●", attributes: [
-            .font: font,
-            .foregroundColor: color,
-        ])
-    }
+    /// Unified menubar urgency color. Calm work stays on the accent; the dot
+    /// only warms when something genuinely needs attention (an upstream
+    /// incident, budget/limit pressure, a hot background session, or context
+    /// pinned at the wall). The worst active signal wins.
+    private func menubarUrgencyColor(active a: Agent, theme: Theme) -> NSColor {
+        var level = 0  // 0 calm · 1 attention · 2 at-the-limit
+        func bump(_ x: Int) { if x > level { level = x } }
 
-    /// Builds a leading "● " glyph colored by the active incident severity.
-    /// Returns nil when no incident is active or the user disabled the poller.
-    private func incidentPrefix(font: NSFont) -> NSAttributedString? {
-        guard DisplayPrefs.incidents else { return nil }
-        let state = IncidentPoller.shared.current
-        guard state.severity != .none else { return nil }
-        let color: NSColor
-        switch state.severity {
-        case .critical: color = .systemRed
-        case .major: color = .systemOrange
-        case .minor: color = .systemYellow
-        case .none: return nil
-        }
-        return NSAttributedString(string: "● ", attributes: [
-            .font: font,
-            .foregroundColor: color,
-        ])
-    }
-
-    /// Surfaces a high-pressure background session when the foreground isn't
-    /// already screaming. Three gates:
-    ///   1. Background pct ≥ 75 (deep orange zone — palette anchors at 70/85/90).
-    ///   2. Foreground pct < 70 (don't double-warn when the main field is
-    ///      already orange/red — user is looking at it).
-    ///   3. Background at least 15 points hotter than foreground (delta gate
-    ///      avoids noisy alerts when both sessions are similar).
-    private func criticalBackgroundSuffix(font: NSFont, theme: Theme) -> NSAttributedString? {
-        guard DisplayPrefs.criticalBackground else { return nil }
-        guard let fg = lastActive else { return nil }
-        let fgPct = fg.ctxPct ?? 0
-        guard fgPct < 70 else { return nil }
-        var hottest: ActiveSession?
-        var hottestPct: Double = 0
-        let foregroundProject = fg.project
-        for ag in lastAllAgents {
-            for sess in ag.activeSessions {
-                guard sess.project != foregroundProject else { continue }
-                let pct = sess.ctxPct ?? 0
-                guard pct >= 75, pct >= fgPct + 15 else { continue }
-                if pct > hottestPct {
-                    hottest = sess
-                    hottestPct = pct
-                }
+        if (a.ctxPct ?? 0) >= 95 { bump(2) }
+        if DisplayPrefs.incidents {
+            switch IncidentPoller.shared.current.severity {
+            case .critical: bump(2)
+            case .major, .minor: bump(1)
+            case .none: break
             }
         }
-        guard let h = hottest else { return nil }
-        let pctStr = String(format: "%.0f%%", hottestPct)
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: theme.ctxColor(hottestPct),
-        ]
-        return NSAttributedString(string: "  ⚠ \(h.project) \(pctStr)", attributes: attrs)
+        if let tier = ContextSnapshot.budgetTier(lastAllAgents), tier != .ok {
+            bump(tier == .critical ? 2 : 1)
+        }
+        if DisplayPrefs.criticalBackground, let hot = hottestBackgroundPct(foreground: a) {
+            bump(hot >= 90 ? 2 : 1)
+        }
+        switch level {
+        case 2: return theme.pctHigh
+        case 1: return theme.pctMid
+        default: return theme.accent
+        }
+    }
+
+    /// Hottest background session percent that out-paces a calm foreground —
+    /// same gates as the old critical-background suffix, now feeding the gauge.
+    private func hottestBackgroundPct(foreground fg: Agent) -> Double? {
+        let fgPct = fg.ctxPct ?? 0
+        guard fgPct < 70 else { return nil }
+        var best: Double?
+        for ag in lastAllAgents {
+            for sess in ag.activeSessions {
+                guard sess.project != fg.project else { continue }
+                let pct = sess.ctxPct ?? 0
+                guard pct >= 75, pct >= fgPct + 15 else { continue }
+                if best == nil || pct > best! { best = pct }
+            }
+        }
+        return best
+    }
+
+    /// Renders the leading radial gauge as an inline text attachment sized to
+    /// the menubar cap-height. `pct == nil` draws just the hollow ring (idle).
+    private func gaugeAttachment(pct: Double?, color: NSColor, font: NSFont) -> NSAttributedString {
+        let side = max(11, round(font.capHeight * 1.18))
+        // Resolve dynamic colors against the status button's appearance so the
+        // bitmap bakes the right light/dark variant.
+        let appearance = statusItem?.button?.effectiveAppearance ?? NSApp.effectiveAppearance
+        var arc = color
+        var track = NSColor.tertiaryLabelColor
+        appearance.performAsCurrentDrawingAppearance {
+            arc = color.usingColorSpace(.sRGB) ?? color
+            track = (NSColor.tertiaryLabelColor.usingColorSpace(.sRGB) ?? .tertiaryLabelColor)
+                .withAlphaComponent(0.45)
+        }
+        let lw: CGFloat = 1.7
+        let img = NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            let inset = lw / 2 + 0.5
+            let radius = (side - 2 * inset) / 2
+            let center = CGPoint(x: side / 2, y: side / 2)
+            let ring = NSBezierPath()
+            ring.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            ring.lineWidth = lw
+            track.setStroke()
+            ring.stroke()
+            if let p = pct, p > 0 {
+                let sweep = 360.0 * min(100, p) / 100.0
+                let arcPath = NSBezierPath()
+                // Start at 12 o'clock, sweep clockwise.
+                arcPath.appendArc(withCenter: center, radius: radius,
+                                  startAngle: 90, endAngle: 90 - sweep, clockwise: true)
+                arcPath.lineWidth = lw
+                arcPath.lineCapStyle = .round
+                arc.setStroke()
+                arcPath.stroke()
+            }
+            return true
+        }
+        let attachment = NSTextAttachment()
+        attachment.attachmentCell = NSTextAttachmentCell(imageCell: img)
+        // Sit the ring on the baseline like the brand icon, nudged up a hair so
+        // its center aligns with the text x-height band.
+        attachment.bounds = NSRect(x: 0, y: -1, width: side, height: side)
+        return NSAttributedString(attachment: attachment)
     }
 
     private func styleTitle(

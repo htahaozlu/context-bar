@@ -29,15 +29,18 @@ struct Theme {
     }
 
     static let all: [Theme] = [
+        // Signature theme: one warm clay accent over neutral gray. Context %
+        // stays calm on the accent and only warms to amber / red as it nears
+        // the limit — the single urgency ramp shared with the menubar gauge.
         Theme(
             id: "default",
             name: "Default",
             agentColor: Palette.primaryText,
-            projectColor: .controlAccentColor,
+            projectColor: Palette.accent,
             separatorColor: Palette.tertiaryText,
-            pctLow: .systemGreen,
-            pctMid: .systemOrange,
-            pctHigh: .systemRed,
+            pctLow: Palette.accent,
+            pctMid: Palette.urgencyAmber,
+            pctHigh: Palette.urgencyRed,
             activeDot: "●", inactiveDot: "○", separator: "·"
         ),
         Theme(

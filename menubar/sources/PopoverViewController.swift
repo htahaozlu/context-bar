@@ -304,28 +304,27 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let (container, stack) = sectionContainer(hero: true)
         stack.spacing = Spacing.s
 
-        // Inline "●" glyph as the activity indicator — drawing the dot as a
-        // text character in the same attributed string as the project name
-        // guarantees baseline alignment regardless of font metrics. No more
-        // Auto Layout / cap-height / x-height math.
-        let projectFont = Typography.display(22, weight: .semibold)
-        let dotColor: NSColor = isActive ? .systemGreen : .tertiaryLabelColor
+        // ── Header row: ● + project (left)  ·  brand glyph well (right) ──
+        // Inline "●" keeps the dot baseline-locked to the project name without
+        // cap-height math; it warms to the accent while the agent is live and
+        // greys to tertiary text when idle.
+        let dotColor: NSColor = isActive ? ThemeStore.current.accent : Palette.tertiaryText
         let title = NSMutableAttributedString()
         title.append(
             NSAttributedString(
                 string: "●  ",
                 attributes: [
-                    .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+                    .font: NSFont.systemFont(ofSize: 10, weight: .bold),
                     .foregroundColor: dotColor,
-                    .baselineOffset: 3,
+                    .baselineOffset: 2,
                 ]))
         title.append(
             NSAttributedString(
                 string: a.project,
                 attributes: [
-                    .font: projectFont,
+                    .font: NSFont.systemFont(ofSize: 16, weight: .semibold),
                     .foregroundColor: Palette.primaryText,
-                    .kern: -0.3,
+                    .kern: -0.2,
                 ]))
         let projectLbl = NSTextField(labelWithAttributedString: title)
         projectLbl.lineBreakMode = .byTruncatingTail
@@ -334,38 +333,16 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         projectLbl.toolTip = a.project
         projectLbl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        // (dot is inline in projectLbl — no wrapper container needed)
-
-        // Context % is a live-session signal — blank it when the session is
-        // idle so an old fill level doesn't read as the current one.
-        let pct = isActive ? a.ctxPct : nil
-        let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
-        let pctColor: NSColor = pct.map { ContextSnapshot.ctxColor($0) } ?? .tertiaryLabelColor
-        // Use the IDENTICAL font as projectLbl — same family, weight, AND
-        // size. `monospacedDigitSystemFont` has different cap/x-height
-        // metrics than systemFont so even at 22pt vs 22pt the baseline /
-        // cap-mid won't match. Same font end-to-end is the only reliable
-        // way to get the title and pct visually centered on the same line.
-        let pctLbl = NSTextField(
-            labelWithAttributedString: NSAttributedString(
-                string: pctStr,
-                attributes: [
-                    .font: projectFont,
-                    .foregroundColor: pctColor,
-                    .kern: -0.3,
-                ]
-            ))
-        pctLbl.setContentHuggingPriority(.required, for: .horizontal)
-
-        // Same-size baseline align — project and pct share font metrics so
-        // .firstBaseline is also cap-mid is also centerY.
-        let topRow = NSStackView(views: [projectLbl, pctLbl])
-        topRow.orientation = .horizontal
-        topRow.alignment = .firstBaseline
-        topRow.distribution = .fill
-        topRow.spacing = Spacing.s
-
-        // Meta row: brand icon + agent name + model + time + duration
+        // Brand glyph in a soft accent well (28pt). Keeps the real provider
+        // logo (not a generic glyph) inside the design's tinted chip; the
+        // `accentSofter` token resolves to the same warm clay wash in both
+        // appearances so we don't have to hand-roll srgb per mode.
+        let well = NSView()
+        well.translatesAutoresizingMaskIntoConstraints = false
+        well.wantsLayer = true
+        well.layer?.cornerRadius = Radius.chip
+        well.layer?.cornerCurve = .continuous
+        well.layer?.backgroundColor = Palette.accentSofter.cgColor
         let brandView = NSImageView()
         if let url = agentIconURL(name: a.name), let img = NSImage(contentsOf: url) {
             brandView.image = img
@@ -373,85 +350,161 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         brandView.imageScaling = .scaleProportionallyUpOrDown
         brandView.translatesAutoresizingMaskIntoConstraints = false
         brandView.toolTip = AgentVisual.forName(a.name).accessibilityLabel
+        well.addSubview(brandView)
         NSLayoutConstraint.activate([
-            brandView.widthAnchor.constraint(equalToConstant: 14),
-            brandView.heightAnchor.constraint(equalToConstant: 14),
+            well.widthAnchor.constraint(equalToConstant: 28),
+            well.heightAnchor.constraint(equalToConstant: 28),
+            brandView.centerXAnchor.constraint(equalTo: well.centerXAnchor),
+            brandView.centerYAnchor.constraint(equalTo: well.centerYAnchor),
+            brandView.widthAnchor.constraint(equalToConstant: 16),
+            brandView.heightAnchor.constraint(equalToConstant: 16),
         ])
+        let headSpacer = NSView()
+        headSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let headerRow = NSStackView(views: [projectLbl, headSpacer, well])
+        headerRow.orientation = .horizontal
+        headerRow.alignment = .centerY
+        headerRow.distribution = .fill
+        headerRow.spacing = Spacing.xs
 
-        var metaParts: [String] = []
-        metaParts.append(a.name)
-        if let m = a.model { metaParts.append(m) }
-        if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
-        // Only claim the session is "running" when it is genuinely live; an
-        // idle agent shows just its last-active time, not a fake live duration.
-        let duration = ContextSnapshot.formatDuration(a.sessionStarted, a.lastTurn)
-        if isActive, duration != "—" {
-            metaParts.append(L10n.text("\(duration) running", "\(duration) aktif"))
+        // ── Hero metric row: caption + big % (left)  ·  token detail (right) ──
+        // Context % is a live-session signal — blank it when the session is
+        // idle so an old fill level doesn't read as the current one.
+        let pct = isActive ? a.ctxPct : nil
+        let pctInt = pct.map { String(format: "%.0f", $0) } ?? "—"
+        // Big number stays NEUTRAL (primaryText) — the bar carries the
+        // urgency color; a coloured giant number was too loud in the redesign.
+        let bigNum = NSMutableAttributedString(
+            string: pctInt,
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 44, weight: .semibold),
+                .foregroundColor: Palette.primaryText,
+                .kern: -1.0,
+            ])
+        if pct != nil {
+            bigNum.append(
+                NSAttributedString(
+                    string: "%",
+                    attributes: [
+                        .font: NSFont.monospacedDigitSystemFont(ofSize: 24, weight: .semibold),
+                        .foregroundColor: Palette.secondaryText,
+                    ]))
         }
-        let metaText = metaParts.joined(separator: "  ·  ")
-        let meta = NSTextField(labelWithString: metaText)
-        meta.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-        meta.textColor = .secondaryLabelColor
-        meta.lineBreakMode = .byTruncatingTail
-        meta.maximumNumberOfLines = 1
-        meta.cell?.usesSingleLineMode = true
-        meta.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        meta.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let bigLbl = NSTextField(labelWithAttributedString: bigNum)
+        bigLbl.setContentHuggingPriority(.required, for: .horizontal)
+        bigLbl.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let capLbl = NSTextField(
+            labelWithAttributedString:
+                Typography.captionAttributed(L10n.text("Context window", "Bağlam penceresi")))
+        let leftCol = NSStackView(views: [capLbl, bigLbl])
+        leftCol.orientation = .vertical
+        leftCol.alignment = .leading
+        leftCol.spacing = 2
 
-        let metaRow = NSStackView(views: [brandView, meta])
-        metaRow.orientation = .horizontal
-        metaRow.alignment = .centerY
-        metaRow.distribution = .fill
-        metaRow.spacing = Spacing.xs
+        let used = a.activeSession
+        // Used tokens over "/ <window> tokens". When the session is idle we
+        // surface its last-active time instead of a stale token count so an
+        // old fill level can't read as the current one.
+        let usedText: String
+        let usedColor: NSColor
+        if isActive {
+            usedText = ContextSnapshot.formatTokens(used)
+            usedColor = Palette.primaryText
+        } else {
+            usedText = a.lastTurn.map { _ in L10n.text("idle", "boşta") }
+                ?? L10n.text("idle", "boşta")
+            usedColor = Palette.tertiaryText
+        }
+        let usedLbl = NSTextField(labelWithString: usedText)
+        usedLbl.font = Typography.bodyMono(13, weight: .semibold)
+        usedLbl.textColor = usedColor
+        usedLbl.alignment = .right
+        let winText: String
+        if !isActive {
+            // No live session — report when it was last active rather than a
+            // fixed window the idle session is no longer filling.
+            winText = a.lastTurn.map {
+                L10n.text("last active \(ContextSnapshot.relative($0))",
+                          "son aktif \(ContextSnapshot.relative($0))")
+            } ?? L10n.text("no active session", "aktif oturum yok")
+        } else if let w = a.ctxWindow {
+            winText = "/ \(ContextSnapshot.formatTokens(w)) " + L10n.text("tokens", "token")
+        } else if used > 0 {
+            winText = L10n.text("session", "oturum")
+        } else {
+            winText = L10n.text("window unknown", "pencere bilinmiyor")
+        }
+        let winLbl = NSTextField(labelWithString: winText)
+        winLbl.font = NSFont.systemFont(ofSize: 10.5, weight: .regular)
+        winLbl.textColor = Palette.tertiaryText
+        winLbl.alignment = .right
+        let rightCol = NSStackView(views: [usedLbl, winLbl])
+        rightCol.orientation = .vertical
+        rightCol.alignment = .trailing
+        rightCol.spacing = 1
+        rightCol.setContentHuggingPriority(.required, for: .horizontal)
 
-        stack.addArrangedSubview(topRow)
-        stack.addArrangedSubview(metaRow)
-        topRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        metaRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        let metricSpacer = NSView()
+        metricSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let metricRow = NSStackView(views: [leftCol, metricSpacer, rightCol])
+        metricRow.orientation = .horizontal
+        metricRow.alignment = .bottom
+        metricRow.distribution = .fill
+        metricRow.spacing = Spacing.s
 
-        // Context meter (capsule, 4pt). Always show — provides hero rhythm
-        // and keeps card height stable when pct/window unknown.
+        stack.addArrangedSubview(headerRow)
+        stack.addArrangedSubview(metricRow)
+        headerRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        metricRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
+        // ── Context meter (thick 8pt). Glow when hot; accent fill throughout. ──
         let bar = ProgressBarView()
         bar.value = pct.map { max(0, min(1, $0 / 100.0)) } ?? 0
         bar.tint = ThemeStore.current.accent
         bar.gradientEnd = ThemeStore.current.pctMid
-        bar.corner = 2
-        bar.glow = (pct ?? 0) > 75
+        bar.corner = 3
+        bar.glow = (pct ?? 0) >= 75
         if DisplayPrefs.tickMarks { bar.tickMarks = [0.70, 0.90] }
         bar.translatesAutoresizingMaskIntoConstraints = false
         bar.setAccessibilityLabel(L10n.text("Context usage", "Bağlam kullanımı"))
 
-        let used = a.activeSession
-        // Prefix with "Context / Bağlam" so the hero pct + bar are obviously
-        // about context usage. Prior UI showed only "621.1k / 200k" with no
-        // label, leaving users confused about what 27% measured.
-        let ctxLabel = L10n.text("Context", "Bağlam")
-        var detailText: String
-        if !isActive {
-            // No live session — report when it was last active instead of a
-            // stale context fill that would read as the current one.
-            detailText = a.lastTurn.map {
-                L10n.text("Last active \(ContextSnapshot.relative($0))",
-                          "Son aktif \(ContextSnapshot.relative($0))")
-            } ?? L10n.text("No active session", "Aktif oturum yok")
-        } else if let w = a.ctxWindow {
-            detailText =
-                "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) / \(ContextSnapshot.formatTokens(w))"
-        } else if used > 0 {
-            detailText =
-                "\(ctxLabel) · \(ContextSnapshot.formatTokens(used)) "
-                + L10n.text("session", "oturum")
-        } else {
-            detailText = L10n.text("Context unknown", "Bağlam bilinmiyor")
+        // ── Meta row: agent · model (left)  ·  last turn · running (right) ──
+        var leftParts: [String] = [a.name]
+        if let m = a.model { leftParts.append(m) }
+        let metaLeft = NSTextField(labelWithString: leftParts.joined(separator: " · "))
+        metaLeft.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+        metaLeft.textColor = Palette.secondaryText
+        metaLeft.lineBreakMode = .byTruncatingTail
+        metaLeft.maximumNumberOfLines = 1
+        metaLeft.cell?.usesSingleLineMode = true
+        metaLeft.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        var rightParts: [String] = []
+        if let t = a.lastTurn { rightParts.append(ContextSnapshot.relative(t)) }
+        // Only claim the session is "running" when it is genuinely live; an
+        // idle agent shows just its last-active time, not a fake live duration.
+        let duration = ContextSnapshot.formatDuration(a.sessionStarted, a.lastTurn)
+        if isActive, duration != "—" {
+            rightParts.append(L10n.text("\(duration) running", "\(duration) aktif"))
         }
-        let detail = NSTextField(labelWithString: detailText)
-        detail.font = Typography.bodyMono(11, weight: .regular)
-        detail.textColor = .secondaryLabelColor
+        let metaRight = NSTextField(labelWithString: rightParts.joined(separator: " · "))
+        metaRight.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+        metaRight.textColor = Palette.tertiaryText
+        metaRight.alignment = .right
+        metaRight.setContentHuggingPriority(.required, for: .horizontal)
+        let metaSpacer = NSView()
+        metaSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        let metaRow = NSStackView(views: [metaLeft, metaSpacer, metaRight])
+        metaRow.orientation = .horizontal
+        metaRow.alignment = .firstBaseline
+        metaRow.distribution = .fill
+        metaRow.spacing = Spacing.xs
 
         stack.addArrangedSubview(bar)
-        stack.addArrangedSubview(detail)
+        stack.addArrangedSubview(metaRow)
         bar.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        bar.heightAnchor.constraint(equalToConstant: 4).isActive = true
+        bar.heightAnchor.constraint(equalToConstant: 8).isActive = true
+        metaRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
         // Incident strip — visible only when IncidentPoller surfaces an
         // active upstream incident. Click opens the status page.

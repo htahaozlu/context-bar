@@ -136,8 +136,18 @@ final class YearHeatmapView: NSView {
                     NSColor.separatorColor.withAlphaComponent(0.18).setFill()
                     path.fill()
                 } else {
+                    // Discrete 5-level accent intensity ramp (signature look):
+                    // log-scaled token volume bucketed to 8/28/52/76/100% accent.
                     let norm = log(Double(day.tokens) + 1) / log(Double(maxTok) + 1)
-                    accent.withAlphaComponent(0.18 + CGFloat(norm) * 0.72).setFill()
+                    let level: CGFloat
+                    switch norm {
+                    case ..<0.2: level = 0.08
+                    case ..<0.4: level = 0.28
+                    case ..<0.6: level = 0.52
+                    case ..<0.8: level = 0.76
+                    default:     level = 1.0
+                    }
+                    accent.withAlphaComponent(level).setFill()
                     path.fill()
                 }
                 // Hover hint — faint inset before commit.
@@ -208,7 +218,7 @@ final class YearHeatmapView: NSView {
 
     private func drawLegend(accent: NSColor, maxBottom: CGFloat) {
         let sw: CGFloat = 9, sgap: CGFloat = 3
-        let levels: [CGFloat] = [0.18, 0.36, 0.54, 0.72, 0.9]
+        let levels: [CGFloat] = [0.08, 0.28, 0.52, 0.76, 1.0]
         let y = bounds.height - bottomGutter + 4
         let less = NSAttributedString(string: L10n.text("Less", "Az"), attributes: labelAttrs())
         let more = NSAttributedString(string: L10n.text("More", "Çok"), attributes: labelAttrs())

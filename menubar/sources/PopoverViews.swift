@@ -15,49 +15,57 @@ final class MenubarCardView: NSView {
     }
 }
 
-/// Premium hero card with a subtle accent gradient overlay. Used as the top
-/// section of the popover for the active agent — provides the "you opened
-/// something premium" first impression.
+/// Hero card — the single SOLID surface in the popover. Everything else floats
+/// as translucent cards on the OS popover material; the hero anchors the panel
+/// with an opaque fill and a 2.5pt accent stripe across its top edge (the lone
+/// chromatic note). Border + elevation shadow come from `Surface.applyHero`.
 final class MenubarHeroCardView: NSView {
-    private let gradient = CAGradientLayer()
-    private let pulse = CALayer()
+    /// Clipped body layer: holds the opaque fill and the accent stripe so both
+    /// honour the rounded top corners. The view's own layer keeps the shadow
+    /// (which needs `masksToBounds = false`), so the two concerns stay split.
+    private let body = CALayer()
+    private let stripe = CALayer()
+    private let stripeHeight: CGFloat = 2.5
 
     init() {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         Surface.applyHero(self)
-        gradient.cornerRadius = Radius.hero
-        gradient.cornerCurve = .continuous
-        gradient.masksToBounds = true
-        gradient.startPoint = CGPoint(x: 0, y: 0)
-        gradient.endPoint = CGPoint(x: 1, y: 1)
-        layer?.insertSublayer(gradient, at: 0)
-        applyGradient()
+        body.cornerRadius = Radius.hero
+        body.cornerCurve = .continuous
+        body.masksToBounds = true
+        body.addSublayer(stripe)
+        layer?.insertSublayer(body, at: 0)
+        applyFill()
     }
     required init?(coder: NSCoder) { fatalError() }
 
     override func layout() {
         super.layout()
-        gradient.frame = bounds
+        body.frame = bounds
+        // Layer space is bottom-left origin (view is not flipped) → the stripe
+        // sits at the top edge.
+        stripe.frame = CGRect(x: 0, y: bounds.height - stripeHeight,
+                              width: bounds.width, height: stripeHeight)
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         Surface.refreshHeroChrome(self)
-        applyGradient()
+        applyFill()
     }
 
-    private func applyGradient() {
+    private func applyFill() {
         let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let baseAlpha: CGFloat = MotionPrefs.reduceTransparency ? 1.0 : (isDark ? 0.30 : 0.55)
-        let base = NSColor.controlBackgroundColor.withAlphaComponent(baseAlpha)
-        let accent = ThemeStore.current.accent
-        let stop1 = accent.withAlphaComponent(0.10)
-        let stop2 = accent.withAlphaComponent(0.02)
-        gradient.colors = [
-            stop1.blended(withFraction: 0.7, of: base)?.cgColor ?? base.cgColor,
-            stop2.blended(withFraction: 0.95, of: base)?.cgColor ?? base.cgColor,
-        ]
+        let solid = isDark ? NSColor(srgbRed: 0.169, green: 0.165, blue: 0.157, alpha: 1)  // #2B2A28
+                           : NSColor(calibratedWhite: 1.0, alpha: 1)
+        body.backgroundColor = solid.cgColor
+        // Resolve the dynamic accent against this view's appearance.
+        var accentCG = ThemeStore.current.accent.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            accentCG = ThemeStore.current.accent.cgColor
+        }
+        stripe.backgroundColor = accentCG
     }
 }
 

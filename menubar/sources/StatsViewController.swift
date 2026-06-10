@@ -38,7 +38,7 @@ final class StatsViewController: PreferencePaneViewController {
     private let selDateLabel = NSTextField(labelWithString: "")
     private let selTotalLabel = NSTextField(labelWithString: "")
     private let selMetaLabel = NSTextField(labelWithString: "")
-    private let breakdownView = ProjectBreakdownView()
+    private let breakdownView = ProjectBarsView()
     private let sessionsLabel = NSTextField(labelWithString: "")
     private let sessionListView = SessionListView()
     private var sessionPopover: NSPopover?
@@ -52,7 +52,8 @@ final class StatsViewController: PreferencePaneViewController {
     private var snapshot = Snapshot()
 
     // Insights — local narrative + token composition + optional AI deep-dive.
-    private let compositionView = TokenCompositionView()
+    // Token composition renders as one segmented accent pill (input/output/cache).
+    private let compositionView = SegmentedCompositionView()
     private let insightsStack = NSStackView()
     private let aiButton = NSButton()
     private let aiSpinner = NSProgressIndicator()
@@ -466,13 +467,19 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     private func insightHeadline(_ metric: String, _ rest: String, tint: NSColor) -> NSAttributedString {
+        // One accent only: the metric reads in bold tabular mono accent, the
+        // sentence continues in primary text. `tint` is ignored here — kept in
+        // the signature so call sites stay unchanged; it still drives the
+        // hot/cool wording of each insight's detail line.
+        _ = tint
         let s = NSMutableAttributedString(string: metric, attributes: [
-            .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
-            .foregroundColor: tint,
+            .font: Typography.bodyMono(13, weight: .semibold),
+            .foregroundColor: Palette.accent,
+            .kern: -0.2,
         ])
         s.append(NSAttributedString(string: rest, attributes: [
             .font: NSFont.systemFont(ofSize: 13, weight: .regular),
-            .foregroundColor: NSColor.labelColor,
+            .foregroundColor: Palette.primaryText,
         ]))
         return s
     }
@@ -603,11 +610,13 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     private func refreshInsights() {
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
+        // Segmented composition pill — input / output / cache in accent shades
+        // 100 / 60 / 26%, with a swatch + percentage legend underneath.
         compositionView.segments = [
             .init(label: L10n.text("Input", "Girdi"), value: snapshot.input30d, color: accent),
-            .init(label: L10n.text("Output", "Çıktı"), value: snapshot.output30d, color: accent.withAlphaComponent(0.55)),
-            .init(label: L10n.text("Cache", "Önbellek"), value: snapshot.cacheRead30d, color: .tertiaryLabelColor),
+            .init(label: L10n.text("Output", "Çıktı"), value: snapshot.output30d, color: accent.withAlphaComponent(0.60)),
+            .init(label: L10n.text("Cache", "Önbellek"), value: snapshot.cacheRead30d, color: accent.withAlphaComponent(0.26)),
         ]
 
         insightsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -619,7 +628,7 @@ final class StatsViewController: PreferencePaneViewController {
             insightsStack.addArrangedSubview(empty)
         } else {
             for ins in insights {
-                let card = InsightCardView(symbol: ins.symbol, tint: ins.tint, headline: ins.headline, detail: ins.detail)
+                let card = AccentInsightCard(symbol: ins.symbol, headline: ins.headline, detail: ins.detail)
                 insightsStack.addArrangedSubview(card)
                 card.widthAnchor.constraint(equalTo: insightsStack.widthAnchor).isActive = true
             }
@@ -880,7 +889,10 @@ final class StatsViewController: PreferencePaneViewController {
         let sessions = sessionsInRange(snap)
         let (active, total) = activeDaysInRange(snap)
 
-        var tiles: [NSView] = [
+        // Lead with the six metrics that matter most at a glance; the rest are
+        // tucked behind a "N more …" disclosure so the grid stays scannable.
+        // Every metric the file computes is still surfaced — only reordered.
+        let primary: [NSView] = [
             StatTileView(
                 caption: L10n.text("sessions", "oturum"),
                 value: numberString(sessions)
@@ -893,6 +905,17 @@ final class StatsViewController: PreferencePaneViewController {
                 value: ContextSnapshot.formatTokens(tokens)
             ),
             StatTileView(
+                caption: L10n.text("active days", "aktif gün"),
+                value: total > 0 ? "\(active)/\(total)" : "—"
+            ),
+            StatTileView(
+                // The live momentum metric carries the lone accent so the eye
+                // lands on it first.
+                caption: L10n.text("current streak", "mevcut seri"),
+                value: streakString(currentStreak(snap)),
+                valueColor: Palette.accent
+            ),
+            StatTileView(
                 // Share of fresh tokens spent inside sub-agents (Task /
                 // dynamic-workflow runs) — the multi-agent burn the boss flagged.
                 caption: L10n.text("via sub-agents", "alt-ajanlarla"),
@@ -901,45 +924,35 @@ final class StatsViewController: PreferencePaneViewController {
                     : "—"
             ),
             StatTileView(
-                caption: L10n.text("active days", "aktif gün"),
-                value: total > 0 ? "\(active)/\(total)" : "—"
-            ),
-            StatTileView(
-                caption: L10n.text("current streak", "mevcut seri"),
-                value: streakString(currentStreak(snap))
-            ),
-            StatTileView(
-                caption: L10n.text("longest streak", "en uzun seri"),
-                value: streakString(longestStreak(snap))
-            ),
-            StatTileView(
-                caption: L10n.text("longest session", "en uzun oturum"),
-                value: durationString(minutes: longestSession(snap))
-            ),
-            StatTileView(
-                caption: L10n.text("most active day", "en aktif gün"),
-                value: mostActiveDay(snap).map { formatDay($0.date) } ?? "—",
-                mono: false
-            ),
-            StatTileView(
                 caption: L10n.text("favorite model", "favori model"),
                 value: favoriteModel(snap) ?? "—",
                 mono: false
             ),
         ]
+
+        // Secondary metrics — surfaced inline behind the disclosure. Only the
+        // ones that actually have a value are kept so the count stays honest.
+        var extras: [(label: String, value: String)] = []
+        let longest = longestStreak(snap)
+        if longest > 0 {
+            extras.append((L10n.text("longest streak", "en uzun seri"), streakString(longest)))
+        }
+        let session = longestSession(snap)
+        if session > 0 {
+            extras.append((L10n.text("longest session", "en uzun oturum"), durationString(minutes: session)))
+        }
+        if let day = mostActiveDay(snap), day.tokens > 0 {
+            extras.append((L10n.text("most active day", "en aktif gün"), formatDay(day.date)))
+        }
         // Codex records a reasoning effort per turn; Claude does not — only show
-        // the tile when the transcripts actually carried one.
+        // it when the transcripts actually carried one.
         if let eff = snap.favoriteEffort, !eff.isEmpty {
-            tiles.append(StatTileView(
-                caption: L10n.text("favorite effort", "favori effort"),
-                value: prettyEffort(eff),
-                mono: false
-            ))
+            extras.append((L10n.text("favorite effort", "favori effort"), prettyEffort(eff)))
         }
 
-        let rows = stride(from: 0, to: tiles.count, by: 4).map { start -> NSStackView in
-            let end = min(start + 4, tiles.count)
-            let row = NSStackView(views: Array(tiles[start..<end]))
+        let rows = stride(from: 0, to: primary.count, by: 3).map { start -> NSStackView in
+            let end = min(start + 3, primary.count)
+            let row = NSStackView(views: Array(primary[start..<end]))
             row.orientation = .horizontal
             row.distribution = .fillEqually
             row.spacing = 10
@@ -949,6 +962,15 @@ final class StatsViewController: PreferencePaneViewController {
         rows.forEach {
             tilesStack.addArrangedSubview($0)
             $0.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
+        }
+        if !extras.isEmpty {
+            let disclosure = StatDisclosureRow(
+                count: extras.count,
+                summary: extras.map(\.label).joined(separator: ", "),
+                detail: extras
+            )
+            tilesStack.addArrangedSubview(disclosure)
+            disclosure.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
         }
 
         // Feed the full ≈365-day window — the heatmap lays it out as a year
@@ -1161,7 +1183,7 @@ final class StatsViewController: PreferencePaneViewController {
             .sorted { $0.value > $1.value }
             .prefix(12)
             .map { name, tok in
-                ProjectBreakdownView.Row(
+                ProjectBarsView.Row(
                     name: name,
                     tokens: tok,
                     cost: projCost[name] ?? 0,
@@ -1306,5 +1328,376 @@ final class StatsViewController: PreferencePaneViewController {
             "You've used ~\(ratioStr) more tokens than War and Peace.",
             "Savaş ve Barış'tan ~\(ratioStr) daha fazla token kullandınız."
         )
+    }
+}
+
+// MARK: - SegmentedCompositionView (token composition pill + legend)
+//
+// One continuous rounded pill split by token category (Input · Output ·
+// Cache-read) in accent shades 100 / 60 / 26%, with a swatch + percentage
+// legend below. The single-accent restyle of the old TokenCompositionView —
+// answers "where do the tokens actually go" at a glance. Same `Segment` shape
+// so the controller's call site is unchanged.
+final class SegmentedCompositionView: NSView {
+    struct Segment { let label: String; let value: UInt64; let color: NSColor }
+    var segments: [Segment] = [] {
+        didSet { invalidateIntrinsicContentSize(); needsDisplay = true }
+    }
+
+    override var isFlipped: Bool { true }
+    private let barH: CGFloat = 12
+    private let legendTop: CGFloat = 24
+    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 44) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let total = segments.reduce(0.0) { $0 + Double($1.value) }
+        let w = bounds.width
+        let radius = barH / 2
+        let barRect = NSRect(x: 0, y: 0, width: w, height: barH)
+        let clip = NSBezierPath(roundedRect: barRect, xRadius: radius, yRadius: radius)
+
+        // Track (also the empty state).
+        Palette.track.setFill()
+        clip.fill()
+
+        if total > 0 {
+            NSGraphicsContext.saveGraphicsState()
+            clip.addClip()
+            var x: CGFloat = 0
+            let divider: CGFloat = 1
+            let drawn = segments.filter { $0.value > 0 }
+            for (idx, seg) in drawn.enumerated() {
+                let segW = w * CGFloat(Double(seg.value) / total)
+                guard segW > 0 else { continue }
+                seg.color.setFill()
+                let isLast = idx == drawn.count - 1
+                let fillW = isLast ? (w - x) : max(0, segW - divider)
+                NSBezierPath(rect: NSRect(x: x, y: 0, width: fillW, height: barH)).fill()
+                x += segW
+            }
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        // Legend — swatch + "Label  pct%" for each segment.
+        var lx: CGFloat = 0
+        let ly = legendTop
+        let dot: CGFloat = 9
+        for seg in segments {
+            let pct = total > 0 ? Int((Double(seg.value) / total * 100).rounded()) : 0
+            let swatch = NSBezierPath(roundedRect: NSRect(x: lx, y: ly + 1, width: dot, height: dot),
+                                      xRadius: 2, yRadius: 2)
+            seg.color.setFill()
+            swatch.fill()
+            lx += dot + 6
+            let attr = NSMutableAttributedString(string: seg.label + "  ", attributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .regular),
+                .foregroundColor: Palette.secondaryText,
+            ])
+            attr.append(NSAttributedString(string: "\(pct)%", attributes: [
+                .font: Typography.bodyMono(11, weight: .semibold),
+                .foregroundColor: Palette.primaryText,
+            ]))
+            attr.draw(at: NSPoint(x: lx, y: ly))
+            lx += attr.size().width + 16
+        }
+    }
+}
+
+// MARK: - AccentInsightCard (accent-tinted narrative callout)
+//
+// One narrative insight, restyled for the single-accent language: an
+// `accentSofter` fill with a 0.5pt `accentSoft` border, a glyph well (accent
+// SF Symbol in a ~32pt accentSoft rounded square) + a bold mono metric headline
+// + a one-sentence detail. Same headline/detail content the controller already
+// computes — only the chrome changes.
+final class AccentInsightCard: NSView {
+    init(symbol: String, headline: NSAttributedString, detail: String) {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        wantsLayer = true
+        layer?.cornerRadius = Radius.card
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+        refreshColors()
+
+        // Glyph well — accent symbol inside an accentSoft rounded square.
+        let well = NSView()
+        well.wantsLayer = true
+        well.layer?.cornerRadius = Radius.chip
+        well.layer?.cornerCurve = .continuous
+        well.layer?.backgroundColor = Palette.accentSoft.cgColor
+        well.translatesAutoresizingMaskIntoConstraints = false
+
+        let glyph = NSImageView()
+        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        glyph.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg)
+        glyph.contentTintColor = Palette.accent
+        glyph.translatesAutoresizingMaskIntoConstraints = false
+        well.addSubview(glyph)
+
+        let head = NSTextField(labelWithAttributedString: headline)
+        head.lineBreakMode = .byWordWrapping
+        head.maximumNumberOfLines = 0
+        head.translatesAutoresizingMaskIntoConstraints = false
+
+        let det = NSTextField(wrappingLabelWithString: detail)
+        det.font = Typography.body(11.5)
+        det.textColor = Palette.secondaryText
+        det.maximumNumberOfLines = 0
+        det.translatesAutoresizingMaskIntoConstraints = false
+
+        let textCol = NSStackView(views: [head, det])
+        textCol.orientation = .vertical
+        textCol.alignment = .leading
+        textCol.spacing = 2
+        textCol.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(well); addSubview(textCol)
+        NSLayoutConstraint.activate([
+            well.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.s),
+            well.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.s),
+            well.widthAnchor.constraint(equalToConstant: 32),
+            well.heightAnchor.constraint(equalToConstant: 32),
+            glyph.centerXAnchor.constraint(equalTo: well.centerXAnchor),
+            glyph.centerYAnchor.constraint(equalTo: well.centerYAnchor),
+            textCol.leadingAnchor.constraint(equalTo: well.trailingAnchor, constant: Spacing.s),
+            textCol.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.s),
+            textCol.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.s),
+            textCol.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Spacing.s),
+            bottomAnchor.constraint(greaterThanOrEqualTo: well.bottomAnchor, constant: Spacing.s),
+        ])
+
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(headline.string)
+        setAccessibilityValue(detail)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func refreshColors() {
+        layer?.backgroundColor = Palette.accentSofter.cgColor
+        layer?.borderColor = Palette.accentSoft.cgColor
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColors()
+    }
+}
+
+// MARK: - ProjectBarsView (top projects — thin accent bar + mono value)
+//
+// "Which project ate what" for the selected day/range: project name (left), a
+// thin accent ProgressBarView (share of the largest row), and a right-aligned
+// monospaced "tokens · cost" value. Same `Row` shape the old ProjectBreakdownView
+// took, so the controller's call site is unchanged — one ProgressBarView per row.
+final class ProjectBarsView: NSView {
+    struct Row {
+        let name: String
+        let tokens: UInt64
+        let cost: Double
+        let share: Double // 0…1 of the largest row
+    }
+
+    var rows: [Row] = [] {
+        didSet { rebuild() }
+    }
+
+    private let stack = NSStackView()
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = Spacing.s
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func rebuild() {
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for row in rows {
+            let line = ProjectBarRow(
+                name: row.name,
+                fraction: CGFloat(max(0, min(1, row.share))),
+                value: "\(ContextSnapshot.formatTokens(row.tokens)) · \(ContextSnapshot.formatUSD(row.cost))"
+            )
+            stack.addArrangedSubview(line)
+            line.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+    }
+}
+
+/// One project line: name (left), a thin accent ProgressBarView, and a
+/// right-aligned monospaced value. Mirrors the spec's compact
+/// "name · bar · value" row.
+final class ProjectBarRow: NSView {
+    init(name: String, fraction: CGFloat, value: String) {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let nameLbl = NSTextField(labelWithString: name)
+        nameLbl.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        nameLbl.textColor = Palette.primaryText
+        nameLbl.lineBreakMode = .byTruncatingMiddle
+        nameLbl.translatesAutoresizingMaskIntoConstraints = false
+        nameLbl.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        nameLbl.toolTip = name
+
+        let bar = ProgressBarView()
+        bar.value = Double(max(0, min(1, fraction)))
+        bar.tint = Palette.accent
+        bar.trackColor = Palette.track
+        bar.corner = 2.5
+        bar.translatesAutoresizingMaskIntoConstraints = false
+
+        let valLbl = NSTextField(labelWithString: value)
+        valLbl.font = Typography.bodyMono(11, weight: .medium)
+        valLbl.textColor = Palette.secondaryText
+        valLbl.alignment = .right
+        valLbl.translatesAutoresizingMaskIntoConstraints = false
+        valLbl.setContentHuggingPriority(.required, for: .horizontal)
+        valLbl.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        addSubview(nameLbl); addSubview(bar); addSubview(valLbl)
+        NSLayoutConstraint.activate([
+            nameLbl.leadingAnchor.constraint(equalTo: leadingAnchor),
+            nameLbl.centerYAnchor.constraint(equalTo: centerYAnchor),
+            nameLbl.widthAnchor.constraint(equalToConstant: 120),
+            bar.leadingAnchor.constraint(equalTo: nameLbl.trailingAnchor, constant: Spacing.xs),
+            bar.centerYAnchor.constraint(equalTo: centerYAnchor),
+            bar.heightAnchor.constraint(equalToConstant: 5),
+            valLbl.leadingAnchor.constraint(equalTo: bar.trailingAnchor, constant: Spacing.xs),
+            valLbl.trailingAnchor.constraint(equalTo: trailingAnchor),
+            valLbl.centerYAnchor.constraint(equalTo: centerYAnchor),
+            heightAnchor.constraint(equalToConstant: 22),
+        ])
+
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(name)
+        setAccessibilityValue(value)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - StatDisclosureRow (overview "N more …" disclosure)
+//
+// "N more — longest streak, longest session, …" row beneath the six lead
+// tiles. Click toggles a compact label · value grid of the secondary metrics.
+// The chevron glyph swaps right ↔ down to mirror the open state. Keeps every
+// secondary metric one tap away without crowding the tile grid.
+final class StatDisclosureRow: NSView {
+    private let chevron = NSImageView()
+    private let summaryLabel = NSTextField(labelWithString: "")
+    private let detailStack = NSStackView()
+    private var expanded = false
+
+    init(count: Int, summary: String, detail: [(label: String, value: String)]) {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let cfg = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        chevron.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg)
+        chevron.contentTintColor = Palette.tertiaryText
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+
+        let lead = "\(count) " + L10n.text("more", "tane daha") + " — "
+        let attr = NSMutableAttributedString(string: lead, attributes: [
+            .font: NSFont.systemFont(ofSize: 11), .foregroundColor: Palette.secondaryText,
+        ])
+        attr.append(NSAttributedString(string: summary, attributes: [
+            .font: NSFont.systemFont(ofSize: 11), .foregroundColor: Palette.tertiaryText,
+        ]))
+        summaryLabel.attributedStringValue = attr
+        summaryLabel.lineBreakMode = .byTruncatingTail
+        summaryLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let headerRow = NSStackView(views: [chevron, summaryLabel])
+        headerRow.orientation = .horizontal
+        headerRow.alignment = .centerY
+        headerRow.spacing = 6
+        headerRow.translatesAutoresizingMaskIntoConstraints = false
+
+        detailStack.orientation = .vertical
+        detailStack.alignment = .leading
+        detailStack.spacing = Spacing.xxs
+        detailStack.translatesAutoresizingMaskIntoConstraints = false
+        detailStack.isHidden = true
+
+        let col = NSStackView(views: [headerRow, detailStack])
+        col.orientation = .vertical
+        col.alignment = .leading
+        col.spacing = Spacing.xs
+        col.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(col)
+        NSLayoutConstraint.activate([
+            col.topAnchor.constraint(equalTo: topAnchor),
+            col.leadingAnchor.constraint(equalTo: leadingAnchor),
+            col.trailingAnchor.constraint(equalTo: trailingAnchor),
+            col.bottomAnchor.constraint(equalTo: bottomAnchor),
+            headerRow.widthAnchor.constraint(equalTo: col.widthAnchor),
+            detailStack.widthAnchor.constraint(equalTo: col.widthAnchor),
+        ])
+
+        for item in detail {
+            let labelLbl = NSTextField(labelWithString: item.label)
+            labelLbl.font = NSFont.systemFont(ofSize: 11)
+            labelLbl.textColor = Palette.secondaryText
+            labelLbl.lineBreakMode = .byTruncatingTail
+            labelLbl.translatesAutoresizingMaskIntoConstraints = false
+
+            let valueLbl = NSTextField(labelWithString: item.value)
+            valueLbl.font = Typography.bodyMono(11, weight: .regular)
+            valueLbl.textColor = Palette.primaryText
+            valueLbl.alignment = .right
+            valueLbl.lineBreakMode = .byTruncatingTail
+            valueLbl.translatesAutoresizingMaskIntoConstraints = false
+            valueLbl.setContentHuggingPriority(.required, for: .horizontal)
+
+            let spacer = NSView()
+            spacer.translatesAutoresizingMaskIntoConstraints = false
+            spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+            let row = NSStackView(views: [labelLbl, spacer, valueLbl])
+            row.orientation = .horizontal
+            row.alignment = .firstBaseline
+            row.translatesAutoresizingMaskIntoConstraints = false
+            detailStack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: detailStack.widthAnchor).isActive = true
+        }
+
+        let click = NSClickGestureRecognizer(target: self, action: #selector(toggle))
+        addGestureRecognizer(click)
+
+        setAccessibilityRole(.disclosureTriangle)
+        setAccessibilityLabel(lead + summary)
+        setAccessibilityValue("collapsed")
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func toggle() {
+        expanded.toggle()
+        detailStack.isHidden = !expanded
+        // Swap the glyph (right ↔ down) rather than rotating the layer — reads
+        // crisply at 10pt and avoids anchor-point juggling.
+        let cfg = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        let symbol = expanded ? "chevron.down" : "chevron.right"
+        chevron.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg)
+        setAccessibilityValue(expanded ? "expanded" : "collapsed")
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .pointingHand)
     }
 }
