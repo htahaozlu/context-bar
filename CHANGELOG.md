@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.8.0] - 2026-06-10
+
+### Changed
+
+- **Full UI redesign — one clay signature over a neutral scale.** Every surface now speaks a single visual language: a warm clay/terracotta accent (`#C2553A` light · `#E68A66` dark) is the only chromatic note, over a neutral gray scale with consistent spacing (4·8·12·16·20·24·32) and radii (chip 8 / card 12 / hero 16 / popover 20). Numbers stay mono + tabular throughout.
+- **Popover hero.** A solid card with a 2.5pt accent top stripe replaces the gradient; the context window is now the single big hero metric (44pt, neutral) with the project + brand glyph above it, a thick accent meter that glows past the warning threshold, and an agent · model / last-turn · running meta line.
+- **Menubar title.** The three competing emergency signals (upstream incident, budget pressure, hot background session) collapse into **one leading gauge-dot**: its arc shows context fill and its color carries urgency — calm accent → amber → red. Hollow ring when idle.
+- **Stats.** The year heatmap now uses a discrete accent intensity ramp (8/28/52/76/100%) with a matching Less→More legend; the overview leads with six key tiles and tucks the rest behind a disclosure; insight cards, a segmented input/output/cache composition pill, and accent project bars round it out. All drill-downs preserved.
+- **Cost / Value.** The "not a bill" hero keeps its clarity with a neutral API-equivalent figure and an accent stripe; the dense daily cost table is lightened to per-day input·output·cache bars that keep click-to-detail; adds a per-model cost breakdown (real `by_model` dollars) with availability badges (In plan · Plan → API · API-only) and a "how this is calculated" note.
+- **Settings.** Each pane's settings are grouped into native sections (Appearance · Alerts · Behavior; Privacy: AI Advisor · Sharing · Across your Macs) with switch controls and a privacy footer.
+
 ## [0.7.10] - 2026-06-08
 
 ### Fixed
