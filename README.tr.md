@@ -129,6 +129,8 @@ Homebrew kullanmıyorsan:
 
 ## Önizleme
 
+**v0.8.0** itibarıyla her yüzey tek bir sakin görsel dil paylaşıyor — nötr gri ölçek üzerinde tek bir sıcak kil (clay) vurgu rengi, baştan sona mono tabular sayılar.
+
 <p align="center">
   <img src="docs/images/context-bar-screenshot.png" alt="ContextBar yerel kullanım penceresi" width="100%">
 </p>
@@ -139,7 +141,7 @@ Claude Code ve Codex için sürekli oturum görünürlüğüne sahip yerel macOS
   <img src="docs/images/context-bar-menubar.png" alt="ContextBar menubar" width="400">
 </p>
 
-Aktif ajan, proje ve bağlam kullanımını gösteren kompakt menubar durum öğesi. Tıklandığında aktif oturum, bağlam penceresi, 5sa/7g limitleri, paralel oturumlar ve canlı tema seçici içeren yerel bir popover açılır.
+Aktif ajan, proje ve bağlam kullanımını gösteren kompakt menubar durum öğesi — başında, yayı bağlam doluluğunu gösteren ve rengi bir limit, bütçe ya da üst-kaynak arızası dikkat isteyene kadar sakin (vurgu) kalıp sonra ısınan (amber → kırmızı) tek bir gösterge-noktası. Tıklandığında solid bir hero kart (bağlam penceresi tek büyük sayı olarak), aktif oturum, 5sa/7g limitleri, paralel oturumlar ve canlı tema seçici içeren yerel bir popover açılır.
 
 <p align="center">
   <img src="docs/images/context-bar-cost.png" alt="ContextBar Maliyet sekmesi — proje başına günlük tahmini API-eşdeğeri maliyet" width="100%">
@@ -194,7 +196,7 @@ Claude Code uyumluluğu için `CLAUDE.md`, depo köküne de aynalanır.
 
 Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) dosyasını okur ve şunları sağlar:
 
-- kompakt menubar durum öğesi (aktif ajan + proje + bağlam %)
+- kompakt menubar durum öğesi — aktif ajan · proje · bağlam % önünde tek bir gösterge-noktası (yayında bağlam doluluğu, renginde aciliyet)
 - modern AppKit popover: aktif ajan, bağlam penceresi, ilerleme barlı 5sa/7g
   limitleri, paralel oturumlar ve tespit edilen diğer AI araçları için kartlar
 - inline renk swatch'leri ve canlı önizlemeli tema seçici — bir temanın

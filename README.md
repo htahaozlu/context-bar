@@ -129,6 +129,8 @@ If you don't use Homebrew:
 
 ## Preview
 
+As of **v0.8.0** every surface shares one calm visual language — a single warm clay accent over a neutral gray scale, with mono tabular numbers throughout.
+
 <p align="center">
   <img src="docs/images/context-bar-screenshot.png" alt="ContextBar native usage window" width="100%">
 </p>
@@ -139,7 +141,7 @@ Native macOS usage window with rolling session visibility for Claude Code and Co
   <img src="docs/images/context-bar-menubar.png" alt="ContextBar menubar" width="400">
 </p>
 
-Compact menubar status item showing active agent, project, and context usage. Clicking it opens a native popover with the active session, context window, rolling 5h/7d limits, parallel sessions, and a live theme picker.
+Compact menubar status item showing active agent, project, and context usage — led by a single gauge-dot whose arc is your context fill and whose color stays calm (accent) until a limit, budget, or upstream incident needs attention (amber → red). Clicking it opens a native popover with a solid hero card (the context window as one big number), the active session, rolling 5h/7d limits, parallel sessions, and a live theme picker.
 
 <p align="center">
   <img src="docs/images/context-bar-cost.png" alt="ContextBar Cost tab — estimated API-equivalent cost per day per project" width="100%">
@@ -197,7 +199,7 @@ For Claude Code compatibility, `CLAUDE.md` is mirrored at the repository root.
 
 The companion app reads `~/.context-bar/context.json` (`hud.json` before v0.3.13) and provides:
 
-- a compact menubar status item (active agent + project + context %)
+- a compact menubar status item — one gauge-dot (context fill in its arc, urgency in its color) ahead of active agent · project · context %
 - a modern AppKit popover with cards for the active agent, context window,
   rolling 5h/7d limits with progress bars, parallel sessions, and other
   detected AI tools
