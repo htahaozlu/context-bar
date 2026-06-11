@@ -510,6 +510,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // Publish this Mac's compact usage to the shared sync folder (no-op
         // unless the user set one). Off the main concern path; cheap.
         MachineSync.exportLocal()
+        // Mirror the latest snapshot into the local SQLite store and, if a
+        // self-hosted server URL is set, push / pull. Both are throttled
+        // internally so this is safe to call every 10s tick.
+        LocalStore.shared.ingestLocalSnapshot()
+        ServerSync.shared.pushIfDue()
+        ServerSync.shared.pullIfDue()
         if popover.isShown {
             popoverVC.rebuild()
         }

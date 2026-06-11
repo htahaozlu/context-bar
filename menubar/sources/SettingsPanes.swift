@@ -417,12 +417,16 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
             control: makeSwitch(on: DisplayPrefs.incidents, action: #selector(incidentsChanged(_:)),
                                 a11y: L10n.text("Show upstream incident overlay", "Üst kaynak olay göstergesi")))
 
-        alerts.addRow(
+        // Budget limit — promoted to a wide row so the live pace preview
+        // (current run-rate vs. cap, color tier) sits directly under the
+        // input. Re-renders on every refresh so the user sees their
+        // current pace without leaving the pane.
+        alerts.addWideRow(
             title: L10n.text("Monthly budget", "Aylık bütçe"),
             desc: L10n.text(
                 "Tint the title as the run-rate nears this cap, or the 5h limit fills. 0 = off.",
                 "Harcama hızı bu üst sınıra ya da 5sa limitine yaklaşınca başlığı renklendir. 0 = kapalı."),
-            control: makeBudgetField())
+            content: makeBudgetFieldAndPreview())
     }
 
     /// BEHAVIOR — how rolling-window resets read, and celebration.
@@ -459,7 +463,10 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         makeSettingsSwitch(on: on, target: self, action: action, a11y: a11y)
     }
 
-    private func makeBudgetField() -> NSView {
+    /// Field + a live pace preview that re-renders on every refresh. The
+    /// preview is a monospaced "X / Y · tier" line, tinted to match the
+    /// menubar color tier the user would see live.
+    private func makeBudgetFieldAndPreview() -> NSView {
         let field = NSTextField()
         field.placeholderString = L10n.text("USD / month", "USD / ay")
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -469,17 +476,71 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         field.target = self
         field.action = #selector(budgetChanged(_:))
         field.setAccessibilityLabel(L10n.text("Monthly budget USD", "Aylık bütçe USD"))
-        let row = NSStackView(views: [NSTextField(labelWithString: "$"), field])
-        row.orientation = .horizontal
-        row.spacing = 4
-        row.alignment = .firstBaseline
-        return row
+
+        let fieldRow = NSStackView(views: [NSTextField(labelWithString: "$"), field])
+        fieldRow.orientation = .horizontal
+        fieldRow.spacing = 4
+        fieldRow.alignment = .firstBaseline
+
+        // Pace preview — sits right under the field so the user sees
+        // "$847 / $1500 · comfortable" the moment they commit a value.
+        let pace = NSTextField(labelWithString: "")
+        pace.font = Typography.bodyMono(11, weight: .regular)
+        pace.textColor = .secondaryLabelColor
+        pace.maximumNumberOfLines = 0
+        pace.lineBreakMode = .byWordWrapping
+        pace.translatesAutoresizingMaskIntoConstraints = false
+        budgetPaceLabel = pace
+
+        let column = NSStackView(views: [fieldRow, pace])
+        column.orientation = .vertical
+        column.alignment = .leading
+        column.spacing = 6
+        refreshBudgetPace()
+        return column
     }
+
+    private weak var budgetPaceLabel: NSTextField?
 
     @objc private func budgetChanged(_ sender: NSTextField) {
         let cleaned = sender.stringValue.filter { $0.isNumber || $0 == "." }
         DisplayPrefs.monthlyBudgetUSD = Double(cleaned) ?? 0
         onChange?()
+        refreshBudgetPace()
+    }
+
+    /// Computes run-rate vs cap and writes the preview line. Color
+    /// matches the menubar tier the user would see live: green for
+    /// comfortable, orange for close, red for over.
+    private func refreshBudgetPace() {
+        guard let label = budgetPaceLabel else { return }
+        let budget = DisplayPrefs.monthlyBudgetUSD
+        guard budget > 0 else {
+            label.stringValue = L10n.text(
+                "No budget set. Menubar tier will follow the 5h limit % only.",
+                "Bütçe yok. Menubar rengi yalnızca 5sa limit %'sini izler.")
+            label.textColor = .tertiaryLabelColor
+            return
+        }
+        let (_, agents, _) = ContextSnapshot().load()
+        let runRate = agents.reduce(0.0) { $0 + $1.totalCost30d }
+        let ratio = runRate / budget
+        let cap = "\(ContextSnapshot.formatUSD(runRate))  ·  \(ContextSnapshot.formatUSD(budget))"
+        let tier: String
+        let color: NSColor
+        switch ratio {
+        case 1...:
+            tier = L10n.text("over budget", "bütçe aşıldı")
+            color = .systemRed
+        case 0.8...:
+            tier = L10n.text("close to cap", "sınıra yakın")
+            color = .systemOrange
+        default:
+            tier = L10n.text("comfortable", "rahat")
+            color = .systemGreen
+        }
+        label.stringValue = "\(cap)  ·  \(tier)"
+        label.textColor = color
     }
 
     @objc private func resetStyleChanged(_ sender: NSSegmentedControl) {
@@ -536,11 +597,29 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     var onChange: (() -> Void)?
     private let aiProviderPopup = NSPopUpButton()
     private let aiKeyField = NSSecureTextField()
+    private let aiRunButton = NSButton()
+    private let aiResultLabel = NSTextField(labelWithString: "")
+    private let syncURLField = NSTextField()
+    private let syncStatusPill = NSTextField(labelWithString: "")
+    private let syncPillDot = NSView()
+    private let syncDetailLabel = NSTextField(labelWithString: "")
+    private let syncNowButton = NSButton()
+    private let syncTestButton = NSButton()
     private let syncFolderLabel = NSTextField(labelWithString: "")
+    private var syncObserverToken: UUID?
+    private var syncHeartbeat: Timer?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
+        refreshAIStatus()
+        refreshSyncStatus()
+        observeSyncState()
+    }
+
+    deinit {
+        if let t = syncObserverToken { ServerSync.shared.unobserve(t) }
+        syncHeartbeat?.invalidate()
     }
 
     private func buildUI() {
@@ -549,9 +628,17 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         advisor.addWideRow(
             title: L10n.text("Bring your own key", "Kendi anahtarını getir"),
             desc: L10n.text(
-                "Optional. Connect your own OpenAI or Gemini API key for usage-efficiency tips. Only an aggregate summary — no transcripts, no project names — is sent, and only when you press Analyze in the Value tab. Off by default.",
-                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — gönderilir, o da yalnızca Değer sekmesinde Analiz'e bastığında. Varsayılan kapalı."),
+                "Optional. Connect your own OpenAI or Gemini API key for usage-efficiency tips. Only an aggregate summary — no transcripts, no project names — is sent, and only when you press Run analysis. Off by default.",
+                "İsteğe bağlı. Kullanım verimliliği önerileri için kendi OpenAI veya Gemini API anahtarını bağla. Yalnızca özet — transcript yok, proje adı yok — gönderilir, o da yalnızca Analizi çalıştır'a bastığında. Varsayılan kapalı."),
             content: makeAIAdvisorField())
+
+        // Run + last result row. Stays in the same card so the user can
+        // set a key, press Run, and read the result in one continuous
+        // flow without leaving the pane.
+        advisor.addWideRow(
+            title: L10n.text("Last analysis", "Son analiz"),
+            desc: nil,
+            content: makeAIRunRow())
 
         // ── SHARING — what gets masked when you export or share.
         let sharing = addGroup(symbol: "eye.slash", title: L10n.text("Sharing", "Paylaşım"))
@@ -571,16 +658,302 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
             control: makeSwitch(on: DisplayPrefs.maskShareProjects, action: #selector(maskShareChanged(_:)),
                                 a11y: L10n.text("Mask project names on share card", "Paylaşım kartında proje adlarını gizle")))
 
-        // ── SYNC — combine usage across your Macs via a folder you already sync.
+        // ── SYNC — combine usage across your Macs.
+        // Two paths, listed in order of recommendation:
+        //   1. Self-hosted server (preferred) — a tiny Rust binary on a
+        //      homelab box. Each Mac pushes its 30-day rollup; the
+        //      Value tab combines them.
+        //   2. Legacy folder — a folder you already sync. Kept for
+        //      users who don't want to run a server.
         let sync = addGroup(symbol: "macbook.and.iphone", title: L10n.text("Across your Macs", "Mac'lerin arasında"))
+
         sync.addWideRow(
-            title: L10n.text("Combined usage", "Birleşik kullanım"),
+            title: L10n.text("Self-hosted server", "Kendi sunucunuz"),
             desc: L10n.text(
-                "Point this at a folder you already sync (iCloud Drive, Dropbox…). Each Mac writes a compact usage summary there; the Value tab then shows combined usage. Aggregates only — no transcripts, no project names. No server.",
-                "Zaten senkronladığın bir klasörü seç (iCloud Drive, Dropbox…). Her Mac oraya özet kullanım yazar; Değer sekmesi makineler arası birleşik kullanımı gösterir. Yalnızca özet — transcript yok, proje adı yok. Sunucu yok."),
+                "Recommended. Run the bundled `context-bar-server` on any always-on Mac (a Pi, NAS, homelab box) and point every Mac at it. Each Mac pushes its rollup; the Value tab combines them. No third-party service.",
+                "Önerilen. Paketlenmiş `context-bar-server`'ı sürekli açık bir Mac'te (Pi, NAS, ev sunucusu) çalıştırıp her Mac'i ona yönlendirin. Her Mac özetini gönderir; Değer sekmesi birleştirir. Üçüncü taraf yok."),
+            content: makeSyncServerField())
+
+        sync.addWideRow(
+            title: L10n.text("Status", "Durum"),
+            desc: nil,
+            content: makeSyncStatusRow())
+
+        sync.addWideRow(
+            title: L10n.text("Local sync folder (legacy)", "Yerel senkron klasörü (eski)"),
+            desc: L10n.text(
+                "Only needed if you don't want to run a server. Each Mac writes a compact usage file there; the Value tab then combines them.",
+                "Yalnızca sunucu çalıştırmak istemiyorsanız gerekir. Her Mac oraya özet kullanım yazar; Değer sekmesi birleştirir."),
             content: makeSyncFolderField())
 
         addPrivacyFooter()
+    }
+
+    // ── AI ADVISOR UI
+
+    private func makeAIAdvisorField() -> NSView {
+        aiProviderPopup.removeAllItems()
+        AIProvider.allCases.forEach { aiProviderPopup.addItem(withTitle: $0.label) }
+        aiProviderPopup.selectItem(at: AIProvider.allCases.firstIndex(of: DisplayPrefs.aiProvider) ?? 0)
+        aiProviderPopup.target = self
+        aiProviderPopup.action = #selector(aiProviderChanged(_:))
+        aiProviderPopup.translatesAutoresizingMaskIntoConstraints = false
+        aiProviderPopup.setAccessibilityLabel(L10n.text("AI provider", "AI sağlayıcı"))
+
+        aiKeyField.placeholderString = keyPlaceholder(for: DisplayPrefs.aiProvider)
+        aiKeyField.target = self
+        aiKeyField.action = #selector(aiKeyCommitted(_:))
+        aiKeyField.translatesAutoresizingMaskIntoConstraints = false
+        aiKeyField.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
+        aiKeyField.setAccessibilityLabel(L10n.text("API key", "API anahtarı"))
+
+        let row = NSStackView(views: [aiProviderPopup, aiKeyField])
+        row.orientation = .horizontal
+        row.spacing = 8
+        row.alignment = .firstBaseline
+        row.distribution = .fill
+        aiKeyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return row
+    }
+
+    /// Run button + a multi-line result area. The result area shows either
+    /// the last analysis (from `LocalStore`) or, while a run is in flight,
+    /// a status line.
+    private func makeAIRunRow() -> NSView {
+        aiRunButton.title = L10n.text("Run analysis", "Analizi çalıştır")
+        aiRunButton.bezelStyle = .rounded
+        aiRunButton.target = self
+        aiRunButton.action = #selector(aiRunTapped(_:))
+        aiRunButton.translatesAutoresizingMaskIntoConstraints = false
+        aiRunButton.setContentHuggingPriority(.required, for: .horizontal)
+
+        aiResultLabel.font = Typography.bodyMono(11, weight: .regular)
+        aiResultLabel.textColor = .secondaryLabelColor
+        aiResultLabel.maximumNumberOfLines = 0
+        aiResultLabel.lineBreakMode = .byWordWrapping
+        aiResultLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let column = NSStackView(views: [aiRunButton, aiResultLabel])
+        column.orientation = .vertical
+        column.alignment = .leading
+        column.spacing = 8
+
+        let row = NSStackView(views: [column])
+        row.orientation = .horizontal
+        row.alignment = .top
+        row.spacing = 12
+        column.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true
+        return row
+    }
+
+    private func keyPlaceholder(for p: AIProvider) -> String {
+        if p == .off { return L10n.text("Select a provider first", "Önce bir sağlayıcı seçin") }
+        return AIKeychain.hasKey(for: p)
+            ? L10n.text("Key saved — paste to replace", "Anahtar kayıtlı — değiştirmek için yapıştır")
+            : L10n.text("Paste \(p.label) API key", "\(p.label) API anahtarını yapıştır")
+    }
+
+    @objc private func aiProviderChanged(_ s: NSPopUpButton) {
+        let p = AIProvider.allCases[max(0, s.indexOfSelectedItem)]
+        DisplayPrefs.aiProvider = p
+        aiKeyField.stringValue = ""
+        aiKeyField.placeholderString = keyPlaceholder(for: p)
+        onChange?()
+        refreshAIStatus()
+    }
+
+    @objc private func aiKeyCommitted(_ f: NSSecureTextField) {
+        let p = DisplayPrefs.aiProvider
+        guard p != .off else { return }
+        let v = f.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !v.isEmpty else { return }
+        AIKeychain.save(v, for: p)
+        f.stringValue = ""
+        f.placeholderString = L10n.text("Key saved ✓", "Anahtar kayıtlı ✓")
+        refreshAIStatus()
+    }
+
+    @objc private func aiRunTapped(_ sender: NSButton) {
+        guard DisplayPrefs.aiProvider != .off, AIKeychain.hasKey(for: DisplayPrefs.aiProvider) else {
+            aiResultLabel.textColor = .systemOrange
+            aiResultLabel.stringValue = L10n.text(
+                "Pick a provider and paste your key first.",
+                "Önce sağlayıcı seçin ve anahtarınızı yapıştırın.")
+            return
+        }
+        sender.isEnabled = false
+        aiResultLabel.textColor = .secondaryLabelColor
+        aiResultLabel.stringValue = L10n.text(
+            "Analyzing your 30-day usage…",
+            "Son 30 günlük kullanımınız analiz ediliyor…")
+        AIAdvisor.analyze { [weak self] result in
+            guard let self else { return }
+            self.aiRunButton.isEnabled = true
+            switch result {
+            case .success(let text):
+                self.aiResultLabel.textColor = .labelColor
+                self.aiResultLabel.stringValue = text
+                LocalStore.shared.saveAIRun(
+                    provider: DisplayPrefs.aiProvider.rawValue,
+                    summary: AIUsageSummary.build(),
+                    tips: text)
+            case .failure(let err):
+                self.aiResultLabel.textColor = .systemOrange
+                self.aiResultLabel.stringValue =
+                    L10n.text("Couldn't analyze: ", "Analiz edilemedi: ") + "\(err)"
+            }
+        }
+    }
+
+    private func refreshAIStatus() {
+        if let run = LocalStore.shared.lastAIRun() {
+            aiResultLabel.textColor = .secondaryLabelColor
+            let rel = ContextSnapshot.relative(run.ranAt)
+            aiResultLabel.stringValue =
+                L10n.text("Last run ", "Son çalıştırma ") + rel
+                + "  ·  " + (run.provider ?? "—")
+                + "\n\n" + run.tips
+        } else {
+            aiResultLabel.textColor = .secondaryLabelColor
+            aiResultLabel.stringValue = L10n.text(
+                "No analysis yet. Set a key above and press Run analysis.",
+                "Henüz analiz yok. Yukarıdan anahtar girin ve Analizi çalıştır'a basın.")
+        }
+    }
+
+    // ── SYNC (self-hosted server) UI
+
+    private func makeSyncServerField() -> NSView {
+        syncURLField.placeholderString = L10n.text("http://home.local:7878", "http://home.local:7878")
+        syncURLField.stringValue = ServerSync.shared.serverURL ?? ""
+        syncURLField.target = self
+        syncURLField.action = #selector(syncURLCommitted(_:))
+        syncURLField.translatesAutoresizingMaskIntoConstraints = false
+
+        // The width is constrained by the card; let it fill the row.
+        syncURLField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return syncURLField
+    }
+
+    private func makeSyncStatusRow() -> NSView {
+        // Status pill: small dot + monospaced label
+        syncPillDot.wantsLayer = true
+        syncPillDot.layer?.cornerRadius = 4
+        syncPillDot.translatesAutoresizingMaskIntoConstraints = false
+        syncPillDot.widthAnchor.constraint(equalToConstant: 8).isActive = true
+        syncPillDot.heightAnchor.constraint(equalToConstant: 8).isActive = true
+
+        syncStatusPill.font = Typography.bodyMono(11, weight: .semibold)
+        syncStatusPill.textColor = .labelColor
+        syncStatusPill.translatesAutoresizingMaskIntoConstraints = false
+
+        let pillRow = NSStackView(views: [syncPillDot, syncStatusPill])
+        pillRow.orientation = .horizontal
+        pillRow.spacing = 7
+        pillRow.alignment = .centerY
+
+        syncDetailLabel.font = NSFont.systemFont(ofSize: 10.5)
+        syncDetailLabel.textColor = .tertiaryLabelColor
+        syncDetailLabel.maximumNumberOfLines = 0
+        syncDetailLabel.lineBreakMode = .byWordWrapping
+        syncDetailLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        syncNowButton.title = L10n.text("Sync now", "Şimdi senkronla")
+        syncNowButton.bezelStyle = .rounded
+        syncNowButton.target = self
+        syncNowButton.action = #selector(syncNowTapped(_:))
+        syncTestButton.title = L10n.text("Test", "Test et")
+        syncTestButton.bezelStyle = .rounded
+        syncTestButton.target = self
+        syncTestButton.action = #selector(syncTestTapped(_:))
+        let btnRow = NSStackView(views: [syncNowButton, syncTestButton])
+        btnRow.orientation = .horizontal
+        btnRow.spacing = 8
+
+        let column = NSStackView(views: [pillRow, syncDetailLabel, btnRow])
+        column.orientation = .vertical
+        column.alignment = .leading
+        column.spacing = 8
+        let wrap = NSStackView(views: [column])
+        wrap.orientation = .horizontal
+        wrap.alignment = .top
+        column.widthAnchor.constraint(equalTo: wrap.widthAnchor).isActive = true
+        return wrap
+    }
+
+    @objc private func syncURLCommitted(_ f: NSTextField) {
+        let v = f.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        ServerSync.shared.serverURL = v.isEmpty ? nil : v
+        refreshSyncStatus()
+    }
+
+    @objc private func syncNowTapped(_ sender: NSButton) {
+        sender.isEnabled = false
+        ServerSync.shared.syncNow { [weak self] _ in
+            sender.isEnabled = true
+            self?.refreshSyncStatus()
+        }
+    }
+
+    @objc private func syncTestTapped(_ sender: NSButton) {
+        sender.isEnabled = false
+        ServerSync.shared.testConnection { [weak self] result in
+            sender.isEnabled = true
+            switch result {
+            case .success:
+                self?.syncDetailLabel.stringValue = L10n.text(
+                    "Connection OK. Server reachable.",
+                    "Bağlantı başarılı. Sunucu erişilebilir.")
+            case .failure(let err):
+                self?.syncDetailLabel.stringValue =
+                    L10n.text("Connection failed: ", "Bağlantı başarısız: ") + err.message
+            }
+        }
+    }
+
+    private func observeSyncState() {
+        syncObserverToken = ServerSync.shared.observeState { [weak self] _ in
+            self?.refreshSyncStatus()
+        }
+        // 10s heartbeat so "last push / pull" ages gracefully.
+        syncHeartbeat = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            self?.refreshSyncStatus()
+        }
+    }
+
+    private func refreshSyncStatus() {
+        let s = ServerSync.shared.state
+        let label: String
+        let color: NSColor
+        switch s {
+        case .disabled:
+            label = L10n.text("Not configured", "Ayarlı değil")
+            color = .tertiaryLabelColor
+        case .idle:
+            let pushed = ServerSync.shared.status.lastPushedAt
+            label = pushed.map {
+                L10n.text("Synced", "Senkron") + " · " + ContextSnapshot.relative($0)
+            } ?? L10n.text("Ready", "Hazır")
+            color = .systemGreen
+        case .syncing:
+            label = L10n.text("Syncing…", "Senkron ediliyor…")
+            color = .systemBlue
+        case .error(let msg):
+            label = L10n.text("Error", "Hata") + " · " + msg
+            color = .systemRed
+        }
+        syncStatusPill.stringValue = label
+        syncPillDot.layer?.backgroundColor = color.cgColor
+        if let pushed = ServerSync.shared.status.lastPushedAt,
+           let pulled = ServerSync.shared.status.lastPulledAt {
+            syncDetailLabel.stringValue = L10n.text(
+                "Last push \(ContextSnapshot.relative(pushed))  ·  Last pull \(ContextSnapshot.relative(pulled))",
+                "Son push \(ContextSnapshot.relative(pushed))  ·  Son pull \(ContextSnapshot.relative(pulled))")
+        } else {
+            syncDetailLabel.stringValue = L10n.text(
+                "Server not contacted yet.",
+                "Sunucu henüz bağlanmadı.")
+        }
     }
 
     private func makeSyncFolderField() -> NSView {
@@ -622,56 +995,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         DisplayPrefs.syncFolder = ""
         syncFolderLabel.stringValue = syncFolderDisplay()
         onChange?()
-    }
-
-    private func makeAIAdvisorField() -> NSView {
-        aiProviderPopup.removeAllItems()
-        AIProvider.allCases.forEach { aiProviderPopup.addItem(withTitle: $0.label) }
-        aiProviderPopup.selectItem(at: AIProvider.allCases.firstIndex(of: DisplayPrefs.aiProvider) ?? 0)
-        aiProviderPopup.target = self
-        aiProviderPopup.action = #selector(aiProviderChanged(_:))
-        aiProviderPopup.translatesAutoresizingMaskIntoConstraints = false
-        aiProviderPopup.setAccessibilityLabel(L10n.text("AI provider", "AI sağlayıcı"))
-
-        aiKeyField.placeholderString = keyPlaceholder(for: DisplayPrefs.aiProvider)
-        aiKeyField.target = self
-        aiKeyField.action = #selector(aiKeyCommitted(_:))
-        aiKeyField.translatesAutoresizingMaskIntoConstraints = false
-        aiKeyField.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
-        aiKeyField.setAccessibilityLabel(L10n.text("API key", "API anahtarı"))
-
-        let row = NSStackView(views: [aiProviderPopup, aiKeyField])
-        row.orientation = .horizontal
-        row.spacing = 8
-        row.alignment = .firstBaseline
-        row.distribution = .fill
-        aiKeyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        return row
-    }
-
-    private func keyPlaceholder(for p: AIProvider) -> String {
-        if p == .off { return L10n.text("Select a provider first", "Önce bir sağlayıcı seçin") }
-        return AIKeychain.hasKey(for: p)
-            ? L10n.text("Key saved — paste to replace", "Anahtar kayıtlı — değiştirmek için yapıştır")
-            : L10n.text("Paste \(p.label) API key", "\(p.label) API anahtarını yapıştır")
-    }
-
-    @objc private func aiProviderChanged(_ s: NSPopUpButton) {
-        let p = AIProvider.allCases[max(0, s.indexOfSelectedItem)]
-        DisplayPrefs.aiProvider = p
-        aiKeyField.stringValue = ""
-        aiKeyField.placeholderString = keyPlaceholder(for: p)
-        onChange?()
-    }
-
-    @objc private func aiKeyCommitted(_ f: NSSecureTextField) {
-        let p = DisplayPrefs.aiProvider
-        guard p != .off else { return }
-        let v = f.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !v.isEmpty else { return }
-        AIKeychain.save(v, for: p)
-        f.stringValue = ""
-        f.placeholderString = L10n.text("Key saved ✓", "Anahtar kayıtlı ✓")
     }
 
     private func makeSwitch(on: Bool, action: Selector, a11y: String) -> NSSwitch {
