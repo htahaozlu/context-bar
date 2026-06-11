@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/context-bar-core"]
+members = ["crates/context-bar-core", "crates/context-bar-server"]
 resolver = "2"
 
 [package]
@@ -20,6 +20,10 @@ default-run = "context-bar"
 include = [
     "src/**/*.rs",
     "examples/**/*.rs",
+    "crates/context-bar-core/src/**/*.rs",
+    "crates/context-bar-server/src/**/*.rs",
+    "crates/context-bar-server/examples/**/*.rs",
+    "crates/*/Cargo.toml",
     "Cargo.toml",
     "README.md",
     "LICENSE",

@@ -1,0 +1,42 @@
+[package]
+name = "context-bar-server"
+version = "0.7.10"
+edition = "2024"
+license = "Apache-2.0"
+description = "Self-hosted sync server for ContextBar — receives per-machine usage rollups, exposes a combined read API for the menubar app. Local-first, no third-party service."
+repository = "https://github.com/htahaozlu/context-bar"
+readme = "README.md"
+keywords = ["claude", "codex", "context-bar", "self-hosted", "sync"]
+categories = ["api-bindings", "database"]
+
+[[bin]]
+name = "context-bar-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "context-bar-push"
+path = "src/bin/push.rs"
+
+[dependencies]
+# Embedded SQLite — `rusqlite` with the `bundled` feature so the server
+# has no system-library dependency. Users on a Raspberry Pi / NAS can
+# drop the binary on the device and run it without `apt install`.
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Tiny HTTP server — no async runtime, no TLS, no extra crates. The server
+# is intended to run behind a LAN firewall (homelab) and be reverse-
+# proxied with TLS at the gateway if exposed to the public internet.
+tiny_http = "0.12"
+# HTTP client used by the `context-bar-push` helper. Bundled rustls so
+# the binary runs on a base Linux install with no system OpenSSL.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+time = { version = "0.3", features = ["formatting", "macros", "serde"] }
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.11"
+
+[[example]]
+name = "self_test"
+path = "examples/self_test.rs"
