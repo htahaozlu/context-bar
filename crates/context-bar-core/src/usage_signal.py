@@ -1408,9 +1408,25 @@ def collect_codex():
     latest_rate_ts = 0.0
     latest_rate_limits = None
 
-    for path in glob.glob(
-        os.path.join(home, ".codex", "sessions", "**", "*.jsonl"), recursive=True
-    ):
+    # Walk every Codex data location the CLI may have written to. Newer
+    # Codex versions (mid-2025+) split transcripts across `sessions/`,
+    # `archived_sessions/`, and the new `session_index.jsonl` summary.
+    # Reading only `sessions/` left the menubar pinned to the pre-update
+    # snapshot the day after a Codex upgrade — the user reported this
+    # exact symptom in v0.8.1.
+    codex_patterns = [
+        os.path.join(home, ".codex", "sessions", "**", "*.jsonl"),
+        os.path.join(home, ".codex", "archived_sessions", "**", "*.jsonl"),
+    ]
+    codex_paths: list[str] = []
+    for pat in codex_patterns:
+        codex_paths.extend(glob.glob(pat, recursive=True))
+    # session_index.jsonl is a flat file (not a glob) — read it if present.
+    idx = os.path.join(home, ".codex", "session_index.jsonl")
+    if os.path.exists(idx):
+        codex_paths.append(idx)
+
+    for path in codex_paths:
         try:
             mtime = os.path.getmtime(path)
         except OSError:

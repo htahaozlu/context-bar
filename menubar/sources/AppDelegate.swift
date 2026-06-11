@@ -44,6 +44,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         setupPopover()
         refresh()
         syncContextToGroupContainer()
+        // Kick the engine immediately on launch so a freshly-opened
+        // menubar reflects any updates the user made while the app was
+        // closed (e.g. Codex CLI bumped today, Claude Code ran
+        // overnight, …). Without this the user sees the previous run's
+        // JSON until the first 10s tick, which feels like a stale
+        // snapshot — and is, if the engine itself never runs (missing
+        // binary, see `runEngine` for the candidate list).
+        regenerateThenRefresh()
         let args = CommandLine.arguments.dropFirst()
         if ProcessInfo.processInfo.environment["CONTEXTBAR_OPEN_WINDOW"] == "1"
             || args.contains("--settings") || args.contains("--open") {
@@ -186,11 +194,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// active project the moment the user starts typing in a different repo.
     /// FSEvents is recursive and debounced so a burst of writes only triggers
     /// one regenerate.
+    ///
+    /// Newer Codex CLI versions (mid-2025+) also write to `archived_sessions/`
+    /// and `session_index.jsonl` — watching only `~/.codex/sessions/`
+    /// misses a refresh after a Codex update, leaving the menubar pinned to
+    /// the pre-update snapshot. We watch every Codex path that the engine
+    /// could plausibly read from.
     private func startAgentDirWatcher() {
         let home = NSHomeDirectory()
         let candidates = [
             "\(home)/.claude/projects",
             "\(home)/.codex/sessions",
+            "\(home)/.codex/archived_sessions",
+            "\(home)/.codex/session_index.jsonl",
         ]
         let paths = candidates.filter { FileManager.default.fileExists(atPath: $0) }
         guard !paths.isEmpty else { return }
@@ -237,6 +253,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let existing: Set<String> = [
             "\(home)/.claude/projects",
             "\(home)/.codex/sessions",
+            "\(home)/.codex/archived_sessions",
+            "\(home)/.codex/session_index.jsonl",
         ].filter { FileManager.default.fileExists(atPath: $0) }
             .reduce(into: Set<String>()) { $0.insert($1) }
         if existing == fsWatchedPaths { return }
@@ -398,17 +416,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+    /// Last path that successfully ran the engine. `runEngine()` records
+    /// here on success; if a future run fails to find any candidate, we
+    /// log it so a missing-engine condition is visible (vs. silently
+    /// falling back to stale JSON).
+    private static var lastEnginePath: String?
+
     private func runEngine() {
+        let home = NSHomeDirectory()
         let bundleExe = Bundle.main.bundleURL
             .appendingPathComponent("Contents/MacOS/context-bar-engine")
-        let candidates: [URL] = [
-            bundleExe,
+        // Probe a wider set of locations than the original three — the
+        // DMG-installed app lives in /Applications, and a dev build
+        // ($PATH or /usr/local/bin) is the common case. Without this
+        // list, a dev run falls back to the stale `context.json` with
+        // zero indication that the engine never ran.
+        var candidates: [URL] = [
+            bundleExe,                                                      // self-bundled (DMG / packaged)
+            URL(fileURLWithPath: "/Applications/ContextBar.app/Contents/MacOS/context-bar-engine"),
             URL(fileURLWithPath: "/usr/local/bin/context-bar"),
-            URL(fileURLWithPath: "\(NSHomeDirectory())/.cargo/bin/context-bar"),
+            URL(fileURLWithPath: "/opt/homebrew/bin/context-bar"),
+            URL(fileURLWithPath: "\(home)/.cargo/bin/context-bar"),
+            URL(fileURLWithPath: "/usr/bin/context-bar"),
         ]
+        // Walk $PATH for any `context-bar` (or `context-bar-engine`)
+        // the user might have installed via brew, mise, asdf, etc.
+        candidates.append(contentsOf: pathLookupCandidates())
         guard let exe = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else {
+            NSLog("[context-bar] engine not found in %d locations; refresh will use stale JSON", candidates.count)
+            Self.lastEnginePath = nil
             return
         }
+        Self.lastEnginePath = exe.path
         let pyURL = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Resources/usage_signal.py")
         let task = Process()
@@ -426,7 +465,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             task.waitUntilExit()
         } catch {
             // Engine missing or failed — refresh() will fall back to existing JSON.
+            NSLog("[context-bar] engine run failed: %@", "\(error)")
         }
+    }
+
+    /// Walks $PATH for executables named `context-bar` (or
+    /// `context-bar-engine` for a self-bundled binary). The original
+    /// hard-coded candidate list missed `mise` / `asdf` / `brew` shims
+    /// and dev shells that put cargo binaries outside `~/.cargo/bin`.
+    private func pathLookupCandidates() -> [URL] {
+        let names = ["context-bar", "context-bar-engine"]
+        let pathEnv = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        let dirs = pathEnv.split(separator: ":").map(String.init)
+        var out: [URL] = []
+        for d in dirs {
+            for n in names {
+                let p = (d as NSString).appendingPathComponent(n)
+                if FileManager.default.isExecutableFile(atPath: p) {
+                    out.append(URL(fileURLWithPath: p))
+                }
+            }
+        }
+        return out
     }
 
     /// Wires the popover and rewires the status item button to toggle it. The

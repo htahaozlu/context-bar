@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.8.3] - 2026-06-11
+
+### Fixed
+
+- **Stale Codex data after a CLI upgrade.** `usage_signal.py` now reads `~/.codex/archived_sessions/**/*.jsonl` and `~/.codex/session_index.jsonl` in addition to `~/.codex/sessions/`. Newer Codex CLI versions (mid-2025+) moved transcripts to `archived_sessions/`, which the previous engine silently ignored — the menubar would stay pinned to the pre-upgrade snapshot. (FSEvents now watches all three paths; `applicationDidFinishLaunching` runs the engine immediately so a relaunched app doesn't wait 10s for the first tick.)
+- **Engine binary discovery on dev / DMG-installed runs.** `runEngine()` now walks `$PATH` and probes `/Applications/ContextBar.app/...` in addition to the bundled binary. A missing engine was previously silent (stale JSON fallback) — we now `NSLog` the full candidate list so a stale snapshot is debuggable from `Console.app`.
+
+## [0.8.2] - 2026-06-11
+
+### Changed
+
+- **Detail window toolbar: 6 tabs → 3 tabs**, matching the design brief (`docs/macOS UI Theme` — Stats · Cost · Settings). The standalone Usage tab is gone (its content is already on the popover hero and the Stats tab); the standalone General / Privacy / About tabs are folded into a single "Settings" tab that scrolls three group cards (General · Privacy · About).
+- **Tab label rename**: "Value" → "Cost" in the toolbar (matches the design mockup).
+
 ## [0.8.1] - 2026-06-11
 
 ### Added

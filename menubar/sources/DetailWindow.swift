@@ -1,49 +1,49 @@
 import AppKit
 import Foundation
 
+/// Detail window — three tabs that match the design brief (`docs/macOS UI
+/// Theme`): **Stats · Cost · Settings**. The previous implementation had
+/// six tabs (Usage, Stats, Value, General, Privacy, About); the redesign
+/// collapses them into three by:
+///   * Dropping the standalone "Usage" tab — the same data the popover
+///     hero shows is already on the popover, and the Stats tab covers
+///     the historical view.
+///   * Renaming "Value" → "Cost" (matches the design mockup).
+///   * Folding General + Privacy + About into a single "Settings" tab
+///     that scrolls three group cards (General · Privacy · About).
 final class DetailWindowController: NSWindowController, NSWindowDelegate {
     private let tabVC = NSTabViewController()
-    let usageVC = UsageViewController()
     let statsVC = StatsViewController()
     let costVC = CostViewController()
-    private let generalVC = GeneralSettingsViewController()
-    private let privacyVC = PrivacySettingsViewController()
-    private let aboutVC = AboutSettingsViewController()
+    private let settingsVC = SettingsViewController()
 
     init(onThemeChange: @escaping (String) -> Void) {
         super.init(window: nil)
 
         tabVC.tabStyle = .toolbar
 
-        let usageItem = NSTabViewItem(viewController: usageVC)
-        usageItem.label = L10n.text("Usage", "Kullanım")
-        usageItem.image = NSImage(systemSymbolName: "chart.bar.xaxis", accessibilityDescription: usageItem.label)
-
         let statsItem = NSTabViewItem(viewController: statsVC)
         statsItem.label = L10n.text("Stats", "İstatistik")
-        statsItem.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis", accessibilityDescription: statsItem.label)
+        statsItem.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis",
+                                   accessibilityDescription: statsItem.label)
 
-        // "Value" (was "Cost") — the figure is hypothetical API value, not a
-        // bill. The hero on this tab makes that explicit.
+        // "Cost" (was "Value") — matches the design mockup; the hero on
+        // this tab makes it explicit that the figure is hypothetical
+        // API value, not a bill.
         let costItem = NSTabViewItem(viewController: costVC)
-        costItem.label = L10n.text("Value", "Değer")
-        costItem.image = NSImage(systemSymbolName: "dollarsign.circle", accessibilityDescription: costItem.label)
+        costItem.label = L10n.text("Cost", "Maliyet")
+        costItem.image = NSImage(systemSymbolName: "dollarsign.circle",
+                                  accessibilityDescription: costItem.label)
 
-        // Settings panes: General (incl. Appearance) · Privacy · About. About
-        // is its own tab again so the update controls stand on their own.
-        let generalItem = NSTabViewItem(viewController: generalVC)
-        generalItem.label = L10n.text("General", "Genel")
-        generalItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: generalItem.label)
+        // Settings — General (Appearance · Alerts · Behavior), Privacy
+        // (AI Advisor · Sharing · Across your Macs), and About live in
+        // one scrollable pane.
+        let settingsItem = NSTabViewItem(viewController: settingsVC)
+        settingsItem.label = L10n.text("Settings", "Ayarlar")
+        settingsItem.image = NSImage(systemSymbolName: "gearshape",
+                                      accessibilityDescription: settingsItem.label)
 
-        let privacyItem = NSTabViewItem(viewController: privacyVC)
-        privacyItem.label = L10n.text("Privacy", "Gizlilik")
-        privacyItem.image = NSImage(systemSymbolName: "hand.raised", accessibilityDescription: privacyItem.label)
-
-        let aboutItem = NSTabViewItem(viewController: aboutVC)
-        aboutItem.label = L10n.text("About", "Hakkında")
-        aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: aboutItem.label)
-
-        [usageItem, statsItem, costItem, generalItem, privacyItem, aboutItem].forEach(tabVC.addTabViewItem)
+        [statsItem, costItem, settingsItem].forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
@@ -63,7 +63,8 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         window.delegate = self
 
         // Premium frosted background — under-window blending so the desktop
-        // wallpaper softly bleeds through behind the tab content.
+        // wallpaper softly bleeds through behind the tab content. Matches
+        // the redesigned Settings pane aesthetic: a warm-neutral tonal wash.
         if let contentView = window.contentView {
             let effect = NSVisualEffectView(frame: contentView.bounds)
             effect.autoresizingMask = [.width, .height]
@@ -73,24 +74,26 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
             contentView.addSubview(effect, positioned: .below, relativeTo: nil)
         }
 
-        // "Connect a key" (Value + Stats AI advisor) jumps to the Privacy pane
-        // (index 4: Usage·Stats·Value·General·Privacy) where the AI key lives.
-        costVC.onShowPrivacy = { [weak self] in self?.selectTab(index: 4) }
-        statsVC.onShowPrivacy = { [weak self] in self?.selectTab(index: 4) }
+        // "Connect a key" / "Connect to a server" CTAs on the Stats + Cost
+        // panes jump to the Settings tab (index 2: Stats·Cost·Settings)
+        // where the AI key + sync server URL live.
+        let openSettings: () -> Void = { [weak self] in
+            self?.selectTab(index: 2)
+        }
+        costVC.onShowPrivacy = openSettings
+        statsVC.onShowPrivacy = openSettings
 
-        // A theme/language/setting change must immediately re-render the data
-        // tabs too — so the Value hero picks up the new accent (contrast-corrected
-        // per theme), the budget bar reflects a new budget, and labels re-localize
-        // without reopening the window.
+        // A theme / language / setting change must immediately re-render
+        // the data tabs too — so the Cost hero picks up the new accent
+        // (contrast-corrected per theme), the budget bar reflects a new
+        // budget, and labels re-localize without reopening the window.
         let apply: (String) -> Void = { [weak self] id in
             onThemeChange(id)
-            self?.usageVC.reload()
             self?.statsVC.reload()
             self?.costVC.reload()
         }
-        generalVC.onThemeChange = apply
-        generalVC.onChange = { apply(ThemeStore.current.id) }
-        privacyVC.onChange = { apply(ThemeStore.current.id) }
+        settingsVC.onThemeChange = apply
+        settingsVC.onChange = { apply(ThemeStore.current.id) }
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -101,7 +104,6 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func load() {
-        usageVC.reload()
         statsVC.reload()
         costVC.reload()
     }
@@ -132,4 +134,3 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         return false
     }
 }
-
