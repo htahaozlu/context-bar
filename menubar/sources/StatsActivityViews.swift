@@ -121,7 +121,7 @@ final class YearHeatmapView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard !grid.isEmpty, let m = metrics() else { return }
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         let maxTok = max(days.map(\.tokens).max() ?? 1, 1)
         let radius = max(2, min(7, m.cell * 0.3))
         let todayKey = days.first?.key
@@ -318,7 +318,7 @@ final class ProjectBreakdownView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard !rows.isEmpty else { return }
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         let w = bounds.width
 
         for (i, row) in rows.enumerated() {
@@ -482,7 +482,7 @@ final class SessionListView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard !rows.isEmpty else { return }
         let w = bounds.width
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         for (i, row) in rows.enumerated() {
             let y = CGFloat(i) * rowH
             if hovered == i {

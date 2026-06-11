@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
+final class MenubarPopoverViewController: NSViewController {
     static let contentWidth: CGFloat = 360
     private static let activeToolWindow: TimeInterval = 30 * 60
     private let hPad: CGFloat = Spacing.m
@@ -16,12 +16,6 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     var onRefresh: (() -> Void)?
     var onQuit: (() -> Void)?
     var onShare: ((NSView) -> Void)?
-    var onPickTheme: ((String) -> Void)?
-    /// Called while the user hovers theme menu items. Passes the hovered
-    /// theme id (or nil to clear the preview). The host (AppDelegate) uses
-    /// this to repaint the menubar title in the theme's colors live, without
-    /// persisting the choice until the menu item is actually selected.
-    var onPreviewTheme: ((String?) -> Void)?
     /// Called at the end of every rebuild with the freshly measured content
     /// size. The host forces `NSPopover.contentSize` from it so the panel
     /// SHRINKS as well as grows — `preferredContentSize` alone only grows the
@@ -125,15 +119,13 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
 
         if let agent = primary {
             // Card order: hero (active session) → parallel sessions →
-            // per-agent limits (primary first, then any others) → other tools.
+            // usage limits → other tools.
             addCard(buildHero(agent: agent, isActive: agent.name == active?.name))
             if hasParallelSessions(agent: agent, now: now) {
                 addCard(buildParallelSessions(agent: agent, now: now))
             }
-            // Primary agent's limits first, then any other agents with data.
-            let orderedAgents = [agent] + all.filter { $0.name != agent.name }
-            for ag in orderedAgents where hasSecondaryData(ag) {
-                addCard(buildAgentLimits(ag))
+            if hasSecondaryData(agent) {
+                addCard(buildUsageLimits(agent))
             }
         } else {
             // Before the engine has produced a context.json (first launch / cache
@@ -251,7 +243,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         sub.preferredMaxLayoutWidth = Self.contentWidth - 2 * hPad
 
         let stripe = LoadingStripeView()
-        stripe.tint = ThemeStore.current.accent
+        stripe.tint = Palette.accent
         stripe.translatesAutoresizingMaskIntoConstraints = false
 
         stack.addArrangedSubview(title)
@@ -308,7 +300,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // Inline "●" keeps the dot baseline-locked to the project name without
         // cap-height math; it warms to the accent while the agent is live and
         // greys to tertiary text when idle.
-        let dotColor: NSColor = isActive ? ThemeStore.current.accent : Palette.tertiaryText
+        let dotColor: NSColor = isActive ? Palette.accent : Palette.tertiaryText
         let title = NSMutableAttributedString()
         title.append(
             NSAttributedString(
@@ -460,8 +452,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         // ── Context meter (thick 8pt). Glow when hot; accent fill throughout. ──
         let bar = ProgressBarView()
         bar.value = pct.map { max(0, min(1, $0 / 100.0)) } ?? 0
-        bar.tint = ThemeStore.current.accent
-        bar.gradientEnd = ThemeStore.current.pctMid
+        bar.tint = Palette.accent
+        bar.gradientEnd = Palette.urgencyAmber
         bar.corner = 3
         bar.glow = (pct ?? 0) >= 75
         if DisplayPrefs.tickMarks { bar.tickMarks = [0.70, 0.90] }
@@ -584,46 +576,31 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         return false
     }
 
-    /// Limits card for one agent — header strip with brand icon + agent
-    /// name + last-turn metadata, followed by 5h / 7d / session rows. Used
-    /// for both the foreground and any other agents so every limits card has
-    /// the same visual treatment.
-    private func buildAgentLimits(_ a: Agent) -> NSView {
+    /// Single usage-limits card for the hero agent. Background agents surface
+    /// through the parallel / other-tools cards so the popover keeps one clear
+    /// primary hierarchy instead of stacking equally loud limit blocks.
+    private func buildUsageLimits(_ a: Agent) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
 
-        let brand = NSImageView()
-        if let url = agentIconURL(name: a.name), let img = NSImage(contentsOf: url) {
-            brand.image = img
-        }
-        brand.imageScaling = .scaleProportionallyUpOrDown
-        brand.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            brand.widthAnchor.constraint(equalToConstant: 16),
-            brand.heightAnchor.constraint(equalToConstant: 16),
-        ])
-
-        let nameLbl = NSTextField(labelWithString: a.name)
-        nameLbl.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        nameLbl.textColor = .labelColor
+        let caption = sectionCaption(
+            Typography.captionAttributed(L10n.text("Usage limits", "Kullanım limitleri"))
+        )
+        stack.addArrangedSubview(caption)
+        caption.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
         var metaParts: [String] = []
+        metaParts.append(a.name)
         if let m = a.model { metaParts.append(m) }
         if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
         let meta = NSTextField(labelWithString: metaParts.joined(separator: " · "))
-        meta.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-        meta.textColor = .tertiaryLabelColor
+        meta.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+        meta.textColor = Palette.secondaryText
         meta.lineBreakMode = .byTruncatingTail
+        meta.maximumNumberOfLines = 1
 
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let header = NSStackView(views: [brand, nameLbl, spacer, meta])
-        header.orientation = .horizontal
-        header.alignment = .centerY
-        header.spacing = Spacing.xs
-
-        stack.addArrangedSubview(header)
-        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        stack.addArrangedSubview(meta)
+        meta.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
         var rows: [NSView] = []
         let showsRemaining = a.name.caseInsensitiveCompare("Codex") == .orderedSame
@@ -838,7 +815,7 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let pctStr = sess.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
         let pctLbl = NSTextField(labelWithString: pctStr)
         pctLbl.font = Typography.bodyMono(11, weight: .semibold)
-        pctLbl.textColor = ContextSnapshot.ctxColor(sess.ctxPct)
+        pctLbl.textColor = usageColor(sess.ctxPct)
         pctLbl.setContentHuggingPriority(.required, for: .horizontal)
 
         let spacer = NSView()
@@ -855,8 +832,8 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         } else {
             bar.value = 0
         }
-        bar.tint = ThemeStore.current.accent
-        bar.gradientEnd = ThemeStore.current.pctMid
+        bar.tint = Palette.accent
+        bar.gradientEnd = Palette.urgencyAmber
         bar.corner = 2
         if DisplayPrefs.tickMarks { bar.tickMarks = [0.70, 0.90] }
         bar.translatesAutoresizingMaskIntoConstraints = false
@@ -952,9 +929,6 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         let container = NSView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        let themeBtn = makeThemeButton()
-        themeBtn.translatesAutoresizingMaskIntoConstraints = false
-
         let shareBtn = FooterIconButton(
             symbol: "square.and.arrow.up",
             tooltip: L10n.text("Share Today's HUD", "Bugünün HUD'unu paylaş"),
@@ -986,20 +960,12 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         rightStack.spacing = 4
         rightStack.translatesAutoresizingMaskIntoConstraints = false
 
-        container.addSubview(themeBtn)
         container.addSubview(rightStack)
 
-        // Inner padding so the leftmost (THEME) and rightmost (Quit) glyphs
-        // clear the popover's rounded bottom corners. macOS popover corner
-        // radius runs up to ~22pt on Sequoia, so we use a generous guard —
-        // smaller values keep clipping the "T" of THEME at the corner curve.
         let edgeGuard: CGFloat = Spacing.m
         NSLayoutConstraint.activate([
-            themeBtn.leadingAnchor.constraint(
+            rightStack.leadingAnchor.constraint(
                 equalTo: container.leadingAnchor, constant: edgeGuard),
-            themeBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            themeBtn.trailingAnchor.constraint(
-                lessThanOrEqualTo: rightStack.leadingAnchor, constant: -Spacing.xs),
             rightStack.trailingAnchor.constraint(
                 equalTo: container.trailingAnchor, constant: -edgeGuard),
             rightStack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
@@ -1008,106 +974,11 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
         return container
     }
 
-    private func makeThemeButton() -> NSView {
-        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        popup.bezelStyle = .rounded
-        popup.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        popup.translatesAutoresizingMaskIntoConstraints = false
-        popup.target = self
-        popup.action = #selector(handleThemePopupChange(_:))
-
-        let currentId = ThemeStore.current.id
-        for theme in Theme.all {
-            let item = NSMenuItem(title: theme.name, action: nil, keyEquivalent: "")
-            item.representedObject = theme.id
-            item.attributedTitle = themeSwatchTitle(theme: theme)
-            popup.menu?.addItem(item)
-        }
-        if let idx = Theme.all.firstIndex(where: { $0.id == currentId }) {
-            popup.selectItem(at: idx)
-        }
-        popup.menu?.delegate = self
-
-        let prefix = NSTextField(
-            labelWithAttributedString:
-                Typography.captionAttributed(L10n.text("Theme", "Tema")))
-        prefix.lineBreakMode = .byClipping
-        prefix.cell?.usesSingleLineMode = true
-        prefix.maximumNumberOfLines = 1
-        prefix.setContentCompressionResistancePriority(.required, for: .horizontal)
-        prefix.setContentHuggingPriority(.required, for: .horizontal)
-
-        // Popup absorbs the squeeze instead of forcing "Theme" to wrap.
-        popup.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        popup.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-        let stack = NSStackView(views: [prefix, popup])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = Spacing.xs
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        return stack
-    }
-
-    @objc private func handleThemePopupChange(_ sender: NSPopUpButton) {
-        guard let id = sender.selectedItem?.representedObject as? String else { return }
-        onPickTheme?(id)
-    }
-
-    // MARK: NSMenuDelegate — live theme preview while hovering items.
-
-    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
-        if let id = item?.representedObject as? String,
-            Theme.all.contains(where: { $0.id == id })
-        {
-            onPreviewTheme?(id)
-        } else {
-            onPreviewTheme?(nil)
-        }
-    }
-
-    func menuDidClose(_ menu: NSMenu) {
-        onPreviewTheme?(nil)
-    }
-
-    /// Builds a "● ● ●  Theme name" attributed string where the bullets are
-    /// rendered in the theme's agent / project / accent colors. Lets the user
-    /// see each theme's palette inline without reading a label.
-    private func themeSwatchTitle(theme: Theme, compact: Bool = false) -> NSAttributedString {
-        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        let result = NSMutableAttributedString()
-        let swatchAttrs: (NSColor) -> [NSAttributedString.Key: Any] = { color in
-            [.font: font, .foregroundColor: color]
-        }
-        result.append(NSAttributedString(string: "● ", attributes: swatchAttrs(theme.agentColor)))
-        result.append(NSAttributedString(string: "● ", attributes: swatchAttrs(theme.projectColor)))
-        result.append(NSAttributedString(string: "● ", attributes: swatchAttrs(theme.pctMid)))
-        result.append(NSAttributedString(string: " ", attributes: [.font: font]))
-        result.append(
-            NSAttributedString(
-                string: theme.name,
-                attributes: [.font: font, .foregroundColor: Palette.primaryText]
-            ))
-        if !compact {
-            // Trailing example token ("42%") in the theme's percent color so
-            // the user sees how the numeric values will render.
-            result.append(
-                NSAttributedString(
-                    string: "   42%",
-                    attributes: [
-                        .font: NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular),
-                        .foregroundColor: theme.pctMid,
-                    ]
-                ))
-        }
-        return result
-    }
-
     private func usageColor(_ pct: Double?) -> NSColor {
         guard let pct else { return .labelColor }
-        if pct >= 90 { return .systemRed }
-        if pct >= 70 { return .systemOrange }
-        return .systemGreen
+        if pct >= 90 { return Palette.urgencyRed }
+        if pct >= 70 { return Palette.urgencyAmber }
+        return Palette.accent
     }
 
     // MARK: Actions
@@ -1124,8 +995,4 @@ final class MenubarPopoverViewController: NSViewController, NSMenuDelegate {
     }
     @objc private func handleQuit() { onQuit?() }
     @objc private func handleShare(_ sender: NSView) { onShare?(sender) }
-    @objc private func handleThemePick(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
-        onPickTheme?(id)
-    }
 }

@@ -61,9 +61,9 @@ final class MenubarHeroCardView: NSView {
                            : NSColor(calibratedWhite: 1.0, alpha: 1)
         body.backgroundColor = solid.cgColor
         // Resolve the dynamic accent against this view's appearance.
-        var accentCG = ThemeStore.current.accent.cgColor
+        var accentCG = Palette.accent.cgColor
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            accentCG = ThemeStore.current.accent.cgColor
+            accentCG = Palette.accent.cgColor
         }
         stripe.backgroundColor = accentCG
     }

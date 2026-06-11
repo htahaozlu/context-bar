@@ -10,7 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var detailWindow: DetailWindowController?
     let snapshot = ContextSnapshot()
     var lastActive: Agent?
-    private var previewTheme: Theme?
     private let popover = NSPopover()
     private let popoverVC = MenubarPopoverViewController()
     private var fsStream: FSEventStreamRef?
@@ -525,19 +524,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popoverVC.onShare = { [weak self] anchor in
             self?.presentShareCard(from: anchor)
         }
-        popoverVC.onPickTheme = { [weak self] id in
-            ThemeStore.set(id)
-            self?.previewTheme = nil
-            self?.refresh()
-            self?.popoverVC.rebuild()
-            self?.detailWindow?.load()
-        }
-        popoverVC.onPreviewTheme = { [weak self] id in
-            guard let self else { return }
-            self.previewTheme = id.map { Theme.by(id: $0) }
-            self.repaintTitle()
-        }
-
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(togglePopover(_:))
@@ -605,12 +591,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
     }
 
-    /// Repaints the status bar title using the current preview theme if any,
-    /// otherwise the persisted theme. Used both on refresh and during the
-    /// theme picker's live hover preview.
+    /// Repaints the status bar title from the current live snapshot.
     private func repaintTitle() {
-        let theme = previewTheme ?? ThemeStore.current
-        statusItem.button?.attributedTitle = composeTitle(active: lastActive, theme: theme)
+        statusItem.button?.attributedTitle = composeTitle(active: lastActive)
     }
 
     /// Builds the compact menubar title using the active theme:
@@ -621,12 +604,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// red). It replaces the three competing badges (incident prefix, budget
     /// suffix, critical-background suffix); whichever is most urgent now just
     /// drives the single dot's color.
-    private func composeTitle(active: Agent?, theme: Theme = ThemeStore.current) -> NSAttributedString {
+    private func composeTitle(active: Agent?) -> NSAttributedString {
         let font = NSFont.menuBarFont(ofSize: 0)
         guard let a = active else {
             // Idle — hollow ring, no number.
             let result = NSMutableAttributedString(
-                attributedString: gaugeAttachment(pct: nil, color: theme.separatorColor, font: font))
+                attributedString: gaugeAttachment(pct: nil, color: Palette.tertiaryText, font: font))
             result.append(NSAttributedString(string: L10n.text(" no agent", " ajan yok"),
                                              attributes: [
                                                  .font: font,
@@ -634,15 +617,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                                              ]))
             return result
         }
-        let gaugeColor = menubarUrgencyColor(active: a, theme: theme)
+        let gaugeColor = menubarUrgencyColor(active: a)
         let result = NSMutableAttributedString(
             attributedString: gaugeAttachment(pct: a.ctxPct, color: gaugeColor, font: font))
         result.append(styleTitle(
             agent: a.name,
             project: a.project,
             pct: a.ctxPct,
-            theme: theme,
-            font: font
+            font: font,
+            extraCount: extraSessionCount(for: a)
         ))
         return result
     }
@@ -651,7 +634,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// only warms when something genuinely needs attention (an upstream
     /// incident, budget/limit pressure, a hot background session, or context
     /// pinned at the wall). The worst active signal wins.
-    private func menubarUrgencyColor(active a: Agent, theme: Theme) -> NSColor {
+    private func menubarUrgencyColor(active a: Agent) -> NSColor {
         var level = 0  // 0 calm · 1 attention · 2 at-the-limit
         func bump(_ x: Int) { if x > level { level = x } }
 
@@ -670,9 +653,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             bump(hot >= 90 ? 2 : 1)
         }
         switch level {
-        case 2: return theme.pctHigh
-        case 1: return theme.pctMid
-        default: return theme.accent
+        case 2: return Palette.urgencyRed
+        case 1: return Palette.urgencyAmber
+        default: return Palette.accent
         }
     }
 
@@ -742,25 +725,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         agent: String,
         project: String,
         pct: Double?,
-        theme: Theme,
         font: NSFont,
+        extraCount: Int = 0,
         renderAgentAsIcon: Bool = true
     ) -> NSAttributedString {
         let agentAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: theme.agentColor,
+            .foregroundColor: Palette.primaryText,
         ]
         let dim: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: theme.separatorColor,
+            .foregroundColor: Palette.tertiaryText,
         ]
         let projectAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: theme.projectColor,
+            .foregroundColor: Palette.primaryText,
         ]
         let ctxAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: theme.ctxColor(pct),
+            .foregroundColor: menubarPctColor(pct),
         ]
         let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
         let rawSep = SeparatorStore.current
@@ -779,7 +762,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             switch item.element {
             case .agent:
                 if renderAgentAsIcon {
-                    s.append(agentInlineString(name: agent, font: font, fallbackColor: theme.agentColor))
+                    s.append(agentInlineString(name: agent, font: font, fallbackColor: Palette.primaryText))
                 } else {
                     s.append(NSAttributedString(string: agent, attributes: agentAttrs))
                 }
@@ -789,7 +772,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 s.append(NSAttributedString(string: pctStr, attributes: ctxAttrs))
             }
         }
+        if extraCount > 0 {
+            s.append(NSAttributedString(string: " +\(extraCount)", attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize - 1, weight: .semibold),
+                .foregroundColor: Palette.tertiaryText,
+            ]))
+        }
         return s
+    }
+
+    private func menubarPctColor(_ pct: Double?) -> NSColor {
+        guard let pct else { return Palette.tertiaryText }
+        if pct >= 90 { return Palette.urgencyRed }
+        if pct >= 70 { return Palette.urgencyAmber }
+        return Palette.primaryText
+    }
+
+    private func extraSessionCount(for foreground: Agent) -> Int {
+        let cutoff = Date().addingTimeInterval(-(30 * 60))
+        var seen = Set<String>()
+        var count = 0
+        for agent in lastAllAgents {
+            for session in agent.activeSessions {
+                guard (session.lastTurn ?? .distantPast) >= cutoff else { continue }
+                if session.project == foreground.project { continue }
+                let key = "\(session.project)|\(session.model ?? "")"
+                guard !seen.contains(key) else { continue }
+                seen.insert(key)
+                count += 1
+            }
+        }
+        return count
     }
 
     @objc func openDetail() {

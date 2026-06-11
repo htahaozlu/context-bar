@@ -59,15 +59,16 @@ final class SettingsViewController: PreferencePaneViewController {
     /// owning the views; we just reparent the top-level container.
     private func embed(child: PreferencePaneViewController,
                        heading: String, symbol: String, subtitle: String) {
-        // `loadViewIfNeeded` is macOS 14+, so manually call the two
-        // lifecycle hooks we need without the API.
+        // `loadViewIfNeeded` is macOS 14+, so manually call the two lifecycle
+        // hooks we need without the API.
         if !child.isViewLoaded { child.loadView() }
         if child.view.window == nil { child.viewDidLoad() }
-        child.view.frame = NSRect(x: 0, y: 0, width: 200, height: 200)
         child.view.layoutSubtreeIfNeeded()
-        // Wrap the child's scroll view in a captioned container so the
-        // user can scan General / Privacy / About at a glance instead of
-        // having to remember which tab they came from.
+
+        // Re-home the CHILD CONTENT STACK, not the child's scroll view. The
+        // redesign wants one continuous Settings scroller; nested scroll views
+        // leave the outer pane with no intrinsic height and render as the blank
+        // shell seen in capture.
         let wrap = NSStackView()
         wrap.orientation = .vertical
         wrap.alignment = .leading
@@ -93,28 +94,25 @@ final class SettingsViewController: PreferencePaneViewController {
         sub.textColor = .tertiaryLabelColor
         sub.maximumNumberOfLines = 0
 
-        // The child's `view` is itself a FlippedView with an NSScrollView
-        // pinned to its edges. Detach the scroll view from the child so
-        // it can be reparented under our wrap, otherwise AppKit treats
-        // the child view as a single window content and refuses to
-        // embed it twice.
-        guard let scroll = child.view.subviews.compactMap({ $0 as? NSScrollView }).first else {
-            return
+        let body = NSStackView()
+        body.orientation = .vertical
+        body.alignment = .leading
+        body.spacing = child.contentStack.spacing
+        body.translatesAutoresizingMaskIntoConstraints = false
+        while let arranged = child.contentStack.arrangedSubviews.first {
+            child.contentStack.removeArrangedSubview(arranged)
+            arranged.removeFromSuperview()
+            body.addArrangedSubview(arranged)
+            arranged.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true
         }
-        scroll.removeFromSuperview()
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        // Detach the child from any further viewDidLoad / viewWillAppear
-        // work — it has already built its content above. We just hold
-        // the scroll view hostage inside our pane.
-        child.view.removeFromSuperview()
 
         wrap.addArrangedSubview(header)
         wrap.addArrangedSubview(sub)
-        wrap.addArrangedSubview(scroll)
+        wrap.addArrangedSubview(body)
         wrap.setCustomSpacing(10, after: sub)
 
         contentStack.addArrangedSubview(wrap)
         wrap.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
-        scroll.widthAnchor.constraint(equalTo: wrap.widthAnchor).isActive = true
+        body.widthAnchor.constraint(equalTo: wrap.widthAnchor).isActive = true
     }
 }

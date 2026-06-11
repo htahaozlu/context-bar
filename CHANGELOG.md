@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.8.4] - 2026-06-11
+
+### Changed
+
+- **Menubar title — leading gauge-dot.** Every menubar title now starts with a small arc gauge (hollow ring when idle, accent fill at calm, amber at ≥70%, red at ≥90%). The arc replaces the three competing emergency badges; its color carries urgency. A `+N` suffix surfaces the number of other recent sessions in different projects so a focused foreground is not mistaken for a quiet machine.
+- **Popover — one primary usage-limits card.** The hero agent is the single anchor for the limits card. Background agents stay visible through the parallel-sessions and other-tools cards instead of stacking equally loud limit blocks, keeping the popover hierarchy unambiguous.
+- **Theme picker removed from the popover footer.** Surfaces now speak through a single clay palette (no live theme switching, no `ThemeStore` indirection in views). The popover footer shrinks to Share / Settings / Quit.
+- **Settings — one continuous scroller.** Detail window tabs (Stats · Cost · Settings) render as a single outer scroller. The previous nested-scroll hack that re-homed each pane's `NSScrollView` is gone; Settings now reads as three group cards (General · Privacy · About) inside the same scroll surface.
+- **Cost & Stats controls combined.** The Cost tab's "Provider" and "Range" sections merge into a single "Cost & value" row; the Stats tab's "Provider" and "Range" merge into "Activity". Header subtitles carry the same explanation in both languages.
+- **DisplayPicker preview mirrors the live gauge-dot.** The title-preview chip in the customizer now renders the same leading gauge and color tiers as the actual menubar title, so what you see in the picker is what you get.
+
 ## [0.8.3] - 2026-06-11
 
 ### Fixed

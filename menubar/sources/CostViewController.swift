@@ -51,6 +51,12 @@ final class CostViewController: PreferencePaneViewController {
         // pace — so the big number never reads as a bill.
         addHero(heroCard)
 
+        let controlsStack = NSStackView()
+        controlsStack.orientation = .horizontal
+        controlsStack.alignment = .centerY
+        controlsStack.spacing = 10
+        controlsStack.translatesAutoresizingMaskIntoConstraints = false
+
         providerControl.segmentStyle = .texturedRounded
         providerControl.segmentCount = 2
         providerControl.setLabel("Claude", forSegment: 0)
@@ -59,15 +65,6 @@ final class CostViewController: PreferencePaneViewController {
         providerControl.target = self
         providerControl.action = #selector(providerChanged(_:))
         providerControl.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Provider", "Sağlayıcı"),
-            subtitle: L10n.text("Cost source.", "Maliyet kaynağı."),
-            symbol: "cpu",
-            info: L10n.text(
-                "Cost source. Each provider is priced from its own transcripts.",
-                "Maliyet kaynağı. Her sağlayıcı kendi transkriptlerinden fiyatlanır."),
-            body: providerControl
-        )
 
         rangeControl.segmentStyle = .texturedRounded
         rangeControl.segmentCount = 2
@@ -78,11 +75,17 @@ final class CostViewController: PreferencePaneViewController {
         rangeControl.action = #selector(rangeChanged(_:))
         rangeControl.translatesAutoresizingMaskIntoConstraints = false
         addSection(
-            title: L10n.text("Range", "Aralık"),
-            subtitle: nil,
-            symbol: "calendar",
-            body: rangeControl
+            title: L10n.text("Cost & value", "Maliyet ve değer"),
+            subtitle: L10n.text("Provider and rolling window for the estimate.",
+                                "Tahmin için sağlayıcı ve kayan pencere."),
+            symbol: "dollarsign.circle",
+            info: L10n.text(
+                "Each provider is priced from its own transcripts. The hero keeps the 'not a bill' explanation pinned above the rest of the tab.",
+                "Her sağlayıcı kendi transkriptlerinden fiyatlanır. Hero kart 'fatura değil' açıklamasını sekmenin üstünde sabit tutar."),
+            body: controlsStack
         )
+        controlsStack.addArrangedSubview(providerControl)
+        controlsStack.addArrangedSubview(rangeControl)
 
         tilesStack.orientation = .vertical
         tilesStack.alignment = .leading
@@ -570,7 +573,7 @@ final class CostViewController: PreferencePaneViewController {
         sparkHost.addSubview(caption)
 
         let chart = CostTrendChartView()
-        chart.tint = ThemeStore.current.accent
+        chart.tint = Palette.accent
         chart.points = points.map { (date: $0.date, cost: $0.cost, tokens: $0.tokens) }
         chart.usd = { ContextSnapshot.formatUSD($0) }
         chart.tokensFmt = { ContextSnapshot.formatTokens($0) }
@@ -1214,7 +1217,7 @@ private final class CostInstancesView: NSView {
             if rect.intersects(dirtyRect) {
                 // Hover affordance on clickable rows.
                 if i == hoveredRowIndex, row.detail != nil {
-                    ThemeStore.current.accent.withAlphaComponent(0.08).setFill()
+                    Palette.accent.withAlphaComponent(0.08).setFill()
                     NSBezierPath(roundedRect: rect.insetBy(dx: -4, dy: 1), xRadius: 6, yRadius: 6).fill()
                 }
                 // Top hairline between rows (not before the header).
@@ -1233,7 +1236,7 @@ private final class CostInstancesView: NSView {
     }
 
     private func drawRow(_ row: CostRow, rect: NSRect) {
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
 
         // Geometry: date | project | [flex bar] | cost | chevron.
         let barLeft = rect.minX + dateW + colGap + projW + colGap
@@ -1386,7 +1389,7 @@ final class CostDetailViewController: NSViewController {
         func cost(_ w: Double) -> Double? { (isAllClaude && wSum > 0) ? detail.totalCost * (w / wSum) : nil }
         func frac(_ w: Double) -> CGFloat { wSum > 0 ? CGFloat(w / wSum) : 0 }
 
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         let buckets = [
             Bucket(name: L10n.text("Input", "Girdi"), tokens: detail.input, cost: cost(wIn), frac: frac(wIn), color: .systemGray),
             Bucket(name: L10n.text("Output", "Çıktı"), tokens: detail.output, cost: cost(wOut), frac: frac(wOut), color: .systemTeal),
@@ -1558,7 +1561,7 @@ final class CostHeroView: NSView {
         // the host — the stripe rides a dedicated, clipped sublayer instead).
         stripe.cornerRadius = Radius.hero
         stripe.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        stripe.backgroundColor = ThemeStore.current.accent.cgColor
+        stripe.backgroundColor = Palette.accent.cgColor
         layer?.addSublayer(stripe)
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -1587,7 +1590,7 @@ final class CostHeroView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         Surface.refreshHeroChrome(self)
-        stripe.backgroundColor = ThemeStore.current.accent.cgColor
+        stripe.backgroundColor = Palette.accent.cgColor
         render()   // re-bake colors for the new light/dark appearance
     }
 
@@ -1605,7 +1608,7 @@ final class CostHeroView: NSView {
         // Theme accents range from system blue to neon yellow / pale lavender;
         // contrast-correct so a chip/bar accent stays legible on every theme in
         // both light and dark — never a near-invisible yellow on a light card.
-        let accent = readableAccent(ThemeStore.current.accent)
+        let accent = readableAccent(Palette.accent)
         stripe.backgroundColor = accent.cgColor
         let usd = ContextSnapshot.formatUSD
         let perMo = L10n.text(" / mo", " / ay")
@@ -1846,7 +1849,7 @@ private final class ModelCostRowView: NSView {
         super.init(frame: .zero)
         let billed: Bool
         switch avail { case .plan: billed = false; default: billed = true }
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
 
         // Left: model name + availability sub-line.
         let nameLbl = NSTextField(labelWithString: name)
@@ -1936,7 +1939,7 @@ private final class AvailBadgeView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 6
         layer?.cornerCurve = .continuous
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         let text: String
         let fg: NSColor
         let bg: NSColor

@@ -211,6 +211,7 @@ final class HorizontalDisplayController: NSObject {
 
 final class TitlePreviewView: NSView {
     private let label = NSTextField(labelWithString: "")
+    private let gauge = NSImageView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -227,11 +228,19 @@ final class TitlePreviewView: NSView {
         layer?.cornerCurve = .continuous
         applyAppearance()
 
+        gauge.translatesAutoresizingMaskIntoConstraints = false
+        gauge.imageScaling = .scaleProportionallyUpOrDown
+
         label.translatesAutoresizingMaskIntoConstraints = false
         label.lineBreakMode = .byTruncatingTail
+        addSubview(gauge)
         addSubview(label)
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            gauge.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            gauge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            gauge.widthAnchor.constraint(equalToConstant: 13),
+            gauge.heightAnchor.constraint(equalToConstant: 13),
+            label.leadingAnchor.constraint(equalTo: gauge.trailingAnchor, constant: 8),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
             label.topAnchor.constraint(equalTo: topAnchor, constant: 10),
             label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
@@ -239,11 +248,10 @@ final class TitlePreviewView: NSView {
     }
 
     func update(items: [DisplayItem], agent: String, project: String, pct: Double?) {
-        let theme = ThemeStore.current
         let font = NSFont.menuBarFont(ofSize: 0)
-        let projectAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.projectColor]
-        let ctxAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.ctxColor(pct)]
-        let dim: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.separatorColor]
+        let projectAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: Palette.primaryText]
+        let ctxAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: paletteUrgencyColor(pct)]
+        let dim: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: Palette.tertiaryText]
         let rawSep = SeparatorStore.current
         let sep = rawSep.isEmpty ? " " : " \(rawSep) "
         let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
@@ -261,13 +269,14 @@ final class TitlePreviewView: NSView {
                     s.append(NSAttributedString(string: sep, attributes: dim))
                 }
                 switch item.element {
-                case .agent: s.append(agentInlineString(name: agent, font: font, fallbackColor: theme.agentColor))
+                case .agent: s.append(agentInlineString(name: agent, font: font, fallbackColor: Palette.primaryText))
                 case .project: s.append(NSAttributedString(string: project, attributes: projectAttrs))
                 case .pct: s.append(NSAttributedString(string: pctStr, attributes: ctxAttrs))
                 }
             }
         }
         label.attributedStringValue = s
+        gauge.image = makeGaugeImage(pct: pct, color: paletteUrgencyColor(pct))
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -280,5 +289,36 @@ final class TitlePreviewView: NSView {
             layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.7).cgColor
         }
     }
-}
 
+    private func paletteUrgencyColor(_ pct: Double?) -> NSColor {
+        guard let pct else { return Palette.tertiaryText }
+        if pct >= 90 { return Palette.urgencyRed }
+        if pct >= 70 { return Palette.urgencyAmber }
+        return Palette.accent
+    }
+
+    private func makeGaugeImage(pct: Double?, color: NSColor) -> NSImage {
+        let side: CGFloat = 13
+        let lineWidth: CGFloat = 1.7
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            let inset = lineWidth / 2 + 0.5
+            let radius = (side - 2 * inset) / 2
+            let center = CGPoint(x: side / 2, y: side / 2)
+            let track = NSBezierPath()
+            track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            track.lineWidth = lineWidth
+            Palette.tertiaryText.withAlphaComponent(0.45).setStroke()
+            track.stroke()
+            if let pct, pct > 0 {
+                let sweep = 360.0 * min(100, pct) / 100.0
+                let arc = NSBezierPath()
+                arc.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - sweep, clockwise: true)
+                arc.lineWidth = lineWidth
+                arc.lineCapStyle = .round
+                color.setStroke()
+                arc.stroke()
+            }
+            return true
+        }
+    }
+}

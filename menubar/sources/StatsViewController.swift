@@ -68,6 +68,12 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     private func buildUI() {
+        let controlsStack = NSStackView()
+        controlsStack.orientation = .horizontal
+        controlsStack.alignment = .centerY
+        controlsStack.spacing = 10
+        controlsStack.translatesAutoresizingMaskIntoConstraints = false
+
         providerControl.segmentStyle = .texturedRounded
         providerControl.segmentCount = 2
         providerControl.setLabel("Claude", forSegment: 0)
@@ -76,15 +82,6 @@ final class StatsViewController: PreferencePaneViewController {
         providerControl.target = self
         providerControl.action = #selector(providerChanged(_:))
         providerControl.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Provider", "Sağlayıcı"),
-            subtitle: L10n.text("Stats source.", "İstatistik kaynağı."),
-            symbol: "cpu",
-            info: L10n.text(
-                "Stats source. Each provider is scanned from its own transcripts.",
-                "İstatistik kaynağı. Her sağlayıcı kendi transkriptlerinden taranır."),
-            body: providerControl
-        )
 
         rangeControl.segmentStyle = .texturedRounded
         rangeControl.segmentCount = 3
@@ -96,14 +93,17 @@ final class StatsViewController: PreferencePaneViewController {
         rangeControl.action = #selector(rangeChanged(_:))
         rangeControl.translatesAutoresizingMaskIntoConstraints = false
         addSection(
-            title: L10n.text("Range", "Aralık"),
-            subtitle: L10n.text("Summary scope.", "Özet kapsamı."),
-            symbol: "calendar",
+            title: L10n.text("Activity", "Aktivite"),
+            subtitle: L10n.text("Provider and time range for the historical view.",
+                                "Geçmiş görünümü için sağlayıcı ve zaman aralığı."),
+            symbol: "chart.line.uptrend.xyaxis",
             info: L10n.text(
-                "Summary scope. Streaks and most-active day always reflect available history.",
-                "Özet kapsamı. Seriler ve en aktif gün her zaman mevcut geçmişi yansıtır."),
-            body: rangeControl
+                "Each provider is scanned from its own local transcripts. Change the range to pivot the overview without losing the yearly heatmap.",
+                "Her sağlayıcı kendi yerel transkriptlerinden taranır. Aralığı değiştirerek yıllık ısı haritasını kaybetmeden özeti çevirebilirsin."),
+            body: controlsStack
         )
+        controlsStack.addArrangedSubview(providerControl)
+        controlsStack.addArrangedSubview(rangeControl)
 
         tilesStack.orientation = .vertical
         tilesStack.alignment = .leading
@@ -488,7 +488,7 @@ final class StatsViewController: PreferencePaneViewController {
     /// importance. The section shows the top few.
     private func computeInsights(_ snap: Snapshot) -> [Insight] {
         var out: [Insight] = []
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         let fresh = Double(snap.total30dTokens)
 
         // 1) Sub-agent burn.
@@ -1037,7 +1037,7 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     private func buildSessionContextView(_ r: SessionListView.Row) -> NSView {
-        let accent = ThemeStore.current.accent
+        let accent = Palette.accent
         let fresh = r.input + r.output
 
         let title = NSTextField(labelWithString: r.time)
