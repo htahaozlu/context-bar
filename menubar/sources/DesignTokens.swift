@@ -26,11 +26,32 @@ enum Radius {
 }
 
 enum Typography {
-    static func display(_ size: CGFloat = 28, weight: NSFont.Weight = .semibold) -> NSFont {
+    /// Signature numeral font — bundled JetBrains Mono (registered at launch by
+    /// `Fonts.registerBundled()`). Every number in the UI flows through here so
+    /// the tabular figures match the redesign exactly. Falls back to the system
+    /// monospaced-digit font if the bundle/registration is unavailable.
+    static func mono(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        let face: String
+        switch weight {
+        case .bold, .heavy, .black: face = "JetBrainsMono-Bold"
+        case .semibold:             face = "JetBrainsMono-SemiBold"
+        case .medium:               face = "JetBrainsMono-Medium"
+        default:                    face = "JetBrainsMono-Regular"
+        }
+        if let f = NSFont(name: face, size: size) { return f }
+        return NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
+    }
+
+    /// Hero/display number — 40pt semibold by the redesign style tile.
+    static func display(_ size: CGFloat = 40, weight: NSFont.Weight = .semibold) -> NSFont {
         NSFont.systemFont(ofSize: size, weight: weight)
     }
-    static func displayMono(_ size: CGFloat = 28, weight: NSFont.Weight = .semibold) -> NSFont {
-        NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
+    static func displayMono(_ size: CGFloat = 40, weight: NSFont.Weight = .semibold) -> NSFont {
+        mono(size, weight: weight)
+    }
+    /// Secondary metric number — 25pt semibold (cost hero, stat tiles).
+    static func metric(_ size: CGFloat = 25, weight: NSFont.Weight = .semibold) -> NSFont {
+        mono(size, weight: weight)
     }
     static func title(_ size: CGFloat = 15) -> NSFont {
         NSFont.systemFont(ofSize: size, weight: .semibold)
@@ -39,7 +60,7 @@ enum Typography {
         NSFont.systemFont(ofSize: size, weight: .regular)
     }
     static func bodyMono(_ size: CGFloat = 12, weight: NSFont.Weight = .regular) -> NSFont {
-        NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
+        mono(size, weight: weight)
     }
     static func caption() -> NSFont {
         NSFont.systemFont(ofSize: 10, weight: .semibold)
@@ -62,16 +83,54 @@ enum Typography {
                                         weight: NSFont.Weight = .semibold,
                                         color: NSColor = Palette.primaryText) -> NSAttributedString {
         NSAttributedString(string: text, attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight),
+            .font: mono(size, weight: weight),
             .foregroundColor: color,
             .kern: -0.4,
         ])
     }
 }
 
-// Signature design language: ONE warm clay accent over a neutral gray scale.
-// Numbers are always mono + tabular. Values mirror the redesign tokens exactly
-// (clay #C2553A/#E68A66, neutral surfaces, amber/red reserved for urgency).
+// Signature accent direction. The redesign keeps ONE chromatic note over a
+// neutral gray scale; the user picks which hue that note is. Clay is the
+// recommended default; Indigo and Teal are the alternate directions from the
+// style tile. The accent drives hero numbers, bars, the heatmap ramp and any
+// over-threshold highlight — nothing else is colored.
+enum AccentDirection: String, CaseIterable {
+    case clay, indigo, teal
+
+    var displayName: String {
+        switch self {
+        case .clay: return "Clay"
+        case .indigo: return "Indigo"
+        case .teal: return "Teal"
+        }
+    }
+    /// Accent on light backgrounds.
+    var lightHex: UInt32 {
+        switch self {
+        case .clay: return 0xC2553A
+        case .indigo: return 0x4F6BED
+        case .teal: return 0x1F8A5B
+        }
+    }
+    /// Accent on dark backgrounds (lifted for contrast).
+    var darkHex: UInt32 {
+        switch self {
+        case .clay: return 0xE68A66
+        case .indigo: return 0x8AA0FF
+        case .teal: return 0x3FCB8E
+        }
+    }
+    /// The live direction — backed by the theme selection so the existing
+    /// theme grid in Settings doubles as the accent picker.
+    static var current: AccentDirection {
+        AccentDirection(rawValue: ThemeStore.current.id) ?? .clay
+    }
+}
+
+// Signature design language: ONE accent (clay / indigo / teal) over a neutral
+// gray scale. Numbers are always mono + tabular. Neutral surfaces, amber/red
+// reserved for the urgency ramp.
 enum Palette {
     // ---- text tiers ----
     static let primaryText = dynamicColor(name: "ContextBarPrimaryText") { isDark in
@@ -86,17 +145,28 @@ enum Palette {
                : NSColor(srgbRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.40)
     }
 
-    // ---- signature accent (clay / terracotta) ----
-    static let accent = dynamicColor(name: "ContextBarAccent") { isDark in
-        isDark ? srgb(0xE68A66) : srgb(0xC2553A)
-    }
+    // ---- signature accent (clay / indigo / teal direction) ----
+    /// Live accent for the selected direction. Drives hero numbers, bars, the
+    /// heatmap ramp and over-threshold highlights — the only chromatic note.
+    static var accent: NSColor { accentColor(AccentDirection.current) }
     /// 16% (light) / 22% (dark) accent — chips, glyph wells, hot-bar wash.
-    static let accentSoft = dynamicColor(name: "ContextBarAccentSoft") { isDark in
-        isDark ? srgb(0xE68A66).withAlphaComponent(0.22) : srgb(0xC2553A).withAlphaComponent(0.16)
-    }
+    static var accentSoft: NSColor { accentTint(AccentDirection.current, light: 0.16, dark: 0.22, suffix: "Soft") }
     /// 8% (light) / 11% (dark) accent — insight-card fills, faint tints.
-    static let accentSofter = dynamicColor(name: "ContextBarAccentSofter") { isDark in
-        isDark ? srgb(0xE68A66).withAlphaComponent(0.11) : srgb(0xC2553A).withAlphaComponent(0.08)
+    static var accentSofter: NSColor { accentTint(AccentDirection.current, light: 0.08, dark: 0.11, suffix: "Softer") }
+
+    /// Accent for an explicit direction — used by the accent picker cards so a
+    /// swatch can preview a direction that is not the currently-selected one.
+    static func accentColor(_ dir: AccentDirection) -> NSColor {
+        NSColor(name: NSColor.Name("ContextBarAccent.\(dir.rawValue)")) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return srgb(isDark ? dir.darkHex : dir.lightHex)
+        }
+    }
+    private static func accentTint(_ dir: AccentDirection, light: CGFloat, dark: CGFloat, suffix: String) -> NSColor {
+        NSColor(name: NSColor.Name("ContextBarAccent\(suffix).\(dir.rawValue)")) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return srgb(isDark ? dir.darkHex : dir.lightHex).withAlphaComponent(isDark ? dark : light)
+        }
     }
 
     // ---- surfaces ----

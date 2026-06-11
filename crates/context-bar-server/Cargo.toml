@@ -1,6 +1,6 @@
 [package]
 name = "context-bar-server"
-version = "0.8.4"
+version = "0.8.5"
 edition = "2024"
 license = "Apache-2.0"
 description = "Self-hosted sync server for ContextBar — receives per-machine usage rollups, exposes a combined read API for the menubar app. Local-first, no third-party service."

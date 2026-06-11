@@ -245,8 +245,8 @@ extension PreferencePaneViewController {
     /// Centered tertiary "stays on this Mac" reassurance line under the groups.
     fileprivate func addPrivacyFooter() {
         let label = NSTextField(labelWithString: L10n.text(
-            "ContextBar · all data stays on this Mac · no account, no server",
-            "ContextBar · tüm veriler bu Mac'te kalır · hesap yok, sunucu yok"))
+            "ContextBar · local-first · no account required · sync stays in your iCloud or your own server",
+            "ContextBar · yerel öncelikli · hesap gerekmez · senkron kendi iCloud'unuzda ya da kendi sunucunuzda kalır"))
         label.font = NSFont.systemFont(ofSize: 10.5)
         label.textColor = Palette.tertiaryText
         label.alignment = .center
@@ -606,6 +606,8 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     private let syncNowButton = NSButton()
     private let syncTestButton = NSButton()
     private let syncFolderLabel = NSTextField(labelWithString: "")
+    private let iCloudStatusLabel = NSTextField(labelWithString: "")
+    private weak var iCloudSyncButton: NSButton?
     private var syncObserverToken: UUID?
     private var syncHeartbeat: Timer?
 
@@ -659,19 +661,26 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
                                 a11y: L10n.text("Mask project names on share card", "Paylaşım kartında proje adlarını gizle")))
 
         // ── SYNC — combine usage across your Macs.
-        // Two paths, listed in order of recommendation:
-        //   1. Self-hosted server (preferred) — a tiny Rust binary on a
-        //      homelab box. Each Mac pushes its 30-day rollup; the
-        //      Value tab combines them.
-        //   2. Legacy folder — a folder you already sync. Kept for
-        //      users who don't want to run a server.
+        // Three paths, listed in order of recommendation:
+        //   1. iCloud Drive (easiest) — zero-config, no account, no server.
+        //      Same Apple ID → flip the switch on each Mac and you're done.
+        //   2. Self-hosted server — a tiny Rust binary on a homelab box for
+        //      users who'd rather not route through iCloud.
+        //   3. Manual folder — any folder you already sync (Dropbox, …).
         let sync = addGroup(symbol: "macbook.and.iphone", title: L10n.text("Across your Macs", "Mac'lerin arasında"))
+
+        sync.addWideRow(
+            title: L10n.text("iCloud Drive", "iCloud Drive"),
+            desc: L10n.text(
+                "Easiest. No account, no server. Turn this on with the same Apple ID on each Mac and ContextBar syncs your usage through your own iCloud Drive automatically.",
+                "En kolayı. Hesap yok, sunucu yok. Her Mac'te aynı Apple ID ile bunu açın; ContextBar kullanımınızı kendi iCloud Drive'ınız üzerinden otomatik senkronlar."),
+            content: makeICloudSyncRow())
 
         sync.addWideRow(
             title: L10n.text("Self-hosted server", "Kendi sunucunuz"),
             desc: L10n.text(
-                "Recommended. Run the bundled `context-bar-server` on any always-on Mac (a Pi, NAS, homelab box) and point every Mac at it. Each Mac pushes its rollup; the Value tab combines them. No third-party service.",
-                "Önerilen. Paketlenmiş `context-bar-server`'ı sürekli açık bir Mac'te (Pi, NAS, ev sunucusu) çalıştırıp her Mac'i ona yönlendirin. Her Mac özetini gönderir; Değer sekmesi birleştirir. Üçüncü taraf yok."),
+                "For homelab setups. Run the bundled `context-bar-server` on any always-on Mac (a Pi, NAS, homelab box) and point every Mac at it. Each Mac pushes its rollup; the Value tab combines them. No third-party service.",
+                "Ev sunucusu kurulumları için. Paketlenmiş `context-bar-server`'ı sürekli açık bir Mac'te (Pi, NAS, ev sunucusu) çalıştırıp her Mac'i ona yönlendirin. Her Mac özetini gönderir; Değer sekmesi birleştirir. Üçüncü taraf yok."),
             content: makeSyncServerField())
 
         sync.addWideRow(
@@ -956,6 +965,50 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         }
     }
 
+    private func makeICloudSyncRow() -> NSView {
+        let on = MachineSync.isICloudMode
+        let btn = NSButton(
+            title: on ? L10n.text("Turn off", "Kapat")
+                      : L10n.text("Use iCloud Drive", "iCloud Drive kullan"),
+            target: self, action: #selector(toggleICloudSync))
+        btn.bezelStyle = .rounded
+        btn.isEnabled = MachineSync.iCloudAvailable
+        iCloudSyncButton = btn
+        iCloudStatusLabel.font = .systemFont(ofSize: 11)
+        iCloudStatusLabel.textColor = .secondaryLabelColor
+        iCloudStatusLabel.lineBreakMode = .byTruncatingMiddle
+        iCloudStatusLabel.stringValue = iCloudStatusText()
+        let row = NSStackView(views: [btn, iCloudStatusLabel])
+        row.orientation = .horizontal
+        row.spacing = 8
+        row.alignment = .firstBaseline
+        return row
+    }
+
+    private func iCloudStatusText() -> String {
+        if !MachineSync.iCloudAvailable {
+            return L10n.text("iCloud Drive isn't set up on this Mac", "Bu Mac'te iCloud Drive ayarlı değil")
+        }
+        return MachineSync.isICloudMode
+            ? L10n.text("On · syncs automatically to your other Macs", "Açık · diğer Mac'lerinize otomatik senkronlanır")
+            : L10n.text("Off", "Kapalı")
+    }
+
+    @objc private func toggleICloudSync() {
+        if MachineSync.isICloudMode {
+            MachineSync.disableSync()
+        } else {
+            MachineSync.enableICloudSync()
+        }
+        let on = MachineSync.isICloudMode
+        iCloudSyncButton?.title = on
+            ? L10n.text("Turn off", "Kapat")
+            : L10n.text("Use iCloud Drive", "iCloud Drive kullan")
+        iCloudStatusLabel.stringValue = iCloudStatusText()
+        syncFolderLabel.stringValue = syncFolderDisplay()
+        onChange?()
+    }
+
     private func makeSyncFolderField() -> NSView {
         let btn = NSButton(title: L10n.text("Choose folder…", "Klasör seç…"), target: self, action: #selector(chooseSyncFolder))
         btn.bezelStyle = .rounded
@@ -973,7 +1026,10 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     }
 
     private func syncFolderDisplay() -> String {
-        DisplayPrefs.syncFolder.isEmpty
+        if MachineSync.isICloudMode {
+            return L10n.text("Using iCloud Drive", "iCloud Drive kullanılıyor")
+        }
+        return DisplayPrefs.syncFolder.isEmpty
             ? L10n.text("Not set", "Ayarlı değil")
             : (DisplayPrefs.syncFolder as NSString).abbreviatingWithTildeInPath
     }

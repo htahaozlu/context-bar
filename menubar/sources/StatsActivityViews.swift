@@ -123,7 +123,9 @@ final class YearHeatmapView: NSView {
         guard !grid.isEmpty, let m = metrics() else { return }
         let accent = Palette.accent
         let maxTok = max(days.map(\.tokens).max() ?? 1, 1)
-        let radius = max(2, min(7, m.cell * 0.3))
+        // Subtle rounding matching the design (≈2.5pt at the spec's 11pt cell);
+        // scales gently with the cell but stays crisp, never pill-like.
+        let radius = max(2, min(3, m.cell * 0.23))
         let todayKey = days.first?.key
 
         // Cells.

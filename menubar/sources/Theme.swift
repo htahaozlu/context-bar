@@ -28,79 +28,30 @@ struct Theme {
         }
     }
 
-    static let all: [Theme] = [
-        // Signature theme: one warm clay accent over neutral gray. Context %
-        // stays calm on the accent and only warms to amber / red as it nears
-        // the limit — the single urgency ramp shared with the menubar gauge.
+    /// The signature accent directions. Each is the SAME neutral language with
+    /// a different single accent (the only chromatic note). Replaces the former
+    /// six free-form palettes — the menubar gauge owns urgency (amber/red), so a
+    /// theme only ever picks the calm accent hue. The Settings theme grid renders
+    /// these three as the accent picker.
+    static func direction(_ dir: AccentDirection) -> Theme {
         Theme(
-            id: "default",
-            name: "Default",
+            id: dir.rawValue,
+            name: dir.displayName,
             agentColor: Palette.primaryText,
-            projectColor: Palette.accent,
+            projectColor: Palette.accentColor(dir),
             separatorColor: Palette.tertiaryText,
-            pctLow: Palette.accent,
-            pctMid: Palette.urgencyAmber,
-            pctHigh: Palette.urgencyRed,
+            pctLow: Palette.accentColor(dir),   // calm work rides the accent
+            pctMid: Palette.urgencyAmber,        // attention
+            pctHigh: Palette.urgencyRed,         // at the limit
             activeDot: "●", inactiveDot: "○", separator: "·"
-        ),
-        Theme(
-            id: "mono",
-            name: "Mono",
-            agentColor: Palette.primaryText,
-            projectColor: Palette.primaryText,
-            separatorColor: Palette.tertiaryText,
-            pctLow: Palette.primaryText,
-            pctMid: Palette.primaryText,
-            pctHigh: Palette.primaryText,
-            activeDot: "▸", inactiveDot: "·", separator: "·"
-        ),
-        Theme(
-            id: "neon",
-            name: "Neon",
-            agentColor: NSColor(srgbRed: 0.45, green: 1.00, blue: 0.85, alpha: 1.0),
-            projectColor: NSColor(srgbRed: 1.00, green: 0.45, blue: 0.85, alpha: 1.0),
-            separatorColor: NSColor(srgbRed: 0.55, green: 0.45, blue: 0.85, alpha: 0.6),
-            pctLow: NSColor(srgbRed: 0.10, green: 1.00, blue: 0.55, alpha: 1.0),
-            pctMid: NSColor(srgbRed: 1.00, green: 0.85, blue: 0.20, alpha: 1.0),
-            pctHigh: NSColor(srgbRed: 1.00, green: 0.30, blue: 0.45, alpha: 1.0),
-            activeDot: "◆", inactiveDot: "◇", separator: "·"
-        ),
-        Theme(
-            id: "pastel",
-            name: "Pastel",
-            agentColor: NSColor(srgbRed: 0.55, green: 0.60, blue: 0.85, alpha: 1.0),
-            projectColor: NSColor(srgbRed: 0.85, green: 0.65, blue: 0.95, alpha: 1.0),
-            separatorColor: NSColor(srgbRed: 0.70, green: 0.70, blue: 0.78, alpha: 0.7),
-            pctLow: NSColor(srgbRed: 0.60, green: 0.85, blue: 0.70, alpha: 1.0),
-            pctMid: NSColor(srgbRed: 0.95, green: 0.80, blue: 0.55, alpha: 1.0),
-            pctHigh: NSColor(srgbRed: 0.95, green: 0.65, blue: 0.70, alpha: 1.0),
-            activeDot: "✦", inactiveDot: "✧", separator: "—"
-        ),
-        Theme(
-            id: "terminal",
-            name: "Terminal",
-            agentColor: NSColor.systemGreen,
-            projectColor: NSColor.systemYellow,
-            separatorColor: .secondaryLabelColor,
-            pctLow: NSColor.systemGreen,
-            pctMid: NSColor.systemYellow,
-            pctHigh: NSColor.systemRed,
-            activeDot: ">", inactiveDot: " ", separator: "|"
-        ),
-        Theme(
-            id: "compact",
-            name: "Compact",
-            agentColor: Palette.primaryText,
-            projectColor: Palette.secondaryText,
-            separatorColor: Palette.tertiaryText,
-            pctLow: .systemTeal,
-            pctMid: .systemOrange,
-            pctHigh: .systemRed,
-            activeDot: "·", inactiveDot: " ", separator: ""
-        ),
-    ]
+        )
+    }
+
+    static let all: [Theme] = AccentDirection.allCases.map(direction)
 
     static func by(id: String) -> Theme {
+        // Unknown / legacy ids (default, mono, neon, pastel, terminal, compact)
+        // migrate to the recommended Clay direction (all[0]).
         all.first(where: { $0.id == id }) ?? all[0]
     }
 }
@@ -108,7 +59,7 @@ struct Theme {
 final class ThemeStore {
     static let key = "theme"
     static var current: Theme {
-        get { Theme.by(id: UserDefaults.standard.string(forKey: key) ?? "default") }
+        get { Theme.by(id: UserDefaults.standard.string(forKey: key) ?? AccentDirection.clay.rawValue) }
     }
     static func set(_ id: String) {
         UserDefaults.standard.set(id, forKey: key)

@@ -224,35 +224,48 @@ final class MenubarPopoverViewController: NSViewController {
 
     private func buildLoadingState() -> NSView {
         let (container, stack) = sectionContainer(hero: true)
-        stack.alignment = .leading
-        stack.spacing = Spacing.s
+        stack.alignment = .centerX
+        stack.spacing = Spacing.m
+
+        // 26pt circular spinner — the redesign's calm "we're reading" beat.
+        let spinner = NSProgressIndicator()
+        spinner.style = .spinning
+        spinner.isIndeterminate = true
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.startAnimation(nil)
 
         let title = NSTextField(
             labelWithString: L10n.text("Gathering session data…", "Oturum verileri toplanıyor…"))
-        title.font = Typography.title(14)
-        title.textColor = .labelColor
+        title.font = Typography.body(12.5)
+        title.textColor = .secondaryLabelColor
+        title.alignment = .center
 
-        let sub = NSTextField(
-            wrappingLabelWithString: L10n.text(
-                "Scanning Claude and Codex transcripts. This usually takes a second.",
-                "Claude ve Codex transcript'leri taranıyor. Genellikle bir saniye sürer."
-            ))
-        sub.font = Typography.body(11)
-        sub.textColor = .secondaryLabelColor
-        sub.maximumNumberOfLines = 0
-        sub.preferredMaxLayoutWidth = Self.contentWidth - 2 * hPad
+        // Three skeleton rows with the design's opacity cascade (0.5/0.38/0.26).
+        let skeleton = NSStackView()
+        skeleton.orientation = .vertical
+        skeleton.spacing = Spacing.xs
+        skeleton.translatesAutoresizingMaskIntoConstraints = false
+        for alpha in [0.5, 0.38, 0.26] {
+            let row = NSView()
+            row.wantsLayer = true
+            row.layer?.cornerRadius = Radius.chip
+            row.layer?.cornerCurve = .continuous
+            row.layer?.backgroundColor = Palette.track.withAlphaComponent(CGFloat(alpha)).cgColor
+            row.translatesAutoresizingMaskIntoConstraints = false
+            row.heightAnchor.constraint(equalToConstant: 30).isActive = true
+            skeleton.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: skeleton.widthAnchor).isActive = true
+        }
 
-        let stripe = LoadingStripeView()
-        stripe.tint = Palette.accent
-        stripe.translatesAutoresizingMaskIntoConstraints = false
-
+        stack.addArrangedSubview(spinner)
         stack.addArrangedSubview(title)
-        stack.addArrangedSubview(sub)
-        stack.addArrangedSubview(stripe)
-        title.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        sub.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        stripe.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        stripe.heightAnchor.constraint(equalToConstant: 4).isActive = true
+        stack.addArrangedSubview(skeleton)
+        NSLayoutConstraint.activate([
+            spinner.widthAnchor.constraint(equalToConstant: 26),
+            spinner.heightAnchor.constraint(equalToConstant: 26),
+            title.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            skeleton.widthAnchor.constraint(equalTo: stack.widthAnchor),
+        ])
         return container
     }
 
@@ -261,12 +274,28 @@ final class MenubarPopoverViewController: NSViewController {
         stack.alignment = .centerX
         stack.spacing = Spacing.s
 
-        let cfg = NSImage.SymbolConfiguration(pointSize: 32, weight: .regular)
+        // Stack glyph in a 48pt accent-softer well — the design's "nothing here
+        // yet" mark (replaces the old loose sparkles symbol).
+        let well = NSView()
+        well.translatesAutoresizingMaskIntoConstraints = false
+        well.wantsLayer = true
+        well.layer?.cornerRadius = Radius.card
+        well.layer?.cornerCurve = .continuous
+        well.layer?.backgroundColor = Palette.accentSofter.cgColor
+
+        let cfg = NSImage.SymbolConfiguration(pointSize: 24, weight: .regular)
         let iv = NSImageView()
-        iv.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)?
+        iv.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: nil)?
             .withSymbolConfiguration(cfg)
-        iv.contentTintColor = .tertiaryLabelColor
+        iv.contentTintColor = Palette.accent
         iv.translatesAutoresizingMaskIntoConstraints = false
+        well.addSubview(iv)
+        NSLayoutConstraint.activate([
+            well.widthAnchor.constraint(equalToConstant: 48),
+            well.heightAnchor.constraint(equalToConstant: 48),
+            iv.centerXAnchor.constraint(equalTo: well.centerXAnchor),
+            iv.centerYAnchor.constraint(equalTo: well.centerYAnchor),
+        ])
 
         let title = NSTextField(
             labelWithString: L10n.text("No agent data yet", "Henüz ajan verisi yok"))
@@ -276,8 +305,8 @@ final class MenubarPopoverViewController: NSViewController {
 
         let sub = NSTextField(
             wrappingLabelWithString: L10n.text(
-                "Start a Claude or Codex session to see context and limits here.",
-                "Bağlam ve limitleri görmek için Claude veya Codex oturumu başlatın."
+                "Start a Claude Code or Codex session and ContextBar will read it from your local transcripts.",
+                "Bir Claude Code veya Codex oturumu başlatın; ContextBar bunu yerel transcript'lerinizden okur."
             ))
         sub.font = Typography.body(11)
         sub.textColor = .secondaryLabelColor
@@ -285,11 +314,24 @@ final class MenubarPopoverViewController: NSViewController {
         sub.maximumNumberOfLines = 0
         sub.preferredMaxLayoutWidth = Self.contentWidth - 2 * hPad
 
-        stack.addArrangedSubview(iv)
+        let howBtn = ClayChipButton(
+            title: L10n.text("How it works", "Nasıl çalışır"),
+            symbol: "info.circle"
+        ) { [weak self] in self?.handleHowItWorks() }
+
+        stack.addArrangedSubview(well)
         stack.addArrangedSubview(title)
         stack.addArrangedSubview(sub)
+        stack.setCustomSpacing(Spacing.m, after: sub)
+        stack.addArrangedSubview(howBtn)
         sub.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         return container
+    }
+
+    @objc private func handleHowItWorks() {
+        if let url = URL(string: "https://github.com/htahaozlu/context-bar#readme") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func buildHero(agent a: Agent, isActive: Bool) -> NSView {
@@ -955,20 +997,25 @@ final class MenubarPopoverViewController: NSViewController {
             action: #selector(handleQuit)
         )
 
-        let rightStack = NSStackView(views: [shareBtn, settingsBtn, refreshBtn, quitBtn])
-        rightStack.orientation = .horizontal
-        rightStack.spacing = 4
-        rightStack.translatesAutoresizingMaskIntoConstraints = false
+        // Design footer is a space-between row: the action icons sit on the
+        // left, Quit (power) alone on the right.
+        let leftStack = NSStackView(views: [shareBtn, settingsBtn, refreshBtn])
+        leftStack.orientation = .horizontal
+        leftStack.spacing = 4
+        leftStack.translatesAutoresizingMaskIntoConstraints = false
 
-        container.addSubview(rightStack)
+        quitBtn.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(leftStack)
+        container.addSubview(quitBtn)
 
         let edgeGuard: CGFloat = Spacing.m
         NSLayoutConstraint.activate([
-            rightStack.leadingAnchor.constraint(
+            leftStack.leadingAnchor.constraint(
                 equalTo: container.leadingAnchor, constant: edgeGuard),
-            rightStack.trailingAnchor.constraint(
+            leftStack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            quitBtn.trailingAnchor.constraint(
                 equalTo: container.trailingAnchor, constant: -edgeGuard),
-            rightStack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            quitBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             container.heightAnchor.constraint(equalToConstant: 40),
         ])
         return container

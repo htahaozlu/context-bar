@@ -44,6 +44,52 @@ enum MachineSync {
     private static let suffix = ".contextbar.json"
     private static var enabled: Bool { !DisplayPrefs.syncFolder.isEmpty }
 
+    // MARK: - iCloud Drive (zero-config, no account)
+    //
+    // The easiest no-account path: the user's iCloud Drive already syncs across
+    // every Mac signed into the same Apple ID. We write our per-machine files
+    // into a `ContextBar` folder inside iCloud Drive — so a second Mac just
+    // flips the same switch and combined usage appears, with no folder picking,
+    // no server, and no ContextBar account. The app is not sandboxed, so we use
+    // the CloudDocs path directly and need no iCloud entitlement.
+
+    /// `~/Library/Mobile Documents/com~apple~CloudDocs` — the iCloud Drive root.
+    static var iCloudDriveRoot: String {
+        (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+    }
+
+    /// True when iCloud Drive is set up on this Mac (the CloudDocs dir exists).
+    static var iCloudAvailable: Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: iCloudDriveRoot, isDirectory: &isDir)
+            && isDir.boolValue
+    }
+
+    /// The `ContextBar` folder inside iCloud Drive used when iCloud sync is on.
+    static var iCloudSyncFolder: String {
+        (iCloudDriveRoot as NSString).appendingPathComponent("ContextBar")
+    }
+
+    /// True when the active sync folder is the iCloud Drive folder.
+    static var isICloudMode: Bool {
+        !DisplayPrefs.syncFolder.isEmpty && DisplayPrefs.syncFolder == iCloudSyncFolder
+    }
+
+    /// Turn on zero-config iCloud sync: create the folder and write this Mac's
+    /// snapshot immediately so the other Macs see it on their next read.
+    static func enableICloudSync() {
+        try? FileManager.default.createDirectory(
+            atPath: iCloudSyncFolder, withIntermediateDirectories: true)
+        DisplayPrefs.syncFolder = iCloudSyncFolder
+        exportLocal()
+    }
+
+    /// Turn off folder/iCloud sync (stops writing; leaves existing files).
+    static func disableSync() {
+        DisplayPrefs.syncFolder = ""
+    }
+
     private static func fileSafe(_ s: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_ "))
         return String(s.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }).trimmingCharacters(in: .whitespaces)

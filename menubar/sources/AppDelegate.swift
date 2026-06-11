@@ -625,7 +625,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             project: a.project,
             pct: a.ctxPct,
             font: font,
-            extraCount: extraSessionCount(for: a)
+            extraCount: extraSessionCount(for: a),
+            pctColor: gaugeColor
         ))
         return result
     }
@@ -727,7 +728,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         pct: Double?,
         font: NSFont,
         extraCount: Int = 0,
-        renderAgentAsIcon: Bool = true
+        renderAgentAsIcon: Bool = true,
+        pctColor: NSColor? = nil
     ) -> NSAttributedString {
         let agentAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
@@ -741,9 +743,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .font: font,
             .foregroundColor: Palette.primaryText,
         ]
+        // The % number follows the SAME unified urgency as the gauge dot so a
+        // calm-but-full context (e.g. 88% with no limit pressure) stays on the
+        // accent instead of falsely warming the text. Falls back to the
+        // context-only ramp for callers that don't supply the unified color.
         let ctxAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: menubarPctColor(pct),
+            .foregroundColor: pctColor ?? menubarPctColor(pct),
         ]
         let pctStr = pct.map { String(format: "%.0f%%", $0) } ?? "—"
         let rawSep = SeparatorStore.current

@@ -67,20 +67,119 @@ pub struct Session {
     pub cwd: Option<String>,
 }
 
-/// `project_name_from_cwd`: basename of the cwd, or `—` when absent.
+/// `project_name_from_cwd`: the git repository name for the cwd when it lives in
+/// a repo (origin remote name, else the toplevel directory), otherwise the
+/// directory's own basename, or `—` when absent. Keeping it git-aware means the
+/// menubar shows the actual repo (e.g. `context-bar`) rather than whichever
+/// sub-directory the agent happened to start in (e.g. `backend`).
+///
+/// MUST stay in lock-step with the same function in `usage_signal.py`.
 pub fn project_name_from_cwd(cwd: Option<&str>) -> String {
     match cwd {
         None => "—".to_string(),
         Some(c) if c.is_empty() => "—".to_string(),
-        Some(c) => {
-            let trimmed = c.trim_end_matches('/');
-            let base = trimmed.rsplit('/').next().unwrap_or("");
-            if base.is_empty() {
-                c.to_string()
-            } else {
-                base.to_string()
+        Some(c) => repo_name_from_cwd(c).unwrap_or_else(|| basename_of(c)),
+    }
+}
+
+fn basename_of(c: &str) -> String {
+    let trimmed = c.trim_end_matches('/');
+    let base = trimmed.rsplit('/').next().unwrap_or("");
+    if base.is_empty() {
+        c.to_string()
+    } else {
+        base.to_string()
+    }
+}
+
+/// Walk up from `cwd` to the nearest `.git` and return the repository name:
+/// origin's URL basename when present, else the toplevel directory's basename.
+/// `None` when `cwd` is not absolute or not inside a git repo (callers fall back
+/// to the plain basename). Pure filesystem — no `git` subprocess required.
+fn repo_name_from_cwd(cwd: &str) -> Option<String> {
+    let start = std::path::Path::new(cwd);
+    if !start.is_absolute() {
+        return None;
+    }
+    let mut dir = Some(start);
+    while let Some(d) = dir {
+        let dotgit = d.join(".git");
+        if dotgit.exists() {
+            if let Some(cfg) = git_config_path(&dotgit) {
+                if let Ok(text) = std::fs::read_to_string(&cfg) {
+                    if let Some(name) = origin_repo_name(&text) {
+                        return Some(name);
+                    }
+                }
+            }
+            return d.file_name().and_then(|n| n.to_str()).map(str::to_string);
+        }
+        dir = d.parent();
+    }
+    None
+}
+
+/// The `config` path for a `.git` entry — a directory for normal repos, or a
+/// `gitdir:`-pointer file for linked worktrees / submodules (resolved via the
+/// `commondir` so the shared config is read).
+fn git_config_path(dotgit: &std::path::Path) -> Option<std::path::PathBuf> {
+    if dotgit.is_dir() {
+        return Some(dotgit.join("config"));
+    }
+    let text = std::fs::read_to_string(dotgit).ok()?;
+    let gitdir = text
+        .lines()
+        .find_map(|l| l.strip_prefix("gitdir:").map(str::trim))?;
+    let gitdir_path = {
+        let p = std::path::Path::new(gitdir);
+        if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            dotgit.parent()?.join(p)
+        }
+    };
+    if let Ok(common) = std::fs::read_to_string(gitdir_path.join("commondir")) {
+        let common = common.trim();
+        let base = if std::path::Path::new(common).is_absolute() {
+            std::path::PathBuf::from(common)
+        } else {
+            gitdir_path.join(common)
+        };
+        return Some(base.join("config"));
+    }
+    Some(gitdir_path.join("config"))
+}
+
+/// Repo name from the `[remote "origin"]` url in a git config, if any.
+fn origin_repo_name(config: &str) -> Option<String> {
+    let mut in_origin = false;
+    for line in config.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_origin = t == "[remote \"origin\"]";
+            continue;
+        }
+        if in_origin {
+            if let Some(rest) = t.strip_prefix("url") {
+                if let Some(eq) = rest.trim_start().strip_prefix('=') {
+                    return repo_name_from_url(eq.trim());
+                }
             }
         }
+    }
+    None
+}
+
+/// Last path/scp segment of a remote URL with a trailing `.git` removed.
+/// Handles `git@host:owner/repo.git` and `https://host/owner/repo.git`.
+fn repo_name_from_url(url: &str) -> Option<String> {
+    let url = url.trim().trim_end_matches('/');
+    let seg = url.rsplit(|c| c == '/' || c == ':').next()?;
+    let seg = seg.strip_suffix(".git").unwrap_or(seg);
+    if seg.is_empty() {
+        None
+    } else {
+        Some(seg.to_string())
     }
 }
 

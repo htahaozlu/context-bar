@@ -181,8 +181,8 @@ final class StatTileView: NSView {
 
         let val = NSTextField(labelWithString: value)
         val.font = mono
-            ? Typography.displayMono(22, weight: .semibold)
-            : Typography.display(22, weight: .semibold)
+            ? Typography.displayMono(25, weight: .semibold)
+            : Typography.display(25, weight: .semibold)
         val.textColor = valueColor
         val.attributedStringValue = NSAttributedString(string: value, attributes: [
             .font: val.font!,
@@ -236,8 +236,8 @@ final class DualStatTileView: NSView {
 
         let val = NSTextField(labelWithString: value)
         let valFont = mono
-            ? Typography.displayMono(22, weight: .semibold)
-            : Typography.display(22, weight: .semibold)
+            ? Typography.displayMono(25, weight: .semibold)
+            : Typography.display(25, weight: .semibold)
         val.attributedStringValue = NSAttributedString(string: value, attributes: [
             .font: valFont,
             .foregroundColor: valueColor,
@@ -281,6 +281,60 @@ final class DualStatTileView: NSView {
         super.viewDidChangeEffectiveAppearance()
         Surface.refreshCardColors(self)
     }
+}
+
+// MARK: - ClayChipButton
+
+/// Small pill button in the signature accent — accent text + 0.5px accent-soft
+/// border over an accent-softer wash (the design's `.cb-chip`). Used for the
+/// empty-state "How it works" affordance.
+final class ClayChipButton: NSView {
+    private let onClick: () -> Void
+
+    init(title: String, symbol: String, onClick: @escaping () -> Void) {
+        self.onClick = onClick
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        wantsLayer = true
+        layer?.cornerRadius = Radius.chip
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+
+        let img = NSImageView()
+        img.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        img.contentTintColor = Palette.accent
+        img.translatesAutoresizingMaskIntoConstraints = false
+
+        let lbl = NSTextField(labelWithString: title)
+        lbl.font = NSFont.systemFont(ofSize: 11.5, weight: .semibold)
+        lbl.textColor = Palette.accent
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+
+        let row = NSStackView(views: [img, lbl])
+        row.orientation = .horizontal
+        row.spacing = 5
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            row.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
+        ])
+        refreshColors()
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(title)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func refreshColors() {
+        layer?.backgroundColor = Palette.accentSofter.cgColor
+        layer?.borderColor = Palette.accentSoft.cgColor
+    }
+    override func updateLayer() { refreshColors() }
+    override func mouseDown(with event: NSEvent) { onClick() }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
 }
 
 // MARK: - LoadingStripeView

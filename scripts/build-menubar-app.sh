@@ -19,6 +19,8 @@ APP_ICON_SRC="$ROOT/app_logo.png"
 APP_ICON_DST="$RESOURCES_DIR/AppIcon.icns"
 BRAND_ICONS_SRC="$ROOT/menubar/assets/brands"
 BRAND_ICONS_DST="$RESOURCES_DIR/brands"
+FONTS_SRC="$ROOT/menubar/assets/fonts"
+FONTS_DST="$RESOURCES_DIR/Fonts"
 APP_PLIST_DST="$CONTENTS_DIR/Info.plist"
 WIDGET_SRC_DIR="$ROOT/menubar/widget"
 WIDGET_XCODEPROJ="$ROOT/packaging/macos/ContextBarWidget.xcodeproj"
@@ -66,6 +68,12 @@ fi
 if [[ -d "$BRAND_ICONS_SRC" ]]; then
   mkdir -p "$BRAND_ICONS_DST"
   cp "$BRAND_ICONS_SRC"/*.png "$BRAND_ICONS_DST"/
+fi
+
+# Bundle JetBrains Mono (registered at launch + via ATSApplicationFontsPath).
+if [[ -d "$FONTS_SRC" ]]; then
+  mkdir -p "$FONTS_DST"
+  cp "$FONTS_SRC"/*.ttf "$FONTS_DST"/
 fi
 
 # Generate AppIcon.icns from app_logo.png (2048x2048 source).

@@ -913,9 +913,93 @@ def apply_claude_statusline_snapshot(out):
 
 
 def project_name_from_cwd(cwd):
+    """Git repo name for the cwd (origin remote, else toplevel dir), falling
+    back to the directory's basename, or "—" when absent. Keeping it git-aware
+    means the menubar shows the actual repo rather than whichever sub-directory
+    the agent started in. MUST stay in lock-step with the Rust twin in
+    aggregate.rs::project_name_from_cwd."""
     if not cwd:
         return "—"
+    repo = _repo_name_from_cwd(cwd)
+    if repo:
+        return repo
     return os.path.basename(cwd.rstrip("/")) or cwd
+
+
+def _repo_name_from_cwd(cwd):
+    """Walk up to the nearest .git; return origin URL basename or toplevel dir
+    basename. None when cwd is not absolute or not inside a git repo."""
+    if not os.path.isabs(cwd):
+        return None
+    d = cwd.rstrip("/") or "/"
+    while True:
+        dotgit = os.path.join(d, ".git")
+        if os.path.exists(dotgit):
+            cfg = _git_config_path(dotgit)
+            if cfg:
+                try:
+                    with open(cfg, "r", encoding="utf-8", errors="replace") as fh:
+                        name = _origin_repo_name(fh.read())
+                    if name:
+                        return name
+                except OSError:
+                    pass
+            return os.path.basename(d) or None
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def _git_config_path(dotgit):
+    if os.path.isdir(dotgit):
+        return os.path.join(dotgit, "config")
+    try:
+        with open(dotgit, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return None
+    gitdir = None
+    for line in text.splitlines():
+        if line.startswith("gitdir:"):
+            gitdir = line[len("gitdir:"):].strip()
+            break
+    if not gitdir:
+        return None
+    if not os.path.isabs(gitdir):
+        gitdir = os.path.normpath(os.path.join(os.path.dirname(dotgit), gitdir))
+    commondir = os.path.join(gitdir, "commondir")
+    if os.path.exists(commondir):
+        try:
+            with open(commondir, "r", encoding="utf-8", errors="replace") as fh:
+                common = fh.read().strip()
+            base = common if os.path.isabs(common) else os.path.normpath(os.path.join(gitdir, common))
+            return os.path.join(base, "config")
+        except OSError:
+            pass
+    return os.path.join(gitdir, "config")
+
+
+def _origin_repo_name(config):
+    in_origin = False
+    for line in config.splitlines():
+        t = line.strip()
+        if t.startswith("["):
+            in_origin = t == '[remote "origin"]'
+            continue
+        if in_origin and t.startswith("url"):
+            rest = t[len("url"):].lstrip()
+            if rest.startswith("="):
+                return _repo_name_from_url(rest[1:].strip())
+    return None
+
+
+def _repo_name_from_url(url):
+    url = url.strip().rstrip("/")
+    seg = re.split(r"[/:]", url)[-1] if url else ""
+    if seg.endswith(".git"):
+        seg = seg[:-len(".git")]
+    return seg or None
 
 
 def _empty_bucket():
