@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.8.1] - 2026-06-11
+
+### Added
+
+- **Self-hosted sync server (`context-bar-server`)** — a small Rust binary you run on any always-on Mac (Pi, NAS, homelab box). Each Mac pushes its 30-day rollup; the Value tab combines them. No third-party service, no telemetry. See `crates/context-bar-server/README.md`.
+- **`context-bar-push` CLI** — one-shot helper to push the current machine's rollup, useful for cron jobs.
+- **Local SQLite store** at `~/.context-bar/context-bar.sqlite` (mirrors the JSON snapshot, persists settings, AI run history). One-shot migration from existing UserDefaults.
+- **Settings → Privacy → Across your Macs → Self-hosted server** — new row with URL field, status pill (`Synced · 2m ago` / `Syncing…` / `Error`), Sync now / Test buttons. The legacy folder picker is kept as a fallback.
+- **Settings → Privacy → AI Advisor → Last analysis** — Run analysis button + last-run result, persisted in the local SQLite store.
+- **Settings → General → Alerts → Monthly budget** — live pace preview under the input (`$847 / $1,500 · comfortable/close/over`), tinted to match the menubar tier.
+
 ## [0.8.0] - 2026-06-10
 
 ### Changed

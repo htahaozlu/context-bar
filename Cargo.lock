@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "context-bar"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "comfy-table",
  "context-bar-core",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "context-bar-core"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "context-bar-server"
-version = "0.7.10"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "clap",
