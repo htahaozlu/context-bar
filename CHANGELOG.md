@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.8.6] - 2026-06-13
+
+### Fixed
+
+- **Context meter no longer mixes sources.** The menubar parser previously fell back to an active session for the context percentage while keeping the top-level context-window size, which could pair fresh usage with a stale `1M` window and show impossible combinations. Percentage and window now resolve from the same source, so the popover's `%` and `used / window` line stay consistent.
+
 ## [0.8.5] - 2026-06-12
 
 ### Changed
@@ -12,10 +18,6 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 - **Across your Macs now leads with iCloud Drive.** Privacy settings add a first-party iCloud Drive sync path with on/off state, keeping server sync for homelab users and manual folders as a fallback.
 - **Typography ships inside the app bundle.** JetBrains Mono is now bundled and registered via the macOS app packaging path so numeric surfaces stay consistent in local builds and release artifacts.
 - **Clay theme polish across popover, settings, and stats.** The refreshed macOS UI pass tightens spacing, component styling, and hierarchy across the menubar surfaces while keeping the single-theme direction introduced in v0.8.4.
-
-### Fixed
-
-- **Context meter no longer mixes sources.** The menubar parser previously fell back to an active session for the context percentage while keeping the top-level context-window size, which could pair fresh usage with a stale `1M` window and show impossible combinations. Percentage and window now resolve from the same source, so the popover's `%` and `used / window` line stay consistent.
 
 ## [0.8.4] - 2026-06-11
 
