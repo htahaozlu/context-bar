@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <strong>Usage and cost visibility for Claude Code and Codex — a native macOS menubar app and a cross-platform terminal CLI.</strong>
+  <strong>Usage and cost for Claude Code <em>and</em> Codex — together, on every surface. Local-first, no account required.</strong>
 </p>
 
 <p align="center">
-  ContextBar shows where your Claude Code and Codex usage is going, on every surface you work from. The <strong>native macOS menubar app</strong> gives you a live session view, rolling 5h/7d limit gauges, cost trends, a WidgetKit widget, and a Share card. The <strong>cross-platform terminal CLI</strong> brings ccusage-class reports (daily / weekly / monthly / session / blocks) and a live TUI dashboard to macOS, Linux, Windows, and SSH — built on a pure-Rust engine, no <code>python3</code> required. Cost numbers are API-equivalent <strong>estimates</strong> priced from the LiteLLM rate table (the same source ccusage uses), not bills. Repository context stays fresh via local snapshots; no external service required.
+  ContextBar shows where your Claude Code <strong>and</strong> Codex usage and money are going. A <strong>native macOS menubar app</strong> keeps a live gauge-dot in your menubar, an at-a-glance popover, and a five-tab detail window (Stats · Cost · Settings · Privacy · About). A <strong>cross-platform terminal CLI</strong> brings the same numbers — daily / weekly / monthly / session reports plus a live TUI — to macOS, Linux, Windows, and SSH, on a pure-Rust engine with no <code>python3</code> required. Both agents are shown side by side throughout. Cost is an <strong>estimate</strong> computed from your local transcripts × published per-model rates — it is not a bill. Everything runs locally; optional iCloud Drive sync rolls usage up across your Macs without a server.
 </p>
 
 <p align="center">
@@ -48,13 +48,13 @@
   <img src="https://img.shields.io/github/stars/htahaozlu/context-bar?style=flat-square" alt="Stars">
 </p>
 
-## Live demo
+## Demo
 
 <p align="center">
-  <img src="docs/images/context-bar-demo.gif" alt="ContextBar demo showing Claude Code and Codex usage updating live on macOS" width="100%">
+  <img src="docs/images/context-bar-cli-demo.gif" alt="ContextBar terminal CLI showing Claude Code and Codex daily usage and cost" width="100%">
 </p>
 
-The native macOS app keeps Claude Code and Codex context drift and rolling usage visible while you work; the terminal CLI brings the same usage and cost numbers to any OS, including over SSH.
+The terminal CLI brings Claude Code and Codex usage and cost to any OS, including over SSH. On macOS the native menubar app keeps the same numbers always-on — a live gauge-dot, a popover, and a five-tab detail window.
 
 ## Install
 
@@ -118,6 +118,10 @@ Every [release](https://github.com/htahaozlu/context-bar/releases/latest) attach
 
 Download the archive for your platform, verify the checksum, unpack it, and put `context-bar` on your `PATH`. (Linux binaries are statically linked against musl, so they run on any distro.)
 
+### Zed extension
+
+ContextBar also ships as a [Zed](https://zed.dev) extension that adds `/hud`, `/brief`, `/hello`, and `/doctor` slash commands to the Assistant (declared in `extension.toml`). Install it from the repo as a dev extension: in Zed, **Extensions → Install Dev Extension**, then pick this repository's root.
+
 ### macOS app — direct download (DMG)
 
 If you don't use Homebrew:
@@ -129,49 +133,48 @@ If you don't use Homebrew:
 
 ## Preview
 
-As of **v0.8.0** every surface shares one calm visual language — a single warm clay accent over a neutral gray scale, with mono tabular numbers throughout.
+Every surface shares one calm visual language — a warm clay signature over a neutral gray scale, with JetBrains Mono tabular numbers throughout.
 
 <p align="center">
-  <img src="docs/images/context-bar-screenshot.png" alt="ContextBar native usage window" width="100%">
+  <img src="docs/images/context-bar-screenshot.png" alt="ContextBar native detail window" width="100%">
 </p>
 
-Native macOS usage window with rolling session visibility for Claude Code and Codex.
+The native macOS detail window with five tabs — Stats · Cost · Settings · Privacy · About — covering both Claude Code and Codex at once.
 
 <p align="center">
   <img src="docs/images/context-bar-menubar.png" alt="ContextBar menubar" width="400">
 </p>
 
-Compact menubar status item showing active agent, project, and context usage — led by a single gauge-dot whose arc is your context fill and whose color stays calm (accent) until a limit, budget, or upstream incident needs attention (amber → red). Clicking it opens a native popover with a solid hero card (the context window as one big number), the active session, rolling 5h/7d limits, parallel sessions, and a live theme picker.
+The menubar is a single gauge-dot: the arc is your context fill and the color ramps calm (clay) → amber → red as a limit gets close (it shows a hollow ring when idle). The project label follows the **git repository** — the origin remote name, else the repo root folder; directories that aren't in a repo read as `parent/leaf`. Click it for a popover: the active session as a hero card on top, parallel sessions below, then two limit cards (Claude and Codex). Click any session to drill into its exact context-window fill (used / free / %) and an estimated per-turn "context loaded" breakdown (CLAUDE.md, MCP, skills).
 
 <p align="center">
-  <img src="docs/images/context-bar-cost.png" alt="ContextBar Cost tab — estimated API-equivalent cost per day per project" width="100%">
+  <img src="docs/images/context-bar-cost.png" alt="ContextBar Cost tab — API-equivalent value vs your plan, plus real billed spend for API-only models" width="100%">
 </p>
 
-The **Cost** tab estimates what your subscription usage would cost on the metered API — per day, per project, for Claude and Codex — and projects it against your plan price (e.g. *"~41× your Max 20× plan"*). It replicates `better-ccusage daily --instances` natively, then adds a monthly projection and a cost trend that a CLI can't show passively. Numbers are estimates priced from the LiteLLM rate table (the same source ccusage uses), not bills.
+The **Cost** tab shows two honest numbers side by side: the **API-equivalent value** of your usage against your flat plan (what the metered API *would* charge for plan models — not what you pay), and **real billed spend** for API-only models that aren't in your plan (e.g. Codex). It breaks both out per model (plan vs billed), with a 30-day trend, a daily breakdown, and cross-machine totals under **Across your Macs**. Every figure is an **estimate** from local transcripts × published rates — never a bill.
 
 ## What it does
 
-ContextBar solves two persistent problems in agent-driven development:
+ContextBar answers a question agent-driven developers keep asking and can't easily see: **where are my Claude Code and Codex tokens — and money — going?** It reads your local transcripts and surfaces usage and cost for both agents, side by side, on whatever surface you work from.
 
-- repository context drifts faster than an agent brief can keep up
-- usage and session state stay buried in terminal output and local transcripts
+### Surfaces
 
-It addresses both through a local pipeline that continuously produces stable project summaries, a cross-platform terminal CLI, and a native macOS HUD for Claude Code and Codex activity.
+- **Menubar app (macOS)** — a single gauge-dot in the menubar (arc = context fill, color = urgency), a popover with the active session, parallel sessions, and Claude + Codex limit cards, and a five-tab detail window (Stats · Cost · Settings · Privacy · About).
+- **Terminal CLI (macOS · Linux · Windows · SSH)** — `daily` / `weekly` / `monthly` / `session` / `blocks` reports + a live TUI, on a pure-Rust engine with no `python3`.
+- **Zed extension** — `/hud`, `/brief`, `/hello`, and `/doctor` slash commands for the Assistant.
 
-### Core surfaces
+### Highlights
 
-- Cross-platform terminal CLI — `daily` / `weekly` / `monthly` / `session` / `blocks` reports + a live TUI (macOS · Linux · Windows · SSH)
-- Native AppKit menubar app (menubar status item, popover, Cost tab, widget, Share card) — macOS
-- Estimated API-equivalent cost per day per project (Claude + Codex), with a click-to-drill-down cache explainer
-- **AI Advisor** — bring your own OpenAI/Gemini key for usage-efficiency tips (aggregate-only, opt-in)
-- **Across-your-Macs** combined usage via a folder you already sync (no server)
-- Sub-agent / dynamic-workflow token burn made visible
-- Repository snapshots under `.context-bar/` with stable `AGENT.md` and `CLAUDE.md`
-- Markdown and JSON artifacts for tooling
+- **Both agents together** — Claude Code and Codex everywhere, with a "Both" filter (the default) in Stats and Cost.
+- **Session context drill-down** — exact context-window fill (used / free / %) plus an estimated per-turn "context loaded" breakdown (CLAUDE.md, MCP, skills). Claude's full `/context` category split lives inside Claude Code and isn't on disk, so loader sizes are clearly marked as estimates.
+- **Cost done honestly** — API-equivalent **value vs your flat plan** for plan models, **real billed spend** for API-only models, per-model breakdown, 30-day trend, daily breakdown — all estimates from local transcripts × published rates.
+- **AI Advisor** — bring your own OpenAI/Gemini key for usage-efficiency tips (aggregate-only, opt-in, off by default).
+- **Across your Macs** — opt-in iCloud Drive sync (or a self-hosted server) rolls small per-machine summaries up into combined totals; local-first, no account required.
+- **Sub-agent burn** — see how much usage went to Task / multi-agent runs.
 
 ## How it compares to ccusage
 
-The terminal CLI replicates [ccusage](https://github.com/ryoppippi/ccusage)'s `daily` / `weekly` / `monthly` / `session` / `blocks` reports for both Claude Code and Codex, on a pure-Rust engine (no `python3`), with API-equivalent cost priced from the same LiteLLM rate table. The native macOS app then adds what a passive CLI can't surface: live 5h/7d limit gauges in the menubar, an interactive cost-trend chart, a WidgetKit widget, and a one-click Share card. Use the CLI anywhere; reach for the app on macOS when you want it always-on.
+The terminal CLI renders [ccusage](https://github.com/ryoppippi/ccusage)-style `daily` / `weekly` / `monthly` / `session` / `blocks` reports for both Claude Code and Codex, on a pure-Rust engine (no `python3`). The native macOS app then adds what a passive CLI can't surface: a live gauge-dot and rolling limit cards in the menubar, a session context drill-down, an interactive cost-trend chart, and cross-machine rollups. Use the CLI anywhere; reach for the app on macOS when you want it always-on.
 
 ## Key capabilities
 
@@ -195,33 +198,28 @@ For Claude Code compatibility, `CLAUDE.md` is mirrored at the repository root.
 - `context-bar watch 30 .` keeps repository context fresh on an interval
 - `context-bar global` builds a cross-project HUD under `~/.context-bar/`
 
-### Native macOS companion
+### Native macOS app
 
-The companion app reads `~/.context-bar/context.json` (`hud.json` before v0.3.13) and provides:
+The app reads `~/.context-bar/context.json` (`hud.json` before v0.3.13) and provides:
 
-- a compact menubar status item — one gauge-dot (context fill in its arc, urgency in its color) ahead of active agent · project · context %
-- a modern AppKit popover with cards for the active agent, context window,
-  rolling 5h/7d limits with progress bars, parallel sessions, and other
-  detected AI tools
-- a theme picker with inline color swatches and live preview — hover a
-  theme and the menubar title repaints in that palette before you commit
-- three data views (Usage, Stats, Cost) plus a clean, Apple-style settings set (General · Appearance · Privacy) and About
-- per-session context percentage for parallel Claude / Codex sessions
+- a menubar gauge-dot — the arc is your context fill, the color ramps calm (clay) → amber → red as a limit approaches, and a hollow ring shows when idle. The project label follows the **git repository** (origin remote, else the repo root folder); non-git directories read as `parent/leaf`.
+- an AppKit popover — the active session as a hero card on top, parallel sessions below, then two limit cards (Claude and Codex). Click any session to open its context detail.
+- a session context detail — exact context-window fill (used / free / %), token composition, and an estimated per-turn "context loaded" breakdown (CLAUDE.md, MCP, skills).
+- a five-tab detail window — **Stats · Cost · Settings · Privacy · About**.
 
-### Estimated cost & plan value
+### Stats tab
 
-The **Cost** tab answers a question subscription users increasingly ask — *"what would this cost if I were forced onto the metered API?"*
+Activity for **both** agents (a "Both" filter, the default), with metric tiles, a year-long heatmap, token composition, top projects, insights, and a model filter.
 
-- per-day, per-project cost breakdown (the native equivalent of `better-ccusage daily --instances`), for both Claude and Codex
-- estimated cost for today / last 7 days / last 30 days, plus 30-day input vs. output token totals
-- a **monthly projection** compared to your actual plan price (e.g. *"≈ $8,268/mo — about 41× your Max 20× plan"*)
-- an interactive 30-day cost-trend chart — hover any day for its date, estimated cost, and tokens
-- priced **per turn by model** from the LiteLLM rate table (the same canonical source ccusage uses), fetched live with a 24h on-disk cache and a bundled offline fallback; Anthropic's prompt-cache and >200K long-context rules are honored
+### Cost tab — value vs. plan, plus real spend
+
+The **Cost** tab separates two things subscription users conflate:
+
+- **API-equivalent value vs your flat plan** — what the metered API *would* charge for the models that are covered by your plan. This is a value estimate, not money you pay.
+- **Real billed spend** — actual cost for API-only models that aren't in your plan (e.g. Codex, or any model you pay per token for).
+- a **per-model breakdown** (plan value vs billed spend), a **30-day trend**, a **daily breakdown**, and **Across your Macs** combined totals.
+- priced **per turn by model** from published rates (input / output, cache-write ×1.25, cache-read ×0.1), with a live fetch, an on-disk cache, and a bundled offline fallback; Anthropic's prompt-cache and long-context rules are honored.
 - everything is clearly labelled an **estimate** — subscription plans are not billed per token. Set `CONTEXTBAR_PRICING_OFFLINE=1` to skip the live rate fetch.
-
-### Click any row — cache, in plain language
-
-Click a project row in the Cost table to open a drill-down: the four token buckets (input / output / cache-write / cache-read) with each one's share of the cost, the dominant line highlighted, and a short explainer of what cache tokens are and why **cache reads usually dominate a heavy session** (replayed context billed at 0.1× input — cheap per token, enormous by volume). It's built to *teach* the bill, not just show it.
 
 ### Sub-agent (dynamic-workflow) burn
 
@@ -233,7 +231,7 @@ Connect **your own** OpenAI or Gemini API key (stored in the macOS Keychain) and
 
 ### Across your Macs
 
-Point context-bar at a folder you already sync (iCloud Drive, Dropbox, …) and each Mac writes a compact usage summary there; the Cost tab then shows your **combined 30-day cost across machines**, with a per-Mac breakdown. No server, no telemetry — just files in your own synced folder.
+Turn on **iCloud Drive sync** in Settings on each Mac (same Apple ID) and each machine writes a small per-machine usage rollup that the others read; the Cost tab then shows your **combined cost across machines**, with a per-Mac breakdown. Prefer not to use iCloud? Point it at a self-hosted server or a folder you already sync instead. Local-first, no account required, no telemetry — just files in your own synced location.
 
 ### Desktop & Notification Center widget
 
@@ -361,7 +359,7 @@ Coding Agent Usage Report — Daily
 | Total      |            |                   | ...     | ...       | ...          | ...           | ...           | $1,682.65  |
 ```
 
-In the real terminal these are Unicode box-drawing tables via `comfy-table`. `Total` follows `ccusage`'s Total Tokens — `input + output + cache_creation + cache_read`. Costs are **estimates** of what the metered API would charge, not a bill — subscription users aren't billed per token.
+In the real terminal these are Unicode box-drawing tables via `comfy-table`. `Total` follows `ccusage`'s Total Tokens — `input + output + cache_creation + cache_read`. Costs are **estimates** computed from your local transcripts × published per-model rates (input / output, cache-write ×1.25, cache-read ×0.1), not a bill — subscription users aren't billed per token.
 
 ## Artifact layout
 
@@ -428,9 +426,11 @@ Artifacts:
 
 ## Repository layout
 
-- `src/` core engine, artifact rendering, and usage aggregation
+- `crates/context-bar-core/` core engine — git/usage signals, cost pricing, report rendering
+- `crates/context-bar-server/` optional self-hosted cross-machine sync server
+- `src/` Zed extension entry point + engine glue (`extension.toml` declares the slash commands)
 - `src/bin/context-bar.rs` standalone CLI entry point
-- `menubar/context-bar.swift` macOS companion app
+- `menubar/sources/` native AppKit macOS app; `menubar/widget/` WidgetKit extension
 - `examples/snapshot.rs` native development harness
 
 ## Development

@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <strong>Claude Code ve Codex için kullanım ve maliyet görünürlüğü — native bir macOS menubar uygulaması ve çapraz platform bir terminal CLI.</strong>
+  <strong>Claude Code <em>ve</em> Codex için kullanım ve maliyet — birlikte, her yüzeyde. Yerel-öncelikli, hesap gerekmez.</strong>
 </p>
 
 <p align="center">
-  ContextBar, Claude Code ve Codex kullanımınızın nereye gittiğini çalıştığınız her yüzeyde gösterir. <strong>Native macOS menubar uygulaması</strong> canlı oturum görünümü, rolling 5sa/7g limit göstergeleri, maliyet trendleri, bir WidgetKit widget'ı ve Share kartı sunar. <strong>Çapraz platform terminal CLI</strong>, ccusage sınıfı raporları (daily / weekly / monthly / session / blocks) ve canlı bir TUI panosunu macOS, Linux, Windows ve SSH'a taşır — saf-Rust motor, <code>python3</code> gerektirmez. Maliyet rakamları LiteLLM fiyat tablosundan (ccusage ile aynı kaynak) hesaplanan API-eşdeğeri <strong>tahminlerdir</strong>, fatura değil. Depo bağlamı yerel snapshot'larla güncel kalır; harici servis gerekmez.
+  ContextBar, Claude Code <strong>ve</strong> Codex kullanımınızın ve paranızın nereye gittiğini gösterir. <strong>Native macOS menubar uygulaması</strong> menubar'da canlı bir gösterge-noktası, bir bakışta popover ve beş sekmeli bir detay penceresi (İstatistik · Maliyet · Ayarlar · Gizlilik · Hakkında) tutar. <strong>Çapraz platform terminal CLI</strong>, aynı rakamları — daily / weekly / monthly / session raporları artı canlı bir TUI — macOS, Linux, Windows ve SSH'a taşır; saf-Rust motor, <code>python3</code> gerekmez. Her iki ajan da baştan sona yan yana gösterilir. Maliyet, yerel transcript'leriniz × yayınlanmış model-başına oranlardan hesaplanan bir <strong>tahmindir</strong> — fatura değildir. Her şey yerelde çalışır; isteğe bağlı iCloud Drive senkronu, kullanımı sunucusuz olarak Mac'leriniz arasında toplar.
 </p>
 
 <p align="center">
@@ -48,13 +48,13 @@
   <img src="https://img.shields.io/github/stars/htahaozlu/context-bar?style=flat-square" alt="Yıldız">
 </p>
 
-## Canlı demo
+## Demo
 
 <p align="center">
-  <img src="docs/images/context-bar-demo.gif" alt="ContextBar üzerinde Claude Code ve Codex kullanımının macOS'ta canlı güncellendiğini gösteren demo" width="100%">
+  <img src="docs/images/context-bar-cli-demo.gif" alt="ContextBar terminal CLI'sinin Claude Code ve Codex günlük kullanım ve maliyetini gösterdiği demo" width="100%">
 </p>
 
-Native macOS uygulaması Claude Code ve Codex bağlam kaymasını ve rolling kullanımı siz çalışırken görünür tutar; terminal CLI aynı kullanım ve maliyet rakamlarını SSH dahil her işletim sistemine taşır.
+Terminal CLI, Claude Code ve Codex kullanım ve maliyetini SSH dahil her işletim sistemine taşır. macOS'ta native menubar uygulaması aynı rakamları hep açık tutar — canlı bir gösterge-noktası, bir popover ve beş sekmeli bir detay penceresi.
 
 ## Kurulum
 
@@ -118,6 +118,10 @@ Her [release](https://github.com/htahaozlu/context-bar/releases/latest) altı he
 
 Platformuna uygun arşivi indir, checksum'ı doğrula, aç ve `context-bar`'ı `PATH`'e koy. (Linux ikilileri musl'a statik bağlıdır, her dağıtımda çalışır.)
 
+### Zed eklentisi
+
+ContextBar ayrıca bir [Zed](https://zed.dev) eklentisi olarak gelir; Assistant'a `/hud`, `/brief`, `/hello` ve `/doctor` slash komutlarını ekler (`extension.toml` içinde tanımlı). Depodan dev eklenti olarak kur: Zed'de **Extensions → Install Dev Extension**, sonra bu deponun kök klasörünü seç.
+
 ### macOS uygulaması — doğrudan indirme (DMG)
 
 Homebrew kullanmıyorsan:
@@ -129,46 +133,48 @@ Homebrew kullanmıyorsan:
 
 ## Önizleme
 
-**v0.8.0** itibarıyla her yüzey tek bir sakin görsel dil paylaşıyor — nötr gri ölçek üzerinde tek bir sıcak kil (clay) vurgu rengi, baştan sona mono tabular sayılar.
+Her yüzey tek bir sakin görsel dil paylaşır — nötr gri ölçek üzerinde sıcak bir kil (clay) imzası, baştan sona JetBrains Mono tabular sayılar.
 
 <p align="center">
-  <img src="docs/images/context-bar-screenshot.png" alt="ContextBar yerel kullanım penceresi" width="100%">
+  <img src="docs/images/context-bar-screenshot.png" alt="ContextBar native detay penceresi" width="100%">
 </p>
 
-Claude Code ve Codex için sürekli oturum görünürlüğüne sahip yerel macOS kullanım penceresi.
+Beş sekmeli native macOS detay penceresi — İstatistik · Maliyet · Ayarlar · Gizlilik · Hakkında — hem Claude Code'u hem Codex'i aynı anda kapsar.
 
 <p align="center">
   <img src="docs/images/context-bar-menubar.png" alt="ContextBar menubar" width="400">
 </p>
 
-Aktif ajan, proje ve bağlam kullanımını gösteren kompakt menubar durum öğesi — başında, yayı bağlam doluluğunu gösteren ve rengi bir limit, bütçe ya da üst-kaynak arızası dikkat isteyene kadar sakin (vurgu) kalıp sonra ısınan (amber → kırmızı) tek bir gösterge-noktası. Tıklandığında solid bir hero kart (bağlam penceresi tek büyük sayı olarak), aktif oturum, 5sa/7g limitleri, paralel oturumlar ve canlı tema seçici içeren yerel bir popover açılır.
+Menubar tek bir gösterge-noktasıdır: yay bağlam doluluğunuzdur ve renk bir limit yaklaştıkça sakin (clay) → amber → kırmızı geçer (boştayken içi boş bir halka gösterir). Proje etiketi **git deposunu** izler — origin remote adı, yoksa depo kök klasörü; bir depoda olmayan dizinler `üst/yaprak` (parent/leaf) olarak okunur. Tıklandığında bir popover açılır: üstte aktif oturum bir hero kart olarak, altında paralel oturumlar, ardından iki limit kartı (Claude ve Codex). Herhangi bir oturuma tıklayınca o oturumun tam bağlam-penceresi doluluğu (kullanılan / boş / %) ve tahmini turn-başına "yüklenen bağlam" dökümü (CLAUDE.md, MCP, skills) açılır.
 
 <p align="center">
-  <img src="docs/images/context-bar-cost.png" alt="ContextBar Maliyet sekmesi — proje başına günlük tahmini API-eşdeğeri maliyet" width="100%">
+  <img src="docs/images/context-bar-cost.png" alt="ContextBar Maliyet sekmesi — flat planınıza karşı API-eşdeğeri değer, artı plan dışı modeller için gerçek faturalanmış harcama" width="100%">
 </p>
 
-**Maliyet** sekmesi, abonelik kullanımınızın ölçümlü API'de ne kadara mal olacağını tahmin eder — gün gün, proje proje, Claude ve Codex için — ve bunu plan fiyatınızla karşılaştırır (örn. *"~41× Max 20× planınız"*). `better-ccusage daily --instances`'i native olarak çoğaltır, üstüne bir CLI'nin pasif gösteremeyeceği aylık projeksiyon ve maliyet trendi ekler. Sayılar, LiteLLM oran tablosundan (ccusage ile aynı kaynak) fiyatlanan tahminlerdir, fatura değildir.
+**Maliyet** sekmesi abonelik kullanıcılarının karıştırdığı iki sayıyı yan yana, dürüstçe gösterir: kullanımınızın flat planınıza karşı **API-eşdeğeri değeri** (plan kapsamındaki modeller için ölçümlü API'nin *ne ücretlendireceği* — ödediğiniz değil) ve planınızda olmayan, sadece-API modeller (örn. Codex) için **gerçek faturalanmış harcama**. Her ikisini de model bazında (plan değeri vs faturalanmış) ayırır; 30 günlük trend, günlük döküm ve **Mac'lerin arasında** birleşik toplamlar ekler. Her rakam, yerel transcript'ler × yayınlanmış oranlardan bir **tahmindir** — asla fatura değildir.
 
 ## Ne işe yarar
 
-ContextBar, ajan destekli geliştirmede sürekli tekrar eden iki sorunu hedefler:
+ContextBar, ajan destekli geliştirenlerin sürekli sorduğu ama kolayca göremediği bir soruyu yanıtlar: **Claude Code ve Codex token'larım — ve param — nereye gidiyor?** Yerel transcript'lerinizi okur ve her iki ajanın kullanım ile maliyetini, çalıştığınız her yüzeyde yan yana gösterir.
 
-- depo bağlamı, ajan özeti güncellenmeden daha hızlı değişir
-- kullanım ve oturum durumu terminal çıktısı ile yerel kayıtlar arasında kaybolur
+### Yüzeyler
 
-Bu iki problemi, sürekli kararlı proje özetleri üreten yerel bir işlem hattıyla ve Claude Code ile Codex etkinliğini gösteren yerel bir macOS HUD arayüzüyle çözer.
+- **Menubar uygulaması (macOS)** — menubar'da tek bir gösterge-noktası (yay = bağlam doluluğu, renk = aciliyet), aktif oturum + paralel oturumlar + Claude ve Codex limit kartlarıyla bir popover, ve beş sekmeli bir detay penceresi (İstatistik · Maliyet · Ayarlar · Gizlilik · Hakkında).
+- **Terminal CLI (macOS · Linux · Windows · SSH)** — `daily` / `weekly` / `monthly` / `session` / `blocks` raporları + canlı bir TUI, saf-Rust motor üzerinde, `python3` gerekmez.
+- **Zed eklentisi** — Assistant için `/hud`, `/brief`, `/hello` ve `/doctor` slash komutları.
 
-### Temel yüzeyler
+### Öne çıkanlar
 
-- `.context-bar/` altında depo snapshot'ları
-- Kararlı `AGENT.md` ve `CLAUDE.md`
-- refresh, watch ve global görünümler için CLI
-- Yerel AppKit menubar yardımcı uygulaması (Maliyet sekmesinde tıkla-aç cache açıklamalı detay)
-- Proje başına günlük tahmini API-eşdeğeri maliyet (Claude + Codex)
-- **AI Danışman** — kendi OpenAI/Gemini anahtarınla kullanım verimliliği önerileri (yalnızca özet, opt-in)
-- **Mac'lerin arasında** birleşik kullanım — zaten senkronladığın bir klasör üzerinden (sunucu yok)
-- Sub-agent / dynamic-workflow token yakımı görünür
-- Araçlar için Markdown ve JSON çıktıları
+- **Her iki ajan birlikte** — Claude Code ve Codex her yerde, İstatistik ve Maliyet'te bir "Both" filtresiyle (varsayılan).
+- **Oturum bağlam detayı** — tam bağlam-penceresi doluluğu (kullanılan / boş / %) artı tahmini turn-başına "yüklenen bağlam" dökümü (CLAUDE.md, MCP, skills). Claude'un tam `/context` kategori bölünmesi Claude Code'un içinde yaşar ve diske yazılmaz, bu yüzden yükleyici boyutları açıkça tahmin olarak işaretlenir.
+- **Maliyet dürüstçe** — plan kapsamındaki modeller için flat planınıza karşı API-eşdeğeri **değer**, plan dışı modeller için **gerçek faturalanmış harcama**, model bazında döküm, 30 günlük trend, günlük döküm — hepsi yerel transcript'ler × yayınlanmış oranlardan tahmin.
+- **AI Danışman** — kendi OpenAI/Gemini anahtarınla kullanım verimliliği önerileri (yalnızca özet, opt-in, varsayılan kapalı).
+- **Mac'lerin arasında** — opt-in iCloud Drive senkronu (veya self-hosted bir sunucu) küçük makine-başına özetleri birleşik toplamlara yuvarlar; yerel-öncelikli, hesap gerekmez.
+- **Sub-agent yakımı** — kullanımınızın ne kadarının Task / çoklu-ajan çalıştırmalarına gittiğini görün.
+
+## ccusage ile karşılaştırma
+
+Terminal CLI, hem Claude Code hem Codex için [ccusage](https://github.com/ryoppippi/ccusage) tarzı `daily` / `weekly` / `monthly` / `session` / `blocks` raporlarını saf-Rust bir motorda (`python3` yok) üretir. Native macOS uygulaması ise pasif bir CLI'nin gösteremeyeceğini ekler: menubar'da canlı bir gösterge-noktası ve rolling limit kartları, bir oturum bağlam detayı, interaktif bir maliyet-trend grafiği ve makineler arası birleşik toplamlar. CLI'yi her yerde kullan; hep-açık istediğinde macOS'ta uygulamaya geç.
 
 ## Temel yetenekler
 
@@ -192,32 +198,28 @@ Claude Code uyumluluğu için `CLAUDE.md`, depo köküne de aynalanır.
 - `context-bar watch 30 .` depo bağlamını belirli aralıklarla taze tutar
 - `context-bar global` `~/.context-bar/` altında projeler arası HUD oluşturur
 
-### Yerel macOS yardımcısı
+### Native macOS uygulaması
 
-Yardımcı uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) dosyasını okur ve şunları sağlar:
+Uygulama `~/.context-bar/context.json` (v0.3.13'e kadar `hud.json`) dosyasını okur ve şunları sağlar:
 
-- kompakt menubar durum öğesi — aktif ajan · proje · bağlam % önünde tek bir gösterge-noktası (yayında bağlam doluluğu, renginde aciliyet)
-- modern AppKit popover: aktif ajan, bağlam penceresi, ilerleme barlı 5sa/7g
-  limitleri, paralel oturumlar ve tespit edilen diğer AI araçları için kartlar
-- inline renk swatch'leri ve canlı önizlemeli tema seçici — bir temanın
-  üzerinde gezinirken menubar başlığı o paletle yeniden çizilir
-- üç veri görünümü (Kullanım, İstatistik, Maliyet) artı sade, Apple-tarzı ayar seti (Genel · Görünüm · Gizlilik) ve Hakkında
-- paralel Claude / Codex oturumları için per-session bağlam yüzdesi
+- menubar gösterge-noktası — yay bağlam doluluğunuzdur, renk bir limit yaklaştıkça sakin (clay) → amber → kırmızı geçer, boştayken içi boş bir halka gösterir. Proje etiketi **git deposunu** izler (origin remote, yoksa depo kök klasörü); bir depoda olmayan dizinler `üst/yaprak` olarak okunur.
+- AppKit popover — üstte aktif oturum bir hero kart olarak, altında paralel oturumlar, ardından iki limit kartı (Claude ve Codex). Herhangi bir oturuma tıklayınca bağlam detayı açılır.
+- oturum bağlam detayı — tam bağlam-penceresi doluluğu (kullanılan / boş / %), token kompozisyonu ve tahmini turn-başına "yüklenen bağlam" dökümü (CLAUDE.md, MCP, skills).
+- beş sekmeli detay penceresi — **İstatistik · Maliyet · Ayarlar · Gizlilik · Hakkında**.
 
-### Tahmini maliyet ve plan değeri
+### İstatistik sekmesi
 
-**Maliyet** sekmesi, abonelik kullanıcılarının giderek daha çok sorduğu soruyu yanıtlar — *"ölçümlü API'ye zorlanırsam bu bana ne kadara mal olur?"*
+**Her iki** ajanın etkinliği (bir "Both" filtresi, varsayılan): metrik tile'ları, yıllık bir heatmap, token kompozisyonu, en çok kullanılan projeler, içgörüler ve bir model filtresi.
 
-- gün başına, proje başına maliyet kırılımı (`better-ccusage daily --instances`'in native karşılığı), hem Claude hem Codex için
-- bugün / son 7 gün / son 30 gün için tahmini maliyet, artı 30 günlük girdi/çıktı token toplamları
-- gerçek plan fiyatınızla karşılaştırmalı **aylık projeksiyon** (örn. *"≈ $8.268/ay — Max 20× planınızın ~41 katı"*)
-- interaktif 30 günlük maliyet trend grafiği — herhangi bir günün üzerine gelince tarih, tahmini maliyet ve token
-- **model bazında turn turn** fiyatlama, LiteLLM oran tablosundan (ccusage ile aynı kanonik kaynak) — 24s disk cache + gömülü offline fallback ile canlı çekilir; Anthropic'in prompt-cache ve >200K uzun-bağlam kuralları gözetilir
+### Maliyet sekmesi — plana karşı değer, artı gerçek harcama
+
+**Maliyet** sekmesi, abonelik kullanıcılarının karıştırdığı iki şeyi ayırır:
+
+- **Flat planınıza karşı API-eşdeğeri değer** — planınızın kapsadığı modeller için ölçümlü API'nin *ne ücretlendireceği*. Bu bir değer tahminidir, ödediğiniz para değil.
+- **Gerçek faturalanmış harcama** — planınızda olmayan, sadece-API modeller (örn. Codex veya token başına ödediğiniz herhangi bir model) için gerçek maliyet.
+- bir **model bazında döküm** (plan değeri vs faturalanmış harcama), bir **30 günlük trend**, bir **günlük döküm** ve **Mac'lerin arasında** birleşik toplamlar.
+- **model bazında turn turn** fiyatlama, yayınlanmış oranlardan (girdi / çıktı, cache-yazma ×1.25, cache-okuma ×0.1); canlı çekim, disk cache ve gömülü offline fallback ile; Anthropic'in prompt-cache ve uzun-bağlam kuralları gözetilir.
 - her şey açıkça **tahmin** olarak etiketli — abonelik planları token başına faturalandırılmaz. Canlı oran çekimini atlamak için `CONTEXTBAR_PRICING_OFFLINE=1`.
-
-### Bir satıra tıkla — cache, düz dille
-
-Maliyet tablosunda bir proje satırına tıkla, detay açılsın: dört token kovası (girdi / çıktı / cache-yazma / cache-okuma), her birinin maliyetteki payı, dominant kalem vurgulu ve cache token'ın ne olduğunu + ağır bir oturumda **cache okumalarının neden baskın olduğunu** (0.1× girdi fiyatına gelen tekrar oynatılan bağlam — token başına ucuz, hacimce devasa) anlatan kısa bir açıklama. Faturayı sadece göstermek değil, *öğretmek* için.
 
 ### Sub-agent (dynamic-workflow) yakımı
 
@@ -229,7 +231,7 @@ Maliyet tablosunda bir proje satırına tıkla, detay açılsın: dört token ko
 
 ### Mac'lerin arasında
 
-context-bar'ı zaten senkronladığın bir klasöre (iCloud Drive, Dropbox…) yönlendir; her Mac oraya kompakt bir kullanım özeti yazsın. Maliyet sekmesi **makineler arası birleşik 30 günlük maliyeti** ve Mac başına kırılımı gösterir. Sunucu yok, telemetri yok — yalnızca kendi senkron klasöründeki dosyalar.
+Her Mac'te Ayarlar'dan **iCloud Drive senkronunu** aç (aynı Apple ID); her makine, diğerlerinin okuduğu küçük bir makine-başına kullanım özeti yazsın. Maliyet sekmesi **makineler arası birleşik maliyeti** ve Mac başına kırılımı gösterir. iCloud istemiyorsan self-hosted bir sunucuya ya da zaten senkronladığın bir klasöre yönlendir. Yerel-öncelikli, hesap gerekmez, telemetri yok — yalnızca kendi senkron konumundaki dosyalar.
 
 ### Masaüstü ve Bildirim Merkezi widget'ı
 
@@ -350,7 +352,7 @@ Global HUD `~/.context-bar/hud.md` konumuna yazılır.
 
 ### Sütunlar
 
-ccusage günlük tablosuyla eşleşir: Tarih · Ajan · Modeller · Girdi · Çıktı · Önbellek Oluşturma · Önbellek Okuma · Toplam · Maliyet (USD). "Toplam", ccusage'ın Total Tokens değeridir = girdi + çıktı + önbellek oluşturma + önbellek okuma. Maliyetler, ölçümlü API'nin ne ücretlendireceğine dair **tahminlerdir** — fatura değil (abonelik kullanıcıları token başına faturalandırılmaz).
+ccusage günlük tablosuyla eşleşir: Tarih · Ajan · Modeller · Girdi · Çıktı · Önbellek Oluşturma · Önbellek Okuma · Toplam · Maliyet (USD). "Toplam", ccusage'ın Total Tokens değeridir = girdi + çıktı + önbellek oluşturma + önbellek okuma. Maliyetler, yerel transcript'leriniz × yayınlanmış model-başına oranlardan (girdi / çıktı, cache-yazma ×1.25, cache-okuma ×0.1) hesaplanan **tahminlerdir** — fatura değil (abonelik kullanıcıları token başına faturalandırılmaz).
 
 ### Çalışma zamanı notu
 
@@ -435,9 +437,11 @@ Artifact'ler:
 
 ## Depo düzeni
 
-- `src/` çekirdek motor, artifact render etme ve kullanım toplama
+- `crates/context-bar-core/` çekirdek motor — git/kullanım sinyalleri, maliyet fiyatlama, rapor render
+- `crates/context-bar-server/` isteğe bağlı self-hosted makineler-arası senkron sunucusu
+- `src/` Zed eklentisi giriş noktası + motor tutkalı (`extension.toml` slash komutlarını tanımlar)
 - `src/bin/context-bar.rs` bağımsız CLI giriş noktası
-- `menubar/context-bar.swift` macOS yardımcı uygulaması
+- `menubar/sources/` native AppKit macOS uygulaması; `menubar/widget/` WidgetKit extension
 - `examples/snapshot.rs` yerel geliştirme harness'i
 
 ## Geliştirme
