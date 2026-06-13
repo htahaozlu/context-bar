@@ -97,6 +97,7 @@ struct ActiveSession {
     let lastTurn: Date?
     let started: Date?
     let ctxPct: Double?
+    let ctxWindow: UInt64?
 }
 
 /// Menubar budget-pressure tier (C1), worst-of monthly $ run-rate and 5h %.

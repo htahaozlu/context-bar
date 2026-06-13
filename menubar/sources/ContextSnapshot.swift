@@ -159,7 +159,8 @@ final class ContextSnapshot {
                 model: obj["model"] as? String,
                 lastTurn: last,
                 started: st,
-                ctxPct: dbl(obj["context_pct"])
+                ctxPct: dbl(obj["context_pct"]),
+                ctxWindow: u64Opt(obj["context_window"])
             )
         }
 
@@ -178,7 +179,10 @@ final class ContextSnapshot {
         let mostRecentActive = actives.max(by: {
             ($0.lastTurn ?? .distantPast) < ($1.lastTurn ?? .distantPast)
         })
-        let resolvedCtxPct = dbl(raw["last_context_pct"]) ?? mostRecentActive?.ctxPct
+        let rawCtxPct = dbl(raw["last_context_pct"])
+        let rawCtxWindow = u64Opt(raw["last_context_window"])
+        let resolvedCtxPct = rawCtxPct ?? mostRecentActive?.ctxPct
+        let resolvedCtxWindow = rawCtxPct != nil ? rawCtxWindow : mostRecentActive?.ctxWindow
         let resolvedCwd = (raw["last_cwd"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             ?? mostRecentActive?.project
 
@@ -199,7 +203,7 @@ final class ContextSnapshot {
             model: raw["last_model"] as? String,
             cwd: resolvedCwd,
             ctxPct: resolvedCtxPct,
-            ctxWindow: u64Opt(raw["last_context_window"]),
+            ctxWindow: resolvedCtxWindow,
             lastTurn: ts,
             sessionStarted: started,
             activeSessions: actives,
