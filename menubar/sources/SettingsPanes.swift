@@ -414,17 +414,17 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
             self?.refreshPreview()
             self?.onThemeChange?(ThemeStore.current.id)
         }
-        modeCtrl.setAccessibilityLabel(L10n.text("Mode", "Mod"))
+        modeCtrl.setAccessibilityLabel(L10n.text("Theme", "Tema"))
         appearance.addRow(
-            title: L10n.text("Mode", "Mod"),
+            title: L10n.text("Theme", "Tema"),
             desc: L10n.text(
                 "Follow the system appearance, or pin Light / Dark.",
                 "Sistem görünümünü izleyin ya da Açık / Koyu sabitleyin."),
             control: modeCtrl)
 
         // ── Accent — KEEP the rich named-palette picker (ThemeCardView grid).
-        //    Distinct from Theme mode above: this is the single chromatic note
-        //    (Clay / Indigo / Teal). Full-width row below the mode switch.
+        //    Distinct from the Theme (System/Light/Dark) row above: this is the
+        //    single chromatic note (Clay / Indigo / Teal). Full-width row below.
         cardViews = Theme.all.map { theme in
             let card = ThemeCardView(theme: theme)
             card.isSelected = theme.id == ThemeStore.current.id
@@ -449,7 +449,7 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         themeGrid.orientation = .vertical
         themeGrid.spacing = 12
         appearance.addWideRow(
-            title: L10n.text("Theme", "Tema"),
+            title: L10n.text("Accent", "Vurgu"),
             desc: L10n.text(
                 "The accent palette used across the menubar and panes.",
                 "Menubar ve panellerde kullanılan vurgu paleti."),
