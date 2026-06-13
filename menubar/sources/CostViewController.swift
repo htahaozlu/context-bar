@@ -63,35 +63,54 @@ final class CostViewController: PreferencePaneViewController {
 
         // ── Hero clarity card + 2×2 tiles (cost.jsx:95-158) — a 1.5:1 grid.
         // LEFT keeps CostHeroView (not-a-bill / billed framing). RIGHT is a 2×2
-        // tile grid built per reload into `tilesStack`.
+        // tile grid built per reload into `tilesStack`. The tiles fill the hero's
+        // height so the two columns are equal height and top-aligned cleanly —
+        // the spec balance (no shorter column floating against a taller one).
         tilesStack.orientation = .vertical
         tilesStack.alignment = .leading
-        tilesStack.spacing = 0
+        tilesStack.distribution = .fillEqually
+        tilesStack.spacing = Spacing.s
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
         addGridRow(left: heroCard, right: tilesStack, leftRatio: 1.5)
-
-        // Cache-savings line — a quiet "you're winning" footnote under the tiles.
-        savingsLabel.font = NSFont.systemFont(ofSize: 11)
-        savingsLabel.textColor = .secondaryLabelColor
-        savingsLabel.maximumNumberOfLines = 0
-        savingsLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentStack.addArrangedSubview(savingsLabel)
-        savingsLabel.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        // Equal-height columns: pin the tile column to the hero. The hero drives
+        // the height (it has the most content); the two 92pt-min tile rows grow
+        // to fill it via .fillEqually, so the 2×2 block reads as one balanced
+        // panel beside the hero rather than a short stack hanging from the top.
+        // Non-required so a short/empty hero can't crush the tiles below their
+        // 92pt minimum (the tiles keep their floor and the hero stretches).
+        let tilesEqualHero = tilesStack.heightAnchor.constraint(equalTo: heroCard.heightAnchor)
+        tilesEqualHero.priority = .defaultHigh
+        tilesEqualHero.isActive = true
 
         // ── 30-day trend card (cost.jsx:160-169). Kept as a bare card so the
-        // header chip ("Jun 1 · $132") sits inside, matching the spec.
+        // header chip ("Jun 1 · $132") sits inside, matching the spec. The quiet
+        // cache-savings line rides along the bottom of this card (demoted from a
+        // top-level row that competed with the core stats).
         sparkHost.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.heightAnchor.constraint(equalToConstant: 150).isActive = true
+        savingsLabel.font = Typography.body(11)
+        savingsLabel.textColor = Palette.secondaryText
+        savingsLabel.maximumNumberOfLines = 0
+        savingsLabel.translatesAutoresizingMaskIntoConstraints = false
+        // sparkHost over the savings line in a stack so the savings row collapses
+        // cleanly (no dead gap) when there's nothing to report.
+        let trendInner = NSStackView(views: [sparkHost, savingsLabel])
+        trendInner.orientation = .vertical
+        trendInner.alignment = .leading
+        trendInner.spacing = Spacing.s
+        trendInner.translatesAutoresizingMaskIntoConstraints = false
         let trendCard = NSView()
         Surface.applyCard(trendCard)
         trendCard.translatesAutoresizingMaskIntoConstraints = false
-        trendCard.addSubview(sparkHost)
+        trendCard.addSubview(trendInner)
         NSLayoutConstraint.activate([
-            sparkHost.topAnchor.constraint(equalTo: trendCard.topAnchor, constant: Spacing.m),
-            sparkHost.leadingAnchor.constraint(equalTo: trendCard.leadingAnchor, constant: Spacing.m),
-            sparkHost.trailingAnchor.constraint(equalTo: trendCard.trailingAnchor, constant: -Spacing.m),
-            sparkHost.bottomAnchor.constraint(equalTo: trendCard.bottomAnchor, constant: -Spacing.m),
-            sparkHost.heightAnchor.constraint(equalToConstant: 150),
+            trendInner.topAnchor.constraint(equalTo: trendCard.topAnchor, constant: Spacing.m),
+            trendInner.leadingAnchor.constraint(equalTo: trendCard.leadingAnchor, constant: Spacing.m),
+            trendInner.trailingAnchor.constraint(equalTo: trendCard.trailingAnchor, constant: -Spacing.m),
+            trendInner.bottomAnchor.constraint(equalTo: trendCard.bottomAnchor, constant: -Spacing.m),
         ])
+        sparkHost.widthAnchor.constraint(equalTo: trendInner.widthAnchor).isActive = true
+        savingsLabel.widthAnchor.constraint(equalTo: trendInner.widthAnchor).isActive = true
         contentStack.addArrangedSubview(trendCard)
         trendCard.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
 
@@ -115,7 +134,22 @@ final class CostViewController: PreferencePaneViewController {
         contentStack.addArrangedSubview(instancesStack)
         instancesStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
 
-        // ── PRESERVED features below the spec sections ──────────────────────
+        // ── Secondary block ─────────────────────────────────────────────────
+        // The core spec sections end here. Everything below (cross-machine, AI
+        // advisor, source note) is supplementary — set it behind a divider and a
+        // quiet caption so it reads as secondary and doesn't compete with the
+        // primary stats above. Extra top space reinforces the separation.
+        let secondaryDivider = DividerView()
+        secondaryDivider.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(secondaryDivider)
+        secondaryDivider.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        contentStack.setCustomSpacing(Spacing.l, after: instancesStack)
+        let secondaryHeading = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("More details & tools", "Daha fazla ayrıntı ve araç"),
+                                         color: Palette.tertiaryText))
+        secondaryHeading.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(secondaryHeading)
+        contentStack.setCustomSpacing(Spacing.xs, after: secondaryDivider)
 
         // Cross-machine combined cost (only meaningful once a sync folder is set).
         machinesHost.orientation = .vertical
@@ -215,10 +249,22 @@ final class CostViewController: PreferencePaneViewController {
         }
         modelFilter.setContentHuggingPriority(.required, for: .horizontal)
 
-        let controls = NSStackView(views: [providerControl, modelFilter])
+        // Range pill lives in the header alongside the other scopers — one tidy
+        // control cluster instead of a second pill floating above the tiles
+        // (which had pushed the 2×2 grid's top out of line with the hero).
+        rangeControl = PillSegmentedControl(
+            options: [L10n.text("7d", "7g"), L10n.text("30d", "30g")],
+            selectedIndex: range.rawValue
+        ) { [weak self] idx in
+            self?.range = Range(rawValue: idx) ?? .last30
+            self?.reload()
+        }
+        rangeControl.setContentHuggingPriority(.required, for: .horizontal)
+
+        let controls = NSStackView(views: [providerControl, modelFilter, rangeControl])
         controls.orientation = .horizontal
         controls.alignment = .centerY
-        controls.spacing = 10
+        controls.spacing = Spacing.xs
         controls.translatesAutoresizingMaskIntoConstraints = false
         controls.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -621,26 +667,11 @@ final class CostViewController: PreferencePaneViewController {
     }
 
     /// 2×2 tile grid (cost.jsx:142-157): Today / 7 days / 30 days (each with a
-    /// delta sub-line) + an In·Out tile with the segmented bar. Prefixed by the
-    /// small range pill. Rebuilt into `tilesStack` each reload.
+    /// delta sub-line) + an In·Out tile with the segmented bar. Four equal tiles,
+    /// uniform Spacing.s gutters, filling the hero's height so the column reads as
+    /// one balanced panel. The range scoper lives in the header now. Rebuilt into
+    /// `tilesStack` each reload.
     private func renderTiles(_ data: CostData, rangeCost: Double) {
-        // Range pill (kept small, above the tiles, per the brief).
-        rangeControl = PillSegmentedControl(
-            options: [L10n.text("7d", "7g"), L10n.text("30d", "30g")],
-            selectedIndex: range.rawValue
-        ) { [weak self] idx in
-            self?.range = Range(rawValue: idx) ?? .last30
-            self?.reload()
-        }
-        let rangeRow = NSStackView(views: [NSView(), rangeControl])
-        rangeRow.orientation = .horizontal
-        rangeRow.distribution = .fill
-        rangeRow.alignment = .centerY
-        rangeRow.translatesAutoresizingMaskIntoConstraints = false
-        tilesStack.addArrangedSubview(rangeRow)
-        rangeRow.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
-        tilesStack.setCustomSpacing(10, after: rangeRow)
-
         let avg7 = data.cost7d / 7.0
         let todaySub = avg7 > 0
             ? String(format: data.costToday >= avg7 ? "↑ %.0f%% " : "↓ %.0f%% ",
@@ -656,7 +687,7 @@ final class CostViewController: PreferencePaneViewController {
         ])
         topRow.orientation = .horizontal
         topRow.distribution = .fillEqually
-        topRow.spacing = 12
+        topRow.spacing = Spacing.s
         topRow.translatesAutoresizingMaskIntoConstraints = false
 
         // 30-day tile: when scoped to 7d range, show the range total instead.
@@ -673,13 +704,16 @@ final class CostViewController: PreferencePaneViewController {
         let bottomRow = NSStackView(views: [bottomLeft, inOut])
         bottomRow.orientation = .horizontal
         bottomRow.distribution = .fillEqually
-        bottomRow.spacing = 12
+        bottomRow.spacing = Spacing.s
         bottomRow.translatesAutoresizingMaskIntoConstraints = false
 
+        // Equal rows that split the column height — the two tile rows grow to fill
+        // the hero's height, keeping all four tiles equal-sized.
         let grid = NSStackView(views: [topRow, bottomRow])
         grid.orientation = .vertical
         grid.alignment = .leading
-        grid.spacing = 12
+        grid.distribution = .fillEqually
+        grid.spacing = Spacing.s
         grid.translatesAutoresizingMaskIntoConstraints = false
         tilesStack.addArrangedSubview(grid)
         grid.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true

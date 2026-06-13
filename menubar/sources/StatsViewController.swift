@@ -85,11 +85,12 @@ final class StatsViewController: PreferencePaneViewController {
         //    filters on the right. No card chrome — added bare via addHero.
         buildHeaderControls()
 
-        // 2) Overview — six metric tiles in ONE row of 6 equal columns, with the
-        //    "N more …" disclosure beneath (stats.jsx overview grid).
+        // 2) Overview — six metric tiles in a 3×2 grid, with the "N more …"
+        //    disclosure beneath. (Row spacing matches the inter-tile gap so the
+        //    grid reads as one even block.)
         tilesStack.orientation = .vertical
         tilesStack.alignment = .leading
-        tilesStack.spacing = 10
+        tilesStack.spacing = Spacing.s
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
         addHero(tilesStack)
 
@@ -97,12 +98,16 @@ final class StatsViewController: PreferencePaneViewController {
         buildHeatmapSection()
 
         // 4) Two-column bottom grid (1.35fr : 1fr): LEFT = token-composition card
-        //    over a top-projects card; RIGHT = two insight cards.
+        //    over a top-projects card; RIGHT = up to four insight cards (capped so
+        //    the two columns balance in height).
         buildBottomGrid()
 
-        // 5) Preserved features, BELOW the spec sections: AI deep-dive, the
-        //    day/range drill-down with the session list, and the War & Peace fun
-        //    fact. Same functionality as before, only relocated.
+        // 5) Secondary tools, clearly demoted below the spec sections: AI
+        //    deep-dive, the day/range drill-down with the session list, and the
+        //    War & Peace fun fact. A labeled hairline marks the boundary so the
+        //    pane reads "essentials first, extras below" instead of one long
+        //    undifferentiated stack. Same functionality, only grouped + demoted.
+        addSecondaryDivider(L10n.text("More detail & tools", "Daha fazla detay & araçlar"))
         buildAISection()
         buildBreakdownSection()
 
@@ -178,14 +183,14 @@ final class StatsViewController: PreferencePaneViewController {
         let controls = NSStackView(views: [providerControl, modelFilter, rangeControl])
         controls.orientation = .horizontal
         controls.alignment = .centerY
-        controls.spacing = 10
+        controls.spacing = Spacing.xs
         controls.translatesAutoresizingMaskIntoConstraints = false
         controls.setContentHuggingPriority(.required, for: .horizontal)
 
         let row = NSStackView(views: [titleCol, spacer, controls])
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 12
+        row.spacing = Spacing.s
         row.translatesAutoresizingMaskIntoConstraints = false
         addHero(row)
     }
@@ -463,7 +468,7 @@ final class StatsViewController: PreferencePaneViewController {
         let compStack = NSStackView(views: [compHeader, compositionView])
         compStack.orientation = .vertical
         compStack.alignment = .leading
-        compStack.spacing = 12
+        compStack.spacing = Spacing.s
         compStack.translatesAutoresizingMaskIntoConstraints = false
         let compCard = makeCard(compStack)
         compHeader.widthAnchor.constraint(equalTo: compStack.widthAnchor).isActive = true
@@ -477,7 +482,7 @@ final class StatsViewController: PreferencePaneViewController {
         let projStack = NSStackView(views: [projCap, topProjectsView])
         projStack.orientation = .vertical
         projStack.alignment = .leading
-        projStack.spacing = 11
+        projStack.spacing = Spacing.s
         projStack.translatesAutoresizingMaskIntoConstraints = false
         let projCard = makeCard(projStack)
         topProjectsView.widthAnchor.constraint(equalTo: projStack.widthAnchor).isActive = true
@@ -485,7 +490,7 @@ final class StatsViewController: PreferencePaneViewController {
         let leftCol = NSStackView(views: [compCard, projCard])
         leftCol.orientation = .vertical
         leftCol.alignment = .leading
-        leftCol.spacing = 14
+        leftCol.spacing = Spacing.s
         leftCol.translatesAutoresizingMaskIntoConstraints = false
         compCard.widthAnchor.constraint(equalTo: leftCol.widthAnchor).isActive = true
         projCard.widthAnchor.constraint(equalTo: leftCol.widthAnchor).isActive = true
@@ -493,10 +498,28 @@ final class StatsViewController: PreferencePaneViewController {
         // ---- RIGHT column: insight cards ----
         insightsStack.orientation = .vertical
         insightsStack.alignment = .leading
-        insightsStack.spacing = 14
+        insightsStack.spacing = Spacing.s
         insightsStack.translatesAutoresizingMaskIntoConstraints = false
 
         addGridRow(left: leftCol, right: insightsStack, leftRatio: 1.35, spacing: Spacing.m)
+    }
+
+    /// A demoted section break: a hairline with a small uppercase caption,
+    /// signalling that everything beneath is secondary (extras / tools) rather
+    /// than part of the primary overview. Added straight into `contentStack`.
+    private func addSecondaryDivider(_ title: String) {
+        let line = DividerView()
+        let cap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(title, color: Palette.tertiaryText))
+        cap.translatesAutoresizingMaskIntoConstraints = false
+        cap.setContentHuggingPriority(.required, for: .horizontal)
+        let row = NSStackView(views: [cap, line])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = Spacing.s
+        row.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(row)
+        row.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
     }
 
     // MARK: - AI deep-dive section (preserved feature)
@@ -751,7 +774,10 @@ final class StatsViewController: PreferencePaneViewController {
             "\(ContextSnapshot.formatTokens(compTotal)) toplam")
 
         insightsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let insights = computeInsights(snapshot)
+        // Cap the right column at 4 cards so its height balances the left column
+        // (composition + top-projects). Showing all 6 made the right side tower
+        // over the left and the row read as "shifted".
+        let insights = Array(computeInsights(snapshot).prefix(4))
         if insights.isEmpty {
             let empty = NSTextField(labelWithString: L10n.text("No usage recorded yet.", "Henüz kullanım kaydı yok."))
             empty.font = NSFont.systemFont(ofSize: 12)
@@ -1193,14 +1219,31 @@ final class StatsViewController: PreferencePaneViewController {
             extras.append((L10n.text("favorite effort", "favori effort"), prettyEffort(eff)))
         }
 
-        // stats.jsx overview: ONE row of 6 equal columns (repeat(6, 1fr)).
-        let tileRow = NSStackView(views: primary)
-        tileRow.orientation = .horizontal
-        tileRow.distribution = .fillEqually
-        tileRow.spacing = 10
-        tileRow.translatesAutoresizingMaskIntoConstraints = false
-        tilesStack.addArrangedSubview(tileRow)
-        tileRow.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
+        // Overview grid: two rows of three equal tiles (3×2). Six-across made
+        // each tile ~120pt — far too narrow for the 25pt values, so labels like
+        // "Opus 4.8 (1M)" and "123/365" truncated. 3×2 gives ~250pt tiles that
+        // never clip, and reads more calmly. Every tile shares ONE height so the
+        // two rows align exactly (no "shifted" look).
+        func tileRow(_ views: [NSView]) -> NSStackView {
+            let r = NSStackView(views: views)
+            r.orientation = .horizontal
+            r.distribution = .fillEqually
+            r.spacing = Spacing.s
+            r.translatesAutoresizingMaskIntoConstraints = false
+            return r
+        }
+        let row1 = tileRow(Array(primary.prefix(3)))
+        let row2 = tileRow(Array(primary.suffix(from: min(3, primary.count))))
+        tilesStack.addArrangedSubview(row1)
+        tilesStack.addArrangedSubview(row2)
+        row1.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
+        row2.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
+        // Equal heights across ALL six tiles so both rows line up.
+        if let anchor = primary.first {
+            for t in primary.dropFirst() {
+                t.heightAnchor.constraint(equalTo: anchor.heightAnchor).isActive = true
+            }
+        }
         if !extras.isEmpty {
             let disclosure = StatDisclosureRow(
                 count: extras.count,
