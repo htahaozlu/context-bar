@@ -162,8 +162,8 @@ final class CostViewController: PreferencePaneViewController {
                                 "Makineler arası birleşik 30 günlük maliyet."),
             symbol: "macbook.and.iphone",
             info: L10n.text(
-                "Combined 30-day estimated cost from every Mac writing to your sync folder (set it in Privacy settings).",
-                "Senkron klasörüne yazan her Mac'in son 30 günlük tahmini maliyeti birleşik (Gizlilik ayarlarından klasörü gir)."),
+                "Combined 30-day estimated cost from every Mac syncing through iCloud Drive (turn it on in Settings → Across your Macs).",
+                "iCloud Drive üzerinden senkronlanan her Mac'in son 30 günlük tahmini maliyeti birleşik (Ayarlar → Mac'lerin arasında'dan aç)."),
             body: machinesHost
         )
 
@@ -195,8 +195,8 @@ final class CostViewController: PreferencePaneViewController {
                                 "Kendi AI anahtarınla kullanım önerileri."),
             symbol: "sparkles",
             info: L10n.text(
-                "Get usage-efficiency tips from your own OpenAI / Gemini key (set it in Privacy settings). Sends an aggregate summary only — no transcripts, no project names.",
-                "Kendi OpenAI / Gemini anahtarınla kullanım verimliliği önerileri al (Gizlilik ayarlarından gir). Yalnızca özet gönderir — transcript yok, proje adı yok."),
+                "Get usage-efficiency tips from your own OpenAI / Gemini key (set it in Settings → AI Advisor). Sends an aggregate summary only — no transcripts, no project names.",
+                "Kendi OpenAI / Gemini anahtarınla kullanım verimliliği önerileri al (Ayarlar → AI Danışman'dan gir). Yalnızca özet gönderir — transcript yok, proje adı yok."),
             body: aiStack
         )
 
@@ -319,8 +319,8 @@ final class CostViewController: PreferencePaneViewController {
             color: .labelColor, bold: true))
         if DisplayPrefs.syncFolder.isEmpty {
             machinesHost.addArrangedSubview(line(L10n.text(
-                "Optional. Pick a folder you already sync (Settings → Privacy) so each Mac shows separately.",
-                "İsteğe bağlı. Zaten senkronladığın bir klasör seç (Ayarlar → Gizlilik) ki her Mac ayrı görünsün."),
+                "Optional. Turn on iCloud Drive sync (Settings → Across your Macs) so each Mac shows separately.",
+                "İsteğe bağlı. iCloud Drive senkronunu aç (Ayarlar → Mac'lerin arasında) ki her Mac ayrı görünsün."),
                 color: .tertiaryLabelColor))
             return
         }

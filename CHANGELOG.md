@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.10.1] - 2026-06-13
+
+### Changed
+
+- **Privacy tab folded into Settings.** The detail window is back to four tabs — Stats · Cost · Settings · About. The bring-your-own-key **AI Advisor** and the **Across your Macs** (iCloud Drive) sync now live in the Settings pane.
+- **Cross-Mac sync is iCloud-only.** The self-hosted-server and manual local-folder sync paths, plus the Sharing (path/email masking) toggles, were removed to keep one zero-config path: turn on iCloud Drive with the same Apple ID on each Mac.
+
+### Fixed
+
+- **The detail window no longer resizes when switching tabs.** The tab controller used to re-apply each pane's preferred size on every switch — snapping the window back and reading as a "jump" into the tall Cost tab. The window size is now pinned and stays put across tabs.
+
+### Added
+
+- **Session detail shows that day's project usage.** Clicking the active session (hero) or a parallel-session row now also reports the whole day's tokens / sessions / cost for that session's project, alongside the existing context-window and per-session breakdown.
+
 ## [0.10.0] - 2026-06-13
 
 ### Fixed

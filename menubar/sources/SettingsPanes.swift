@@ -351,32 +351,6 @@ extension PreferencePaneViewController {
         return card
     }
 
-    /// Centered tertiary "stays on this Mac" reassurance line under the groups.
-    fileprivate func addPrivacyFooter() {
-        let label = NSTextField(labelWithString: L10n.text(
-            "ContextBar · local-first · no account required · sync stays in your iCloud or your own server",
-            "ContextBar · yerel öncelikli · hesap gerekmez · senkron kendi iCloud'unuzda ya da kendi sunucunuzda kalır"))
-        label.font = NSFont.systemFont(ofSize: 10.5)
-        label.textColor = Palette.tertiaryText
-        label.alignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        contentStack.addArrangedSubview(label)
-        label.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
-    }
-}
-
-// MARK: - Settings controls (switch)
-
-/// Trailing on/off control matching the redesign — an NSSwitch tinted with the
-/// app accent so toggles read as one consistent affordance.
-private func makeSettingsSwitch(on: Bool, target: AnyObject, action: Selector,
-                                a11y: String) -> NSSwitch {
-    let toggle = NSSwitch()
-    toggle.state = on ? .on : .off
-    toggle.target = target
-    toggle.action = action
-    toggle.setAccessibilityLabel(a11y)
-    return toggle
 }
 
 // MARK: - General pane (Appearance · Alerts · Behavior)
@@ -890,26 +864,18 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
 
 // MARK: - Privacy pane
 
-/// Privacy settings — the AI Advisor opt-in, output redaction, and cross-Mac
-/// sync. Reorganized into grouped cards: AI ADVISOR (the actionable opt-in),
-/// SHARING (what gets masked in exports), and SYNC (combine usage across Macs).
+/// AI Advisor + across-your-Macs settings — adopted into the Settings tab. Two
+/// grouped cards: AI ADVISOR (the bring-your-own-key opt-in) and ACROSS YOUR
+/// MACS (zero-config iCloud Drive sync). The old Sharing toggles and the
+/// self-hosted-server / local-folder sync paths were removed.
 final class PrivacySettingsViewController: PreferencePaneViewController {
     var onChange: (() -> Void)?
     private let aiProviderPopup = NSPopUpButton()
     private let aiKeyField = NSSecureTextField()
     private let aiRunButton = NSButton()
     private let aiResultLabel = NSTextField(labelWithString: "")
-    private let syncURLField = NSTextField()
-    private let syncStatusPill = NSTextField(labelWithString: "")
-    private let syncPillDot = NSView()
-    private let syncDetailLabel = NSTextField(labelWithString: "")
-    private let syncNowButton = NSButton()
-    private let syncTestButton = NSButton()
-    private let syncFolderLabel = NSTextField(labelWithString: "")
     private let iCloudStatusLabel = NSTextField(labelWithString: "")
     private weak var iCloudSyncButton: NSButton?
-    private var syncObserverToken: UUID?
-    private var syncHeartbeat: Timer?
 
     /// Center + cap at 580pt to match the Settings tab (consistency across the
     /// standalone settings panes).
@@ -919,13 +885,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         super.viewDidLoad()
         buildUI()
         refreshAIStatus()
-        refreshSyncStatus()
-        observeSyncState()
-    }
-
-    deinit {
-        if let t = syncObserverToken { ServerSync.shared.unobserve(t) }
-        syncHeartbeat?.invalidate()
     }
 
     private func buildUI() {
@@ -946,31 +905,10 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
             desc: nil,
             content: makeAIRunRow())
 
-        // ── SHARING — what gets masked when you export or share.
-        let sharing = addGroup(symbol: "eye.slash", title: L10n.text("Sharing", "Paylaşım"))
-        sharing.addRow(
-            title: L10n.text("Shared output", "Paylaşılan çıktı"),
-            desc: L10n.text(
-                "Replace $HOME with ~, collapse /Users/<name>/ paths, and mask emails in exports.",
-                "Dışa aktarımda $HOME değerini ~ yapar, /Users/<ad>/ yollarını sadeleştirir ve e-postaları gizler."),
-            control: makeSwitch(on: DisplayPrefs.redactPaths, action: #selector(redactChanged(_:)),
-                                a11y: L10n.text("Mask project paths and emails", "Proje yollarını ve e-postaları gizle")))
-
-        sharing.addRow(
-            title: L10n.text("Share card", "Paylaşım kartı"),
-            desc: L10n.text(
-                "Replace real project names with generic labels (Project A, B) when sharing Today's HUD.",
-                "Today's HUD paylaşılırken gerçek proje adlarını genel etiketlerle (Proje A, B) değiştirir."),
-            control: makeSwitch(on: DisplayPrefs.maskShareProjects, action: #selector(maskShareChanged(_:)),
-                                a11y: L10n.text("Mask project names on share card", "Paylaşım kartında proje adlarını gizle")))
-
-        // ── SYNC — combine usage across your Macs.
-        // Three paths, listed in order of recommendation:
-        //   1. iCloud Drive (easiest) — zero-config, no account, no server.
-        //      Same Apple ID → flip the switch on each Mac and you're done.
-        //   2. Self-hosted server — a tiny Rust binary on a homelab box for
-        //      users who'd rather not route through iCloud.
-        //   3. Manual folder — any folder you already sync (Dropbox, …).
+        // ── ACROSS YOUR MACS — zero-config iCloud Drive sync.
+        // Same Apple ID → flip the switch on each Mac and you're done. No
+        // account, no server. (The self-hosted-server and manual-folder paths
+        // were removed.)
         let sync = addGroup(symbol: "macbook.and.iphone", title: L10n.text("Across your Macs", "Mac'lerin arasında"))
 
         sync.addWideRow(
@@ -979,29 +917,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
                 "Easiest. No account, no server. Turn this on with the same Apple ID on each Mac and ContextBar syncs your usage through your own iCloud Drive automatically.",
                 "En kolayı. Hesap yok, sunucu yok. Her Mac'te aynı Apple ID ile bunu açın; ContextBar kullanımınızı kendi iCloud Drive'ınız üzerinden otomatik senkronlar."),
             content: makeICloudSyncRow())
-
-        sync.addWideRow(
-            title: L10n.text("Self-hosted server", "Kendi sunucunuz"),
-            desc: L10n.text(
-                "For homelab setups. Run the bundled `context-bar-server` on any always-on Mac (a Pi, NAS, homelab box) and point every Mac at it. Each Mac pushes its rollup; the Value tab combines them. No third-party service.",
-                "Ev sunucusu kurulumları için. Paketlenmiş `context-bar-server`'ı sürekli açık bir Mac'te (Pi, NAS, ev sunucusu) çalıştırıp her Mac'i ona yönlendirin. Her Mac özetini gönderir; Değer sekmesi birleştirir. Üçüncü taraf yok."),
-            content: makeSyncServerField())
-
-        sync.addWideRow(
-            title: L10n.text("Status", "Durum"),
-            desc: nil,
-            content: makeSyncStatusRow())
-
-        sync.addWideRow(
-            title: L10n.text("Local sync folder (legacy)", "Yerel senkron klasörü (eski)"),
-            desc: L10n.text(
-                "Only needed if you don't want to run a server. Each Mac writes a compact usage file there; the Value tab then combines them.",
-                "Yalnızca sunucu çalıştırmak istemiyorsanız gerekir. Her Mac oraya özet kullanım yazar; Değer sekmesi birleştirir."),
-            content: makeSyncFolderField())
-
-        // Standalone tab now — render the reassurance footer at the bottom of
-        // this pane's own scroll.
-        addPrivacyFooter()
     }
 
     // ── AI ADVISOR UI
@@ -1136,140 +1051,7 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
         }
     }
 
-    // ── SYNC (self-hosted server) UI
-
-    private func makeSyncServerField() -> NSView {
-        syncURLField.placeholderString = L10n.text("http://home.local:7878", "http://home.local:7878")
-        syncURLField.stringValue = ServerSync.shared.serverURL ?? ""
-        syncURLField.target = self
-        syncURLField.action = #selector(syncURLCommitted(_:))
-        syncURLField.translatesAutoresizingMaskIntoConstraints = false
-
-        // The width is constrained by the card; let it fill the row.
-        syncURLField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        return syncURLField
-    }
-
-    private func makeSyncStatusRow() -> NSView {
-        // Status pill: small dot + monospaced label
-        syncPillDot.wantsLayer = true
-        syncPillDot.layer?.cornerRadius = 4
-        syncPillDot.translatesAutoresizingMaskIntoConstraints = false
-        syncPillDot.widthAnchor.constraint(equalToConstant: 8).isActive = true
-        syncPillDot.heightAnchor.constraint(equalToConstant: 8).isActive = true
-
-        syncStatusPill.font = Typography.bodyMono(11, weight: .semibold)
-        syncStatusPill.textColor = .labelColor
-        syncStatusPill.translatesAutoresizingMaskIntoConstraints = false
-
-        let pillRow = NSStackView(views: [syncPillDot, syncStatusPill])
-        pillRow.orientation = .horizontal
-        pillRow.spacing = 7
-        pillRow.alignment = .centerY
-
-        syncDetailLabel.font = NSFont.systemFont(ofSize: 10.5)
-        syncDetailLabel.textColor = .tertiaryLabelColor
-        syncDetailLabel.maximumNumberOfLines = 0
-        syncDetailLabel.lineBreakMode = .byWordWrapping
-        syncDetailLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        syncNowButton.title = L10n.text("Sync now", "Şimdi senkronla")
-        syncNowButton.bezelStyle = .rounded
-        syncNowButton.target = self
-        syncNowButton.action = #selector(syncNowTapped(_:))
-        syncTestButton.title = L10n.text("Test", "Test et")
-        syncTestButton.bezelStyle = .rounded
-        syncTestButton.target = self
-        syncTestButton.action = #selector(syncTestTapped(_:))
-        let btnRow = NSStackView(views: [syncNowButton, syncTestButton])
-        btnRow.orientation = .horizontal
-        btnRow.spacing = 8
-
-        let column = NSStackView(views: [pillRow, syncDetailLabel, btnRow])
-        column.orientation = .vertical
-        column.alignment = .leading
-        column.spacing = 8
-        let wrap = NSStackView(views: [column])
-        wrap.orientation = .horizontal
-        wrap.alignment = .top
-        column.widthAnchor.constraint(equalTo: wrap.widthAnchor).isActive = true
-        return wrap
-    }
-
-    @objc private func syncURLCommitted(_ f: NSTextField) {
-        let v = f.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        ServerSync.shared.serverURL = v.isEmpty ? nil : v
-        refreshSyncStatus()
-    }
-
-    @objc private func syncNowTapped(_ sender: NSButton) {
-        sender.isEnabled = false
-        ServerSync.shared.syncNow { [weak self] _ in
-            sender.isEnabled = true
-            self?.refreshSyncStatus()
-        }
-    }
-
-    @objc private func syncTestTapped(_ sender: NSButton) {
-        sender.isEnabled = false
-        ServerSync.shared.testConnection { [weak self] result in
-            sender.isEnabled = true
-            switch result {
-            case .success:
-                self?.syncDetailLabel.stringValue = L10n.text(
-                    "Connection OK. Server reachable.",
-                    "Bağlantı başarılı. Sunucu erişilebilir.")
-            case .failure(let err):
-                self?.syncDetailLabel.stringValue =
-                    L10n.text("Connection failed: ", "Bağlantı başarısız: ") + err.message
-            }
-        }
-    }
-
-    private func observeSyncState() {
-        syncObserverToken = ServerSync.shared.observeState { [weak self] _ in
-            self?.refreshSyncStatus()
-        }
-        // 10s heartbeat so "last push / pull" ages gracefully.
-        syncHeartbeat = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-            self?.refreshSyncStatus()
-        }
-    }
-
-    private func refreshSyncStatus() {
-        let s = ServerSync.shared.state
-        let label: String
-        let color: NSColor
-        switch s {
-        case .disabled:
-            label = L10n.text("Not configured", "Ayarlı değil")
-            color = .tertiaryLabelColor
-        case .idle:
-            let pushed = ServerSync.shared.status.lastPushedAt
-            label = pushed.map {
-                L10n.text("Synced", "Senkron") + " · " + ContextSnapshot.relative($0)
-            } ?? L10n.text("Ready", "Hazır")
-            color = .systemGreen
-        case .syncing:
-            label = L10n.text("Syncing…", "Senkron ediliyor…")
-            color = .systemBlue
-        case .error(let msg):
-            label = L10n.text("Error", "Hata") + " · " + msg
-            color = .systemRed
-        }
-        syncStatusPill.stringValue = label
-        syncPillDot.layer?.backgroundColor = color.cgColor
-        if let pushed = ServerSync.shared.status.lastPushedAt,
-           let pulled = ServerSync.shared.status.lastPulledAt {
-            syncDetailLabel.stringValue = L10n.text(
-                "Last push \(ContextSnapshot.relative(pushed))  ·  Last pull \(ContextSnapshot.relative(pulled))",
-                "Son push \(ContextSnapshot.relative(pushed))  ·  Son pull \(ContextSnapshot.relative(pulled))")
-        } else {
-            syncDetailLabel.stringValue = L10n.text(
-                "Server not contacted yet.",
-                "Sunucu henüz bağlanmadı.")
-        }
-    }
+    // ── ACROSS YOUR MACS (iCloud Drive) UI
 
     private func makeICloudSyncRow() -> NSView {
         let on = MachineSync.isICloudMode
@@ -1311,65 +1093,6 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
             ? L10n.text("Turn off", "Kapat")
             : L10n.text("Use iCloud Drive", "iCloud Drive kullan")
         iCloudStatusLabel.stringValue = iCloudStatusText()
-        syncFolderLabel.stringValue = syncFolderDisplay()
-        onChange?()
-    }
-
-    private func makeSyncFolderField() -> NSView {
-        let btn = NSButton(title: L10n.text("Choose folder…", "Klasör seç…"), target: self, action: #selector(chooseSyncFolder))
-        btn.bezelStyle = .rounded
-        syncFolderLabel.font = .systemFont(ofSize: 11)
-        syncFolderLabel.textColor = .secondaryLabelColor
-        syncFolderLabel.lineBreakMode = .byTruncatingMiddle
-        syncFolderLabel.stringValue = syncFolderDisplay()
-        let clear = NSButton(title: L10n.text("Clear", "Temizle"), target: self, action: #selector(clearSyncFolder))
-        clear.bezelStyle = .rounded
-        let row = NSStackView(views: [btn, syncFolderLabel, clear])
-        row.orientation = .horizontal
-        row.spacing = 8
-        row.alignment = .firstBaseline
-        return row
-    }
-
-    private func syncFolderDisplay() -> String {
-        if MachineSync.isICloudMode {
-            return L10n.text("Using iCloud Drive", "iCloud Drive kullanılıyor")
-        }
-        return DisplayPrefs.syncFolder.isEmpty
-            ? L10n.text("Not set", "Ayarlı değil")
-            : (DisplayPrefs.syncFolder as NSString).abbreviatingWithTildeInPath
-    }
-
-    @objc private func chooseSyncFolder() {
-        let p = NSOpenPanel()
-        p.canChooseDirectories = true
-        p.canChooseFiles = false
-        p.allowsMultipleSelection = false
-        p.prompt = L10n.text("Use folder", "Klasörü kullan")
-        if p.runModal() == .OK, let url = p.url {
-            DisplayPrefs.syncFolder = url.path
-            syncFolderLabel.stringValue = syncFolderDisplay()
-            onChange?()
-        }
-    }
-
-    @objc private func clearSyncFolder() {
-        DisplayPrefs.syncFolder = ""
-        syncFolderLabel.stringValue = syncFolderDisplay()
-        onChange?()
-    }
-
-    private func makeSwitch(on: Bool, action: Selector, a11y: String) -> NSSwitch {
-        makeSettingsSwitch(on: on, target: self, action: action, a11y: a11y)
-    }
-
-    @objc private func redactChanged(_ sender: NSSwitch) {
-        DisplayPrefs.redactPaths = sender.state == .on
-        onChange?()
-    }
-
-    @objc private func maskShareChanged(_ sender: NSSwitch) {
-        DisplayPrefs.maskShareProjects = sender.state == .on
         onChange?()
     }
 }

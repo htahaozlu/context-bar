@@ -581,6 +581,36 @@ final class SessionDetailView: NSView {
                 ).widthPinned(to: stack))
         }
 
+        // ── That day's usage for this project ──
+        // The session is one slice of a day's work on a project; surface the
+        // whole day's rollup for the same project (engine `by_day_project`) so
+        // clicking a session also answers "how much on <project> that day?".
+        let day = session.lastTurn ?? session.started ?? Date()
+        if let usage = Self.dayProjectUsage(agentName: agentName, project: session.project, on: day) {
+            stack.addArrangedSubview(DividerView().widthPinned(to: stack))
+            stack.addArrangedSubview(NSTextField(
+                labelWithAttributedString: Typography.captionAttributed(
+                    Self.isToday(day)
+                        ? L10n.text("Today · this project", "Bugün · bu proje")
+                        : L10n.text("That day · this project", "O gün · bu proje"))))
+            stack.addArrangedSubview(
+                Self.kvRow(label: L10n.text("Tokens", "Token"),
+                           value: ContextSnapshot.formatTokens(usage.tokens),
+                           valueColor: Palette.primaryText).widthPinned(to: stack))
+            if usage.sessions > 0 {
+                stack.addArrangedSubview(
+                    Self.kvRow(label: L10n.text("Sessions", "Oturum"),
+                               value: "\(usage.sessions)",
+                               valueColor: Palette.secondaryText).widthPinned(to: stack))
+            }
+            if usage.cost > 0 {
+                stack.addArrangedSubview(
+                    Self.kvRow(label: L10n.text("Cost", "Maliyet"),
+                               value: ContextSnapshot.formatUSD(usage.cost),
+                               valueColor: Palette.accent).widthPinned(to: stack))
+            }
+        }
+
         // ── Timing: started → last turn (duration) · relative "active Xm ago" ──
         if session.started != nil || session.lastTurn != nil {
             stack.addArrangedSubview(DividerView().widthPinned(to: stack))
@@ -695,6 +725,51 @@ final class SessionDetailView: NSView {
         row.distribution = .fill
         row.spacing = Spacing.xs
         return row
+    }
+
+    // MARK: - That day's per-project usage
+
+    private struct DayProjectUsage { let tokens: UInt64; let sessions: Int; let cost: Double }
+
+    /// Sums the engine's `by_day_project` rollup for one agent · project · day
+    /// (read straight from the snapshot JSON, same source as the sparkline).
+    /// Returns nil when the day/project has no row so the section is omitted.
+    private static func dayProjectUsage(
+        agentName: String, project: String, on day: Date
+    ) -> DayProjectUsage? {
+        let path = ContextSnapshot.resolveSnapshotPath()
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let agent = root[agentName.lowercased()] as? [String: Any],
+              let rows = agent["by_day_project"] as? [[String: Any]] else { return nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let key = f.string(from: day)
+        var tokens: UInt64 = 0, sessions = 0, cost = 0.0, found = false
+        for r in rows where (r["date"] as? String) == key && (r["project"] as? String) == project {
+            found = true
+            tokens += jsonU64(r["tokens"])
+            sessions += Int(jsonU64(r["sessions"]))
+            cost += jsonDouble(r["cost"])
+        }
+        return found ? DayProjectUsage(tokens: tokens, sessions: sessions, cost: cost) : nil
+    }
+
+    private static func isToday(_ d: Date) -> Bool { Calendar.current.isDateInToday(d) }
+
+    private static func jsonU64(_ v: Any?) -> UInt64 {
+        if let n = v as? UInt64 { return n }
+        if let n = v as? Int, n >= 0 { return UInt64(n) }
+        if let d = v as? Double, d.isFinite, d >= 0 { return UInt64(d) }
+        if let num = v as? NSNumber { return num.uint64Value }
+        return 0
+    }
+
+    private static func jsonDouble(_ v: Any?) -> Double {
+        if let d = v as? Double { return d }
+        if let num = v as? NSNumber { return num.doubleValue }
+        return 0
     }
 
     // MARK: - Context-loaded-each-turn estimate (CLAUDE sessions)

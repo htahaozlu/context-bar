@@ -1,19 +1,31 @@
 import AppKit
 import Foundation
 
-/// Detail window — five top-level tabs: **Stats · Cost · Settings · Privacy
-/// · About**. Stats and Cost are the data views; Settings hosts only the
-/// General preferences (Appearance · Alerts · Behavior), while Privacy and
-/// About are now their own top-level tabs (previously they were folded into
-/// the Settings tab as embedded sub-panes). Each settings tab is a standalone
+/// NSTabViewController in `.toolbar`/`.preference` mode resizes the window to
+/// the selected pane's `preferredContentSize` on *every* tab switch. Even with
+/// all panes reporting the same size, that re-apply snaps the window back —
+/// so any size the user dragged is lost and revisiting a tall pane (Cost) reads
+/// as the window "jumping". Pin the controller's preferred size to a constant
+/// and swallow the per-pane updates so the window size never changes on switch.
+final class FixedSizeTabViewController: NSTabViewController {
+    override var preferredContentSize: NSSize {
+        get { NSSize(width: 820, height: 680) }
+        set { /* ignore child-driven size — keep the window stable across tabs */ }
+    }
+}
+
+/// Detail window — four top-level tabs: **Stats · Cost · Settings · About**.
+/// Stats and Cost are the data views; Settings hosts the General preferences
+/// (Appearance · Alerts · Behavior) plus the AI Advisor key and the across-your-
+/// Macs (iCloud) sync that used to live on a separate Privacy tab. About is its
+/// own top-level tab. Each settings tab is a standalone
 /// `PreferencePaneViewController` with its own scroll view and centered 580pt
 /// column; the data tabs keep the full 820pt canvas.
 final class DetailWindowController: NSWindowController, NSWindowDelegate {
-    private let tabVC = NSTabViewController()
+    private let tabVC = FixedSizeTabViewController()
     let statsVC = StatsViewController()
     let costVC = CostViewController()
     private let settingsVC = SettingsViewController()
-    private let privacyVC = PrivacySettingsViewController()
     private let aboutVC = AboutSettingsViewController()
 
     init(onThemeChange: @escaping (String) -> Void) {
@@ -40,13 +52,6 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         settingsItem.image = NSImage(systemSymbolName: "gearshape",
                                       accessibilityDescription: settingsItem.label)
 
-        // Privacy — AI Advisor · Sharing · Across your Macs. Now its own
-        // top-level tab (standalone scrollable pane).
-        let privacyItem = NSTabViewItem(viewController: privacyVC)
-        privacyItem.label = L10n.text("Privacy", "Gizlilik")
-        privacyItem.image = NSImage(systemSymbolName: "lock.shield",
-                                     accessibilityDescription: privacyItem.label)
-
         // About — version, updates, repository context, files & shortcuts.
         // Now its own top-level tab.
         let aboutItem = NSTabViewItem(viewController: aboutVC)
@@ -54,7 +59,7 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         aboutItem.image = NSImage(systemSymbolName: "info.circle",
                                    accessibilityDescription: aboutItem.label)
 
-        [statsItem, costItem, settingsItem, privacyItem, aboutItem]
+        [statsItem, costItem, settingsItem, aboutItem]
             .forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
@@ -86,14 +91,14 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
             contentView.addSubview(effect, positioned: .below, relativeTo: nil)
         }
 
-        // "Connect a key" / "Connect to a server" CTAs on the Stats + Cost
-        // panes jump to the Privacy tab (index 3: Stats·Cost·Settings·
-        // Privacy·About) where the AI key + sync server URL now live.
-        let openPrivacy: () -> Void = { [weak self] in
-            self?.selectTab(index: 3)
+        // "Connect a key" CTAs on the Stats + Cost panes jump to the Settings
+        // tab (index 2: Stats·Cost·Settings·About) where the AI Advisor key now
+        // lives (folded in from the removed Privacy tab).
+        let openSettings: () -> Void = { [weak self] in
+            self?.selectTab(index: 2)
         }
-        costVC.onShowPrivacy = openPrivacy
-        statsVC.onShowPrivacy = openPrivacy
+        costVC.onShowPrivacy = openSettings
+        statsVC.onShowPrivacy = openSettings
 
         // A theme / language / setting change must immediately re-render
         // the data tabs too — so the Cost hero picks up the new accent
@@ -106,8 +111,6 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         }
         settingsVC.onThemeChange = apply
         settingsVC.onChange = { apply(ThemeStore.current.id) }
-        // Privacy changes (budget/sync/AI) also refresh the data tabs.
-        privacyVC.onChange = { apply(ThemeStore.current.id) }
     }
     required init?(coder: NSCoder) { fatalError() }
 

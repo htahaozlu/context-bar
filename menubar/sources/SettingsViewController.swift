@@ -1,19 +1,23 @@
 import AppKit
 import Foundation
 
-/// Settings pane — hosts ONLY the General preferences (Appearance · Alerts ·
-/// Behavior). Privacy and About are now their own top-level tabs on the detail
-/// window, so this pane no longer embeds them.
+/// Settings pane — hosts the General preferences (Appearance · Alerts ·
+/// Behavior) plus the AI Advisor key and the across-your-Macs (iCloud) sync that
+/// used to live on a separate Privacy tab. About is its own top-level tab.
 ///
-/// The General groups are built by `GeneralSettingsViewController` and adopted
-/// into this pane's own content stack so they sit, full-width, directly inside
-/// the centered 580pt column (matching `docs/macOS UI Theme/settings.jsx` —
-/// `width: 580`, `justifyContent: center`).
+/// The groups are built by `GeneralSettingsViewController` and
+/// `PrivacySettingsViewController` and adopted into this pane's own content
+/// stack so they sit, full-width, directly inside the centered 580pt column
+/// (matching `docs/macOS UI Theme/settings.jsx` — `width: 580`,
+/// `justifyContent: center`).
 final class SettingsViewController: PreferencePaneViewController {
     var onThemeChange: ((String) -> Void)?
     var onChange: (() -> Void)?
 
     private let general = GeneralSettingsViewController()
+    /// Trimmed to AI Advisor + Across-your-Macs (iCloud); its groups are adopted
+    /// below General. Kept alive so its controls' targets/actions stay valid.
+    private let privacy = PrivacySettingsViewController()
 
     /// Center + cap the Settings column at 580pt. The data tabs (Stats/Cost)
     /// keep the full 820pt canvas via the `nil` default on
@@ -36,6 +40,11 @@ final class SettingsViewController: PreferencePaneViewController {
         // Alerts · Behavior) read as the top level of the pane, each a
         // full-width card in the centered 580pt column.
         adoptGroups(of: general)
+
+        // Then the former Privacy groups (AI Advisor · Across your Macs), folded
+        // in below General so the key + sync controls live in one Settings pane.
+        privacy.onChange = { [weak self] in self?.onChange?() }
+        adoptGroups(of: privacy)
 
         // Single centered reassurance line at the very bottom of the scroll
         // (settings.jsx footer).
