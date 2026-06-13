@@ -77,6 +77,16 @@ class PreferencePaneViewController: NSViewController {
                 contentStack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -24),
             ])
         }
+
+        // Uniform window content size for EVERY tab. The detail window uses an
+        // NSTabViewController with the System-Settings "preference" toolbar
+        // style, which resizes the window to each pane's content on switch —
+        // with no fixed size the tall Cost pane made the window abruptly jump
+        // bigger. Pin all panes to the same size so switching never resizes;
+        // content taller than this scrolls within the pane (every pane already
+        // wraps its content in this scroll view). Mirrors the HUD's deterministic
+        // sizing discipline rather than trusting a shown view's fittingSize.
+        preferredContentSize = NSSize(width: 820, height: 680)
     }
 
     /// A bare two-column row (no section header / card wrapper), added full-width

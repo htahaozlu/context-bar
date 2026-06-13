@@ -94,8 +94,11 @@ final class StatsViewController: PreferencePaneViewController {
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
         addHero(tilesStack)
 
-        // 3) Year heatmap card.
+        // 3) Year heatmap card, with the per-day breakdown directly beneath it.
+        //    Clicking a heatmap cell updates this breakdown — keeping it adjacent
+        //    (instead of demoted far below) makes that change impossible to miss.
         buildHeatmapSection()
+        buildBreakdownSection()
 
         // 4) Two-column bottom grid (1.35fr : 1fr): LEFT = token-composition card
         //    over a top-projects card; RIGHT = up to four insight cards (capped so
@@ -103,13 +106,11 @@ final class StatsViewController: PreferencePaneViewController {
         buildBottomGrid()
 
         // 5) Secondary tools, clearly demoted below the spec sections: AI
-        //    deep-dive, the day/range drill-down with the session list, and the
-        //    War & Peace fun fact. A labeled hairline marks the boundary so the
-        //    pane reads "essentials first, extras below" instead of one long
-        //    undifferentiated stack. Same functionality, only grouped + demoted.
+        //    deep-dive and the War & Peace fun fact. A labeled hairline marks the
+        //    boundary so the pane reads "essentials first, extras below" instead
+        //    of one long undifferentiated stack.
         addSecondaryDivider(L10n.text("More detail & tools", "Daha fazla detay & araçlar"))
         buildAISection()
-        buildBreakdownSection()
 
         comparisonLabel.font = NSFont.systemFont(ofSize: 11)
         comparisonLabel.textColor = .secondaryLabelColor
@@ -421,6 +422,12 @@ final class StatsViewController: PreferencePaneViewController {
         selEnd = selStart
         datePicker.dateValue = selStart
         refreshBreakdown()
+        // The breakdown sits right under the heatmap; nudge it into view so the
+        // updated detail is obvious after a cell click (no silent change below).
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.selDateLabel.scrollToVisible(self.selDateLabel.bounds)
+        }
     }
 
     // MARK: - Bottom grid (stats.jsx): composition + top-projects | insights

@@ -440,9 +440,9 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
             self?.refreshPreview()
             self?.onThemeChange?(ThemeStore.current.id)
         }
-        modeCtrl.setAccessibilityLabel(L10n.text("Theme", "Tema"))
+        modeCtrl.setAccessibilityLabel(L10n.text("Mode", "Mod"))
         appearance.addRow(
-            title: L10n.text("Theme", "Tema"),
+            title: L10n.text("Mode", "Mod"),
             desc: L10n.text(
                 "Follow the system appearance, or pin Light / Dark.",
                 "Sistem görünümünü izleyin ya da Açık / Koyu sabitleyin."),
@@ -475,10 +475,10 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         themeGrid.orientation = .vertical
         themeGrid.spacing = 12
         appearance.addWideRow(
-            title: L10n.text("Accent", "Vurgu"),
+            title: L10n.text("Theme", "Tema"),
             desc: L10n.text(
-                "The single accent hue used across the menubar and panes.",
-                "Menubar ve panellerde kullanılan tek vurgu rengi."),
+                "The accent palette used across the menubar and panes.",
+                "Menubar ve panellerde kullanılan vurgu paleti."),
             content: themeGrid)
         cardViews.forEach { $0.0.heightAnchor.constraint(equalToConstant: 82).isActive = true }
 

@@ -592,6 +592,13 @@ final class CostViewController: PreferencePaneViewController {
         updateAIButton()
         let data = loadData()
 
+        // A non-empty subscription type means the user is signed in with a Claude
+        // plan (pro / max / free), NOT an API key — so their Claude usage is
+        // plan-covered, never billed per token. This drives the per-model
+        // plan/api framing so a subscriber never sees "Billed to API key" on a
+        // Claude model (the static availability map is only the no-plan fallback).
+        hasClaudePlan = (data.planType?.isEmpty == false)
+
         // Aggregate per-model rows (collapse suffix variants under a pretty
         // name) — drives both the model filter and the breakdown card.
         let aggModels = aggregatedModels(data.byModel)
@@ -821,17 +828,25 @@ final class CostViewController: PreferencePaneViewController {
         return true
     }
 
-    /// Availability for a prettified model name (models.jsx framing). Claude plan
-    /// models stay `.plan`; Sonnet 3.7 sunsets Jun 22; Opus 4.8 is API-only.
-    /// EVERYTHING non-Claude (Codex / GPT / Gemini / o-series) is `.api` —
-    /// billed — which is exactly the spec's cross-provider "API-only" case.
+    /// True when the active account is an actual Claude subscription (pro/max/
+    /// free) rather than an API key. Set per-reload from `CostData.planType`;
+    /// makes `availability` reflect how the user really pays, not a static map.
+    private var hasClaudePlan = false
+
+    /// Availability for a prettified model name (models.jsx framing). Non-Claude
+    /// (Codex / GPT / Gemini / o-series) is always `.api` — a Claude plan can't
+    /// cover them. For Claude models: with an active subscription EVERY Claude
+    /// model is plan-covered (`.plan`); without one we fall back to the static
+    /// availability map (Opus 4.8 framed as API-only). Sonnet 3.7 always shows
+    /// its sunset note.
     private func availability(for pretty: String) -> ModelAvail {
         let p = pretty.lowercased()
         let isClaude = p.hasPrefix("opus") || p.hasPrefix("sonnet")
-            || p.hasPrefix("haiku") || p.hasPrefix("mythos")
+            || p.hasPrefix("haiku") || p.hasPrefix("mythos") || p.hasPrefix("fable")
         if !isClaude { return .api }                 // Codex/GPT/Gemini → billed
         if p.hasPrefix("sonnet 3.7") { return .sunset("Jun 22") }
-        if p.hasPrefix("opus 4.8") { return .api }
+        if hasClaudePlan { return .plan }            // subscriber → never billed
+        if p.hasPrefix("opus 4.8") { return .api }   // no plan: static fallback
         return .plan
     }
 
@@ -1126,6 +1141,8 @@ final class CostViewController: PreferencePaneViewController {
         let suffix = m.contains("[1m]") || m.contains("-1m") ? " (1M)" : ""
         let base: String
         switch true {
+        case m.contains("fable-5"):    base = "Fable 5"
+        case m.contains("fable"):      base = "Fable"
         case m.contains("opus-4-8"):   base = "Opus 4.8"
         case m.contains("opus-4-7"):   base = "Opus 4.7"
         case m.contains("opus-4-6"):   base = "Opus 4.6"
