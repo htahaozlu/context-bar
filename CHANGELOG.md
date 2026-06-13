@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.10.2] - 2026-06-14
+
+### Fixed
+
+- **The Activity model filter actually filters now.** Picking a model in Stats → Activity did nothing before; it now scopes the overview tiles, year heatmap, streaks, daily-breakdown totals, the session list and the insights to that model — backed by a new per-day-per-model rollup in the engine. Per-project splits and sub-agent share aren't tracked per model, so those two show a short "choose All models" note while a model is selected.
+- **The detail window width no longer changes between tabs.** The centered Settings/About panes fit narrower than the full-width data tabs, so switching tabs resized the window; the content size is now pinned both ways so neither a tab switch nor a drag changes it.
+
 ## [0.10.1] - 2026-06-13
 
 ### Changed

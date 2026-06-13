@@ -138,6 +138,8 @@ pub struct AgentUsage {
     #[serde(default)]
     pub by_day_project: Vec<DailyInstance>,
     #[serde(default)]
+    pub by_day_model: Vec<DailyModelInstance>,
+    #[serde(default)]
     pub recent_sessions: Vec<SessionRecord>,
     #[serde(default)]
     pub active_sessions: Vec<ActiveSession>,
@@ -225,6 +227,30 @@ pub struct DailyInstance {
     pub project: String,
     #[serde(default)]
     pub models: Vec<String>,
+    #[serde(default)]
+    pub tokens: u64,
+    #[serde(default)]
+    pub sessions: u64,
+    #[serde(default)]
+    pub input: u64,
+    #[serde(default)]
+    pub output: u64,
+    #[serde(default)]
+    pub cache_creation: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cost: f64,
+}
+
+/// One (day × model) row — lets the Stats Activity view scope every metric to a
+/// single model (the day×project cross-tab can't, since it has no model split).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct DailyModelInstance {
+    #[serde(default)]
+    pub date: String,
+    #[serde(default)]
+    pub model: String,
     #[serde(default)]
     pub tokens: u64,
     #[serde(default)]

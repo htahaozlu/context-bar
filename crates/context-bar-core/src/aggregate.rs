@@ -12,7 +12,9 @@
 
 use time::{Date, OffsetDateTime, UtcOffset};
 
-use crate::usage_signal::{DailyInstance, NamedBucket, SessionRecord, TimeBucket};
+use crate::usage_signal::{
+    DailyInstance, DailyModelInstance, NamedBucket, SessionRecord, TimeBucket,
+};
 
 /// Idle gap (seconds) that splits one transcript file into logical sessions —
 /// matches Claude's 5h window, which resets 5h after the *first* turn.
@@ -346,6 +348,7 @@ pub struct Buckets {
     pub by_model: Vec<NamedBucket>,
     pub by_project: Vec<NamedBucket>,
     pub by_day_project: Vec<DailyInstance>,
+    pub by_day_model: Vec<DailyModelInstance>,
 }
 
 /// Split each file's events into logical sessions on the 5h idle gap, returning
@@ -492,6 +495,11 @@ pub fn bucket_aggregates(sessions: &[Session], now: f64, offset: UtcOffset) -> B
     let mut dp_idx: std::collections::HashMap<(String, String), usize> = Default::default();
     let mut dp_buckets: Vec<Bucket> = Vec::new();
     let mut dp_models: Vec<Vec<String>> = Vec::new();
+    // (day, model) -> bucket. Full window (the Stats heatmap scopes the whole
+    // year to a model), insertion-ordered for stable output.
+    let mut dm_order: Vec<(String, String)> = Vec::new();
+    let mut dm_idx: std::collections::HashMap<(String, String), usize> = Default::default();
+    let mut dm_buckets: Vec<Bucket> = Vec::new();
 
     let mut total30: u64 = 0;
     let mut sessions30: u64 = 0;
@@ -515,6 +523,19 @@ pub fn bucket_aggregates(sessions: &[Session], now: f64, offset: UtcOffset) -> B
         if let Some(model) = &s.model {
             if !model.is_empty() {
                 by_model.entry(model).accumulate(s);
+                // Per (day × model) — full window for the model-scoped Stats view.
+                let key = (day.clone(), model.clone());
+                let i = match dm_idx.get(&key) {
+                    Some(&i) => i,
+                    None => {
+                        let i = dm_buckets.len();
+                        dm_idx.insert(key.clone(), i);
+                        dm_order.push(key);
+                        dm_buckets.push(Bucket::default());
+                        i
+                    }
+                };
+                dm_buckets[i].accumulate(s);
             }
         }
         by_project.entry(&proj).accumulate(s);
@@ -611,6 +632,29 @@ pub fn bucket_aggregates(sessions: &[Session], now: f64, offset: UtcOffset) -> B
     });
     instances.truncate(200);
 
+    // by_day_model: newest day first, within a day by tokens desc. Capped wide
+    // enough to keep a full year for several models.
+    let mut model_days: Vec<DailyModelInstance> = dm_order
+        .iter()
+        .enumerate()
+        .map(|(i, (day, model))| {
+            let b = &dm_buckets[i];
+            DailyModelInstance {
+                date: day.clone(),
+                model: model.clone(),
+                tokens: b.tokens,
+                sessions: b.sessions,
+                input: b.input,
+                output: b.output,
+                cache_creation: b.cache_creation,
+                cache_read: b.cache_read,
+                cost: round6(b.cost),
+            }
+        })
+        .collect();
+    model_days.sort_by(|a, b| b.date.cmp(&a.date).then(b.tokens.cmp(&a.tokens)));
+    model_days.truncate(2000);
+
     // Longest single session across all history (minutes).
     let mut max_session_minutes = 0.0f64;
     for s in sessions {
@@ -640,6 +684,7 @@ pub fn bucket_aggregates(sessions: &[Session], now: f64, offset: UtcOffset) -> B
         by_model: by_model_out,
         by_project: by_project_out,
         by_day_project: instances,
+        by_day_model: model_days,
     }
 }
 

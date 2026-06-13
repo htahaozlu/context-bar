@@ -466,6 +466,8 @@ def empty_block():
         "by_project": [],
         # Per (day × project) rows — the `better-ccusage daily --instances` view.
         "by_day_project": [],
+        # Per (day × model) rows — model-scoped Stats Activity view.
+        "by_day_model": [],
         "recent_sessions": [],
         "active_sessions": [],
         # When the rolling 5h / 7d usage windows next free up — the timestamp
@@ -1065,6 +1067,7 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24,
     by_model = defaultdict(_empty_bucket)
     by_project = defaultdict(_empty_bucket)
     by_day_project = {}  # (day, project) -> bucket + models set
+    by_day_model = defaultdict(_empty_bucket)  # (day, model) -> bucket (full window)
 
     total30 = 0
     sessions30 = 0
@@ -1091,6 +1094,7 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24,
         _accumulate(by_month[month], s, cache_read)
         if s["model"]:
             _accumulate(by_model[s["model"]], s, cache_read)
+            _accumulate(by_day_model[(day, s["model"])], s, cache_read)
         _accumulate(by_project[proj], s, cache_read)
 
         # Per-day-per-project cross-tab, scoped to the recent instance window.
@@ -1159,6 +1163,17 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24,
     instances.sort(key=lambda r: (r["date"], r["cost"]), reverse=True)
     instances = instances[:instance_rows]
 
+    # Per (day × model) rows — full window so the Stats Activity view can scope
+    # every metric (heatmap included) to a single model. Newest day first, within
+    # a day by tokens desc.
+    model_days = []
+    for (day, model), b in by_day_model.items():
+        b = dict(b)
+        b["cost"] = round(b["cost"], 6)
+        model_days.append({"date": day, "model": model, **b})
+    model_days.sort(key=lambda r: (r["date"], r["tokens"]), reverse=True)
+    model_days = model_days[:2000]
+
     # Longest single session across the whole scanned history (minutes).
     # Computed here so it isn't capped to recent_sessions (last 20).
     max_session_minutes = 0.0
@@ -1184,6 +1199,7 @@ def bucket_aggregates(per_session, days=365, weeks=52, months=24,
         "by_model": take(by_model, "model", 20),
         "by_project": take(by_project, "project", 20),
         "by_day_project": instances,
+        "by_day_model": model_days,
     }
 
 

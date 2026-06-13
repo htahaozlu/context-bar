@@ -2,15 +2,41 @@ import AppKit
 import Foundation
 
 /// NSTabViewController in `.toolbar`/`.preference` mode resizes the window to
-/// the selected pane's `preferredContentSize` on *every* tab switch. Even with
-/// all panes reporting the same size, that re-apply snaps the window back —
-/// so any size the user dragged is lost and revisiting a tall pane (Cost) reads
-/// as the window "jumping". Pin the controller's preferred size to a constant
-/// and swallow the per-pane updates so the window size never changes on switch.
+/// each pane's *fitting* size on every tab switch — and the centered 580pt
+/// Settings/About panes fit narrower than the full-width 820pt data tabs, so the
+/// window width (and height) jumped on every switch. `preferredContentSize`
+/// alone doesn't stop it (that path is ignored for the fitting-size resize), so
+/// we force the window back to one fixed content size after each switch.
 final class FixedSizeTabViewController: NSTabViewController {
+    static let fixedContentSize = NSSize(width: 820, height: 680)
+
     override var preferredContentSize: NSSize {
-        get { NSSize(width: 820, height: 680) }
-        set { /* ignore child-driven size — keep the window stable across tabs */ }
+        get { Self.fixedContentSize }
+        set { /* ignore child-driven size */ }
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        transitionOptions = [] // no animated resize, so the size fix is synchronous
+    }
+
+    override func tabView(_ tabView: NSTabView, didSelect item: NSTabViewItem?) {
+        super.tabView(tabView, didSelect: item)
+        enforceFixedSize()
+    }
+
+    /// Pin the window's content area to `fixedContentSize`, anchoring the top
+    /// edge so the title bar doesn't appear to creep when AppKit changed height.
+    private func enforceFixedSize() {
+        guard let window = view.window else { return }
+        let target = Self.fixedContentSize
+        let current = window.contentRect(forFrameRect: window.frame).size
+        guard abs(current.width - target.width) > 0.5
+            || abs(current.height - target.height) > 0.5 else { return }
+        let top = window.frame.maxY
+        var frame = window.frameRect(forContentRect: NSRect(origin: window.frame.origin, size: target))
+        frame.origin.y = top - frame.height
+        window.setFrame(frame, display: true)
     }
 }
 
@@ -73,6 +99,10 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
+        // Fixed content size — clamp both ways so neither the user nor the tab
+        // controller's per-pane fitting-size resize can change the window.
+        window.contentMinSize = FixedSizeTabViewController.fixedContentSize
+        window.contentMaxSize = FixedSizeTabViewController.fixedContentSize
         window.minSize = NSSize(width: 720, height: 560)
         window.center()
         window.contentViewController = tabVC

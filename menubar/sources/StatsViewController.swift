@@ -28,6 +28,9 @@ final class StatsViewController: PreferencePaneViewController {
     private var modelFilterIDs: [String] = []
     /// Currently selected model ID (nil = all). Filters the model-aware sections.
     private var selectedModelID: String?
+    /// True while `selectedModelID` is active — the snapshot is scoped to that
+    /// model, so a few all-model-only sections show a note instead of stale data.
+    private var modelScoped = false
     private let tilesStack = NSStackView()
     private let comparisonLabel = NSTextField(labelWithString: "")
 
@@ -817,6 +820,11 @@ final class StatsViewController: PreferencePaneViewController {
         let cacheRead: UInt64
     }
     private struct ProjInst { let date: String; let project: String; let tokens: UInt64; let cost: Double }
+    private struct DayModel {
+        let date: String; let model: String
+        let tokens: UInt64; let sessions: Int; let cost: Double
+        let input: UInt64; let output: UInt64; let cacheRead: UInt64
+    }
 
     private struct Snapshot {
         var byDay: [Day] = []          // newest-first, up to ~365
@@ -824,6 +832,7 @@ final class StatsViewController: PreferencePaneViewController {
         var byModel: [ModelBucket] = []
         var byProject: [ModelBucket] = [] // .model holds the project name
         var instances: [ProjInst] = [] // by_day_project rows (last ~30 days)
+        var byDayModel: [DayModel] = [] // by_day_model rows (full window, per model)
         var recent: [Session] = []
         var total30dTokens: UInt64 = 0
         var subagent30dTokens: UInt64 = 0   // fresh tokens spent inside sub-agents (30d)
@@ -903,6 +912,13 @@ final class StatsViewController: PreferencePaneViewController {
         snap.instances = ((c["by_day_project"] as? [[String: Any]]) ?? []).compactMap { o in
             guard let d = o["date"] as? String, let p = o["project"] as? String else { return nil }
             return ProjInst(date: d, project: p, tokens: u64(o["tokens"]), cost: dbl(o["cost"]))
+        }
+        snap.byDayModel = ((c["by_day_model"] as? [[String: Any]]) ?? []).compactMap { o in
+            guard let d = o["date"] as? String, let m = o["model"] as? String else { return nil }
+            return DayModel(date: d, model: m,
+                            tokens: u64(o["tokens"]), sessions: (o["sessions"] as? Int) ?? 0,
+                            cost: dbl(o["cost"]), input: u64(o["input"]),
+                            output: u64(o["output"]), cacheRead: u64(o["cache_read"]))
         }
         snap.byModel = ((c["by_model"] as? [[String: Any]]) ?? []).compactMap { o in
             guard let m = o["model"] as? String else { return nil }
@@ -1001,6 +1017,25 @@ final class StatsViewController: PreferencePaneViewController {
             ProjInst(date: $0.date, project: $0.project, tokens: inst[$0.k]!.tokens, cost: inst[$0.k]!.cost)
         }
 
+        // by_day_model — sum per (date, model). Claude/Codex models are distinct
+        // ids, so this is effectively a concatenation, but sum to be safe.
+        var dm: [String: (tokens: UInt64, sessions: Int, cost: Double, input: UInt64, output: UInt64, cacheRead: UInt64)] = [:]
+        var dmKeys: [(date: String, model: String, k: String)] = []
+        for x in a.byDayModel + b.byDayModel {
+            let k = x.date + "\u{1}" + x.model
+            if dm[k] == nil { dmKeys.append((x.date, x.model, k)) }
+            var acc = dm[k] ?? (0, 0, 0, 0, 0, 0)
+            acc.tokens += x.tokens; acc.sessions += x.sessions; acc.cost += x.cost
+            acc.input += x.input; acc.output += x.output; acc.cacheRead += x.cacheRead
+            dm[k] = acc
+        }
+        out.byDayModel = dmKeys.map {
+            let v = dm[$0.k]!
+            return DayModel(date: $0.date, model: $0.model, tokens: v.tokens,
+                            sessions: v.sessions, cost: v.cost, input: v.input,
+                            output: v.output, cacheRead: v.cacheRead)
+        }
+
         // recent_sessions — concatenate, newest-first, cap 20.
         out.recent = (a.recent + b.recent)
             .sorted { ($0.startedAt) > ($1.startedAt) }
@@ -1023,6 +1058,76 @@ final class StatsViewController: PreferencePaneViewController {
                 out.lastContextWindow = a.lastContextWindow; out.lastContextPct = a.lastContextPct
             }
         }
+        return out
+    }
+
+    /// Project the snapshot onto a single model using `by_day_model`. Every
+    /// byDay-derived metric (heatmap, streaks, overview tiles, breakdown totals,
+    /// insights, fun fact) then reflects only that model. Per-project sections
+    /// can't be model-split, so their callers blank them with a note while
+    /// `modelScoped`.
+    private func scopeToModel(_ snap: Snapshot, _ model: String) -> Snapshot {
+        // Per-date totals for the chosen model.
+        typealias Acc = (tokens: UInt64, sessions: Int, cost: Double, input: UInt64, output: UInt64, cacheRead: UInt64)
+        var byDate: [String: Acc] = [:]
+        for r in snap.byDayModel where r.model == model {
+            var a = byDate[r.date] ?? (0, 0, 0, 0, 0, 0)
+            a.tokens += r.tokens; a.sessions += r.sessions; a.cost += r.cost
+            a.input += r.input; a.output += r.output; a.cacheRead += r.cacheRead
+            byDate[r.date] = a
+        }
+
+        var out = snap
+
+        // byDay: keep the padded 365-day date list, swap in this model's values
+        // so streaks/active-days/heatmap stay correct.
+        out.byDay = snap.byDay.map { d in
+            let v = byDate[d.date]
+            return Day(date: d.date, tokens: v?.tokens ?? 0, sessions: v?.sessions ?? 0, cost: v?.cost ?? 0)
+        }
+
+        // byMonth: aggregate the model's days by "yyyy-MM", newest-first.
+        var months: [String: Acc] = [:]
+        for (date, v) in byDate {
+            let m = String(date.prefix(7))
+            var a = months[m] ?? (0, 0, 0, 0, 0, 0)
+            a.tokens += v.tokens; a.sessions += v.sessions; a.cost += v.cost
+            months[m] = a
+        }
+        out.byMonth = months
+            .map { Day(date: $0.key, tokens: $0.value.tokens, sessions: $0.value.sessions, cost: $0.value.cost) }
+            .sorted { $0.date > $1.date }
+
+        // 30-day scalars from the model's recent days.
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"; fmt.locale = Locale(identifier: "en_US_POSIX"); fmt.timeZone = .current
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Calendar.current.startOfDay(for: Date()))
+        var t30: UInt64 = 0, in30: UInt64 = 0, out30: UInt64 = 0, cr30: UInt64 = 0
+        var s30 = 0; var c30 = 0.0
+        for (date, v) in byDate {
+            guard let cutoff, let d = fmt.date(from: date), d >= cutoff else { continue }
+            t30 += v.tokens; s30 += v.sessions; c30 += v.cost
+            in30 += v.input; out30 += v.output; cr30 += v.cacheRead
+        }
+        out.total30dTokens = t30
+        out.total30dSessions = s30
+        out.totalCost30d = c30
+        out.input30d = in30
+        out.output30d = out30
+        out.cacheRead30d = cr30
+        // Not available per model — zero so callers show "—"/skip rather than lie.
+        out.subagent30dTokens = 0
+        out.subagent30dCost = 0
+        out.cacheSavings30d = 0
+
+        // byModel: just the selected bucket (drives the "favorite model" tile).
+        out.byModel = snap.byModel.filter { $0.model == model }
+        // Per-project sections can't be scoped to a single model — blank them.
+        out.byProject = []
+        out.instances = []
+        // Sessions list filters to the model; longestSession recomputes from it.
+        out.recent = snap.recent.filter { $0.model == model }
+        out.maxSessionMinutes = 0
         return out
     }
 
@@ -1156,9 +1261,13 @@ final class StatsViewController: PreferencePaneViewController {
 
     func reload() {
         guard isViewLoaded else { return }
-        snapshot = loadSnapshot()
+        // Populate the model dropdown from the FULL (unscoped) snapshot, then
+        // scope to the picked model so every section reflects it consistently.
+        let raw = loadSnapshot()
+        refreshModelFilter(raw)
+        modelScoped = selectedModelID.map { id in raw.byModel.contains { $0.model == id } } ?? false
+        snapshot = (modelScoped ? scopeToModel(raw, selectedModelID!) : raw)
         let snap = snapshot
-        refreshModelFilter(snap)
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         let tokens = tokensInRange(snap)
@@ -1195,9 +1304,11 @@ final class StatsViewController: PreferencePaneViewController {
                 // Share of fresh tokens spent inside sub-agents (Task /
                 // dynamic-workflow runs) — the multi-agent burn the boss flagged.
                 caption: L10n.text("via sub-agents", "alt-ajanlarla"),
-                value: snap.total30dTokens > 0
-                    ? String(format: "%.0f%%", Double(snap.subagent30dTokens) / Double(snap.total30dTokens) * 100)
-                    : "—"
+                // Sub-agent share isn't tracked per model — show "—" when filtered.
+                value: modelScoped ? "—"
+                    : (snap.total30dTokens > 0
+                        ? String(format: "%.0f%%", Double(snap.subagent30dTokens) / Double(snap.total30dTokens) * 100)
+                        : "—")
             ),
             StatTileView(
                 caption: L10n.text("favorite model", "favori model"),
@@ -1291,6 +1402,12 @@ final class StatsViewController: PreferencePaneViewController {
     /// Feed the 30-day "Top projects" bars card (stats.jsx bottom-left). Uses the
     /// by_day_project instances (last ~30 days), summed per project.
     private func refreshTopProjects(_ snap: Snapshot) {
+        // Per-project totals can't be split by model, so a model filter blanks
+        // this card with a note rather than showing all-model bars.
+        topProjectsView.emptyNote = modelScoped
+            ? L10n.text("Per-project split isn't available for a single model — choose All models.",
+                        "Proje kırılımı tek model için yok — Tüm modeller'i seçin.")
+            : nil
         var projTokens: [String: UInt64] = [:]
         var projCost: [String: Double] = [:]
         for inst in snap.instances {
@@ -1541,10 +1658,14 @@ final class StatsViewController: PreferencePaneViewController {
                 "Bu seçimde kullanım yok."
             )
         } else if projRows.isEmpty {
-            breakdownNote.stringValue = L10n.text(
-                "Per-project breakdown is available for the last 30 days.",
-                "Proje kırılımı son 30 gün için mevcuttur."
-            )
+            breakdownNote.stringValue = modelScoped
+                ? L10n.text(
+                    "Per-project split isn't available for a single model — choose All models.",
+                    "Proje kırılımı tek model için yok — Tüm modeller'i seçin.")
+                : L10n.text(
+                    "Per-project breakdown is available for the last 30 days.",
+                    "Proje kırılımı son 30 gün için mevcuttur."
+                )
         } else {
             breakdownNote.stringValue = ""
         }
@@ -1829,6 +1950,12 @@ final class ProjectBarsView: NSView {
         didSet { rebuild() }
     }
 
+    /// Shown (tertiary, wrapping) when `rows` is empty — e.g. when a model filter
+    /// blanks a per-project card. nil = render nothing when empty.
+    var emptyNote: String? {
+        didSet { rebuild() }
+    }
+
     private let stack = NSStackView()
     override var isFlipped: Bool { true }
 
@@ -1850,6 +1977,15 @@ final class ProjectBarsView: NSView {
 
     private func rebuild() {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        if rows.isEmpty, let note = emptyNote, !note.isEmpty {
+            let label = NSTextField(wrappingLabelWithString: note)
+            label.font = NSFont.systemFont(ofSize: 11)
+            label.textColor = .tertiaryLabelColor
+            label.maximumNumberOfLines = 0
+            stack.addArrangedSubview(label)
+            label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            return
+        }
         for row in rows {
             let line = ProjectBarRow(
                 name: row.name,

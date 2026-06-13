@@ -234,6 +234,7 @@ fn apply_buckets(out: &mut AgentUsage, b: Buckets) {
     out.by_model = b.by_model;
     out.by_project = b.by_project;
     out.by_day_project = b.by_day_project;
+    out.by_day_model = b.by_day_model;
 }
 
 /// Build `FileEvents` (for sessionization) from the per-file accumulators,
