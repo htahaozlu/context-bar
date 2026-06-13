@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.9.1] - 2026-06-13
+
+### Added
+
+- **Privacy and About are now their own tabs.** The detail window has five top-level tabs — Stats · Cost · Settings · Privacy · About — instead of cramming General/Privacy/About into one scrolling Settings pane.
+
+### Changed
+
+- **Project label follows the git repository, not the sub-directory.** A session running deep inside a repo (or a worktree) now shows the repo name (origin remote, else the repo root folder) rather than whatever sub-folder it started in. Directories that aren't in a git repo show `parent/leaf` (e.g. `hususi/backend`) so they read as a location, not a fake project.
+- **Cleaner menubar popover.** One active-session hero on top, the parallel sessions below it, and two limit cards at the bottom — Claude and Codex — instead of two stacked hero cards.
+- **UI/UX pass on Stats, Cost and Settings.** Equal-height, top-aligned cards and tiles in the two-column grids (no more shifted/misaligned cards), consistent spacing, and the secondary tools (AI advisor, cross-machine, drill-downs, fun-fact) grouped below a divider so the core view is less cluttered.
+
 ## [0.9.0] - 2026-06-13
 
 ### Added
