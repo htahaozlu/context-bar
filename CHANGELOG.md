@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.10.3] - 2026-06-14
+
+### Fixed
+
+- **Clicking a session in the menubar popover now opens its detail.** Tapping a session (the hero card or a parallel-session row) showed a context-detail popover that instantly vanished — a transient child popover stole key focus and pulled the parent (and the row it was anchored to) closed with it. The menubar popover now suspends its own auto-dismiss while a detail is on screen, so the detail stays open beside the row; a click anywhere outside closes the whole stack.
+- **The detail window really stops resizing between tabs now.** 0.10.2 pinned the content size, but `NSTabViewController` still resized the window to each pane's *fitting* width on switch (the centered Settings/About column fits ~628pt, the data tabs ~820pt) and only snapped back afterward — a visible widen/narrow flicker. Every pane now reports the same fitting width, so the per-switch resize is a no-op.
+
+### Changed
+
+- **Appearance settings match the design's naming.** The System/Light/Dark control is labelled **Theme** (was "Mode"); the Clay/Indigo/Teal palette grid is now **Accent** (was "Theme"). Same controls, clearer split — one row picks light/dark, the other picks the accent.
+
 ## [0.10.2] - 2026-06-14
 
 ### Fixed
