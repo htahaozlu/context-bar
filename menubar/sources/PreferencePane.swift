@@ -78,6 +78,19 @@ class PreferencePaneViewController: NSViewController {
             ])
         }
 
+        // Every pane reports the SAME fitting WIDTH as the full-canvas data tabs.
+        // `NSTabViewController` in `.preference` style resizes the window to each
+        // pane's *fitting* size on switch (it ignores `preferredContentSize` for
+        // that path) — and a centered 580pt Settings/About column fits ~628pt
+        // while the full-width data tabs fit ~820pt, so the window visibly
+        // widened/narrowed on every tab switch (then snapped back). Pinning the
+        // pane to the canvas width makes that per-switch resize a no-op, so the
+        // window never changes size. `>=` so a wider marketing-capture frame can
+        // still stretch the data tabs without a constraint conflict.
+        view.widthAnchor.constraint(
+            greaterThanOrEqualToConstant: FixedSizeTabViewController.fixedContentSize.width
+        ).isActive = true
+
         // Uniform window content size for EVERY tab. The detail window uses an
         // NSTabViewController with the System-Settings "preference" toolbar
         // style, which resizes the window to each pane's content on switch —

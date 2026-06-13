@@ -30,6 +30,11 @@ final class FixedSizeTabViewController: NSTabViewController {
     private func enforceFixedSize() {
         guard let window = view.window else { return }
         let target = Self.fixedContentSize
+        // Re-assert the content-size clamp: NSTabViewController relaxes the
+        // window's content min/max around its per-pane resize, so restore both
+        // bounds after each switch or a later layout pass could resize again.
+        window.contentMinSize = target
+        window.contentMaxSize = target
         let current = window.contentRect(forFrameRect: window.frame).size
         guard abs(current.width - target.width) > 0.5
             || abs(current.height - target.height) > 0.5 else { return }
