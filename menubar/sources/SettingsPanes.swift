@@ -1,6 +1,111 @@
 import AppKit
 import Foundation
 
+// MARK: - Appearance (light / dark / system) mode store
+//
+// The redesign's "Theme" control is a System/Light/Dark appearance switch
+// (distinct from the accent picker, which stays the ThemeCardView grid). No
+// persisted store existed for this — only a capture-only env override in
+// AppDelegate — so we add one here. It writes the user's choice to
+// UserDefaults and applies `NSApp.appearance` live. The capture env override
+// still wins at launch (it sets `NSApp.appearance` directly).
+enum AppearanceMode: String, CaseIterable {
+    case system, light, dark
+
+    var label: String {
+        switch self {
+        case .system: return L10n.text("System", "Sistem")
+        case .light: return L10n.text("Light", "Açık")
+        case .dark: return L10n.text("Dark", "Koyu")
+        }
+    }
+}
+
+enum AppearanceStore {
+    private static let key = "appearanceMode"
+    private static let kLivePreview = "appearance.livePreview"
+
+    static var current: AppearanceMode {
+        get { AppearanceMode(rawValue: UserDefaults.standard.string(forKey: key) ?? "system") ?? .system }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
+    }
+
+    /// Whether the live menu-bar title sample shows while editing Settings.
+    /// Defaults ON. (Kept here rather than DisplayPrefs since this is purely a
+    /// Settings-pane affordance.)
+    static var livePreview: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: kLivePreview) == nil { return true }
+            return UserDefaults.standard.bool(forKey: kLivePreview)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: kLivePreview) }
+    }
+
+    /// Maps the stored mode to a concrete `NSAppearance` (nil = follow system)
+    /// and applies it to the running app.
+    static func apply() {
+        switch current {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+// MARK: - Alerts (warning-threshold) store
+//
+// The redesign's "Context bar marks" control is a % picker (Off / 60 / 70 /
+// 75 / 80 / 90) rather than a plain on/off. We persist the chosen threshold
+// here and keep the existing `DisplayPrefs.tickMarks` boolean in sync (Off →
+// false, any % → true) so the bar-rendering path is unchanged.
+enum AlertsStore {
+    private static let kThreshold = "alerts.barMarkThreshold"
+
+    /// % values offered by the popup. `0` = Off.
+    static let thresholds: [Int] = [0, 60, 70, 75, 80, 90]
+
+    /// Persisted warning threshold. 0 = off. Defaults to 0 (off) to match the
+    /// previous out-of-box `tickMarks == false`.
+    static var threshold: Int {
+        get {
+            if UserDefaults.standard.object(forKey: kThreshold) == nil {
+                return DisplayPrefs.tickMarks ? 75 : 0
+            }
+            return UserDefaults.standard.integer(forKey: kThreshold)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: kThreshold)
+            DisplayPrefs.tickMarks = newValue > 0
+        }
+    }
+
+    static var optionLabels: [String] {
+        thresholds.map { $0 == 0 ? L10n.text("Off", "Kapalı") : "\($0)%" }
+    }
+    static var selectedIndex: Int {
+        thresholds.firstIndex(of: threshold) ?? 0
+    }
+}
+
+// MARK: - Budget cap presets
+//
+// The redesign's "Budget alerts" control is a cap-preset popup (Off / $50 /
+// $100 / $150 / $300 mo) mapped onto the existing `DisplayPrefs.monthlyBudgetUSD`
+// pref. The detailed field + live pace preview is preserved as a wide row.
+enum BudgetPresets {
+    /// USD/month caps. `0` = Off.
+    static let caps: [Double] = [0, 50, 100, 150, 300]
+
+    static var optionLabels: [String] {
+        caps.map { $0 == 0 ? L10n.text("Off", "Kapalı") : String(format: "$%.0f/mo", $0) }
+    }
+    /// Index of the preset matching the current budget, or 0 (Off) when the
+    /// budget is a custom value not in the preset list.
+    static var selectedIndex: Int {
+        caps.firstIndex(of: DisplayPrefs.monthlyBudgetUSD) ?? 0
+    }
+}
+
 // MARK: - Grouped settings card
 //
 // The redesign collapses each settings pane into a few native grouped sections.
@@ -164,7 +269,10 @@ private final class SettingsGroupCard: NSView {
 
     /// A row whose control occupies the full card width below the label —
     /// for the theme grid, the menubar preview, and the title-field chips.
-    func addWideRow(title: String, desc: String? = nil, content: NSView) {
+    /// Returns the created row so callers can show/hide it (e.g. the live
+    /// preview sample toggles with its switch).
+    @discardableResult
+    func addWideRow(title: String, desc: String? = nil, content: NSView) -> NSView {
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         titleLabel.textColor = Palette.primaryText
@@ -191,6 +299,7 @@ private final class SettingsGroupCard: NSView {
         let wrapper = SettingsWideRowView(content: column, leadingHairline: rowCount > 0)
         appendRow(wrapper)
         content.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        return wrapper
     }
 
     private func appendRow(_ row: NSView) {
@@ -280,12 +389,27 @@ private func makeSettingsSwitch(on: Bool, target: AnyObject, action: Selector,
 final class GeneralSettingsViewController: PreferencePaneViewController {
     var onThemeChange: ((String) -> Void)?
     var onChange: (() -> Void)?
-    private let displayChips = HorizontalDisplayController()
+    private var displayChips = HorizontalDisplayController()
+    /// Stable container the chips controller's view lives inside, so the "N
+    /// shown" popup can toggle a field, rebuild the controller from the
+    /// persisted store, and swap the chips view in without losing its place in
+    /// the card.
+    private let chipsHolder = FlippedView()
     private let preview = TitlePreviewView()
     private var cardViews: [(ThemeCardView, Theme)] = []
+    private var titleFieldsPopup: PopupButton?
+    private var previewSwitch: PillSwitch?
+    private var previewRow: NSView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Enforce the persisted appearance mode when the UI is built. (Launch
+        // is owned by AppDelegate, which is frozen; this is the earliest hook
+        // we own.) Skip when a capture-only override is pinned via env so
+        // marketing/regression screenshots keep their forced appearance.
+        if ProcessInfo.processInfo.environment["CONTEXTBAR_FORCE_APPEARANCE"] == nil {
+            AppearanceStore.apply()
+        }
         buildUI()
         refreshPreview()
     }
@@ -294,15 +418,39 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         buildAppearanceGroup()
         buildAlertsGroup()
         buildBehaviorGroup()
-        addPrivacyFooter()
+        // Footer is rendered once by the parent SettingsViewController at the
+        // very bottom of the combined scroll (settings.jsx renders it once).
     }
 
-    /// APPEARANCE — theme grid, language, separator, title fields, live preview.
-    /// (Formerly the standalone Appearance tab, merged into General.)
+    /// APPEARANCE — theme mode, accent grid, language, separator, title fields,
+    /// live preview. (Formerly the standalone Appearance tab, merged into
+    /// General.) Mirrors settings.jsx's "Appearance" group, row for row.
     private func buildAppearanceGroup() {
         let appearance = addGroup(symbol: "paintbrush", title: L10n.text("Appearance", "Görünüm"))
 
-        // ── Theme — full-width card grid (keeps the rich named-palette picker).
+        // ── Theme → System / Light / Dark pill segmented control (settings.jsx
+        //    `SegCtrl options={['System','Light','Dark']}`). Drives the live
+        //    NSApp.appearance via AppearanceStore.
+        let modeCtrl = PillSegmentedControl(
+            options: AppearanceMode.allCases.map(\.label),
+            selectedIndex: AppearanceMode.allCases.firstIndex(of: AppearanceStore.current) ?? 0
+        ) { [weak self] idx in
+            AppearanceStore.current = AppearanceMode.allCases[idx]
+            AppearanceStore.apply()
+            self?.refreshPreview()
+            self?.onThemeChange?(ThemeStore.current.id)
+        }
+        modeCtrl.setAccessibilityLabel(L10n.text("Theme", "Tema"))
+        appearance.addRow(
+            title: L10n.text("Theme", "Tema"),
+            desc: L10n.text(
+                "Follow the system appearance, or pin Light / Dark.",
+                "Sistem görünümünü izleyin ya da Açık / Koyu sabitleyin."),
+            control: modeCtrl)
+
+        // ── Accent — KEEP the rich named-palette picker (ThemeCardView grid).
+        //    Distinct from Theme mode above: this is the single chromatic note
+        //    (Clay / Indigo / Teal). Full-width row below the mode switch.
         cardViews = Theme.all.map { theme in
             let card = ThemeCardView(theme: theme)
             card.isSelected = theme.id == ThemeStore.current.id
@@ -327,64 +475,175 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         themeGrid.orientation = .vertical
         themeGrid.spacing = 12
         appearance.addWideRow(
-            title: L10n.text("Theme", "Tema"),
+            title: L10n.text("Accent", "Vurgu"),
             desc: L10n.text(
-                "Pick the menubar palette that matches your desktop.",
-                "Masaüstüne en uygun menubar paletini seçin."),
+                "The single accent hue used across the menubar and panes.",
+                "Menubar ve panellerde kullanılan tek vurgu rengi."),
             content: themeGrid)
         cardViews.forEach { $0.0.heightAnchor.constraint(equalToConstant: 82).isActive = true }
 
-        // ── Language — segmented (Auto · EN · TR).
-        let langControl = NSSegmentedControl(
-            labels: AppLanguage.allCases.map(\.label),
-            trackingMode: .selectOne,
-            target: self,
-            action: #selector(languageChanged(_:)))
-        langControl.selectedSegment = AppLanguage.allCases.firstIndex(of: LanguageStore.selected) ?? 0
-        langControl.setAccessibilityLabel(L10n.text("Language", "Dil"))
+        // ── Language → rounded popup (Auto · English · Türkçe). settings.jsx
+        //    `<Popup value="English" />`.
+        let langOptions = AppLanguage.allCases.map { lang -> String in
+            switch lang {
+            case .auto: return L10n.text("Auto", "Otomatik")
+            case .en: return "English"
+            case .tr: return "Türkçe"
+            }
+        }
+        let langPopup = PopupButton(
+            options: langOptions,
+            selectedIndex: AppLanguage.allCases.firstIndex(of: LanguageStore.selected) ?? 0
+        ) { [weak self] idx in
+            LanguageStore.set(AppLanguage.allCases[idx])
+            self?.onThemeChange?(ThemeStore.current.id)
+        }
+        langPopup.setAccessibilityLabel(L10n.text("Language", "Dil"))
         appearance.addRow(
             title: L10n.text("Language", "Dil"),
             desc: L10n.text(
                 "Follow the system language or pin to English / Turkish.",
                 "Sistem dilini izleyin ya da İngilizce / Türkçe sabitleyin."),
-            control: langControl)
+            control: langPopup)
 
-        // ── Separator — segmented glyph picker between title fields.
-        let sepControl = NSSegmentedControl(
-            labels: SeparatorStore.options.map { $0.label },
-            trackingMode: .selectOne,
-            target: self,
-            action: #selector(separatorChanged(_:)))
-        sepControl.selectedSegment = SeparatorStore.currentIndex
-        sepControl.setAccessibilityLabel(L10n.text("Separator", "Ayraç"))
-        appearance.addRow(
-            title: L10n.text("Separator", "Ayraç"),
-            desc: L10n.text(
-                "Character between the agent icon, project, and context values.",
-                "Ajan ikonu, proje ve bağlam değerleri arasındaki karakter."),
-            control: sepControl)
-
-        // ── Title content — toggle/reorder chips (full width).
-        displayChips.onChange = { [weak self] in
+        // ── Menu-bar separator → rounded popup of glyph options. settings.jsx
+        //    `<Popup value="·  dot" />`, desc "Character between title fields".
+        let sepOptions = SeparatorStore.options.map { opt -> String in
+            opt.value.isEmpty ? L10n.text("None", "Yok") : opt.label
+        }
+        let sepPopup = PopupButton(
+            options: sepOptions,
+            selectedIndex: SeparatorStore.currentIndex
+        ) { [weak self] idx in
+            SeparatorStore.set(SeparatorStore.options[idx].value)
             self?.refreshPreview()
             self?.onThemeChange?(ThemeStore.current.id)
         }
+        sepPopup.setAccessibilityLabel(L10n.text("Menu-bar separator", "Menü çubuğu ayracı"))
+        appearance.addRow(
+            title: L10n.text("Menu-bar separator", "Menü çubuğu ayracı"),
+            desc: L10n.text(
+                "Character between title fields.",
+                "Başlık alanları arasındaki karakter."),
+            control: sepPopup)
+
+        // ── Title fields → "N shown" popup (settings.jsx `<Popup value="3
+        //    shown" />`, desc "Project · Model · Context %"). The popup toggles
+        //    a field's visibility; the rich drag-reorder chips stay below it as
+        //    a full-width row so the reorder feature is preserved.
+        titleFieldsPopup = makeTitleFieldsPopup()
+        appearance.addRow(
+            title: L10n.text("Title fields", "Başlık alanları"),
+            desc: L10n.text("Project · Model · Context %", "Proje · Model · Bağlam %"),
+            control: titleFieldsPopup!)
+        refreshTitleFieldsPopup()
+
+        wireChips()
         appearance.addWideRow(
-            title: L10n.text("Title content", "Başlık içeriği"),
+            title: L10n.text("Reorder fields", "Alanları sırala"),
             desc: L10n.text(
                 "Toggle a field's checkbox to show it. Drag the ⠿ handle to reorder.",
                 "Bir alanı göstermek için onay kutusunu işaretleyin. Sıralamak için ⠿ tutamacından sürükleyin."),
-            content: displayChips.container)
+            content: chipsHolder)
 
-        // ── Live preview — menubar title sample (full width).
+        // ── Live preview → pill switch (settings.jsx `<Switch on />`, desc
+        //    "Show this menu-bar title sample while editing"). The sample
+        //    itself stays visible below as a full-width row.
+        previewSwitch = PillSwitch(isOn: AppearanceStore.livePreview) { [weak self] on in
+            AppearanceStore.livePreview = on
+            self?.applyPreviewVisibility()
+        }
+        previewSwitch?.setAccessibilityLabel(L10n.text("Live preview", "Canlı önizleme"))
+        appearance.addRow(
+            title: L10n.text("Live preview", "Canlı önizleme"),
+            desc: L10n.text(
+                "Show this menu-bar title sample while editing.",
+                "Düzenlerken bu menü çubuğu başlık örneğini göster."),
+            control: previewSwitch!)
+
         preview.translatesAutoresizingMaskIntoConstraints = false
         preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
-        appearance.addWideRow(
+        previewRow = appearance.addWideRow(
             title: L10n.text("Preview", "Önizleme"),
-            desc: L10n.text(
-                "Live sample of the menubar title. Changes apply instantly.",
-                "Menubar başlığının canlı örneği. Değişiklikler anında uygulanır."),
+            desc: nil,
             content: preview)
+        applyPreviewVisibility()
+    }
+
+    /// Builds the "N shown" popup for title-field visibility. Each menu item
+    /// is a field with a leading ✓ when visible; picking one toggles it. The
+    /// displayed value summarizes how many fields are shown. Checkmarks are
+    /// rendered as a text prefix (not the popup's single-selection state) so
+    /// the menu reads as a multi-toggle list.
+    private func makeTitleFieldsPopup() -> PopupButton {
+        let popup = PopupButton(options: [], selectedIndex: 0) { [weak self] idx in
+            guard let self else { return }
+            self.toggleTitleField(at: idx)
+            self.refreshPreview()
+            self.refreshTitleFieldsPopup()
+            self.onThemeChange?(ThemeStore.current.id)
+        }
+        return popup
+    }
+
+    /// Refreshes the title-fields popup option list + summary value to mirror
+    /// the persisted display items (kept in sync with the reorder chips).
+    private func refreshTitleFieldsPopup() {
+        guard let popup = titleFieldsPopup else { return }
+        let items = DisplayStore.items
+        let opts = items.map { item -> String in
+            (item.enabled ? "✓ " : "   ") + item.element.label
+        }
+        let shown = items.filter { $0.enabled }.count
+        popup.setOptions(opts, selectedIndex: 0)
+        popup.setValue(L10n.text("\(shown) shown", "\(shown) gösteriliyor"))
+    }
+
+    private func applyPreviewVisibility() {
+        let on = AppearanceStore.livePreview
+        previewRow?.isHidden = !on
+        if on { refreshPreview() }
+    }
+
+    /// Installs the chips controller's container into the stable holder and
+    /// wires its change handler. Called once on build, and again from
+    /// `reloadChips()` after the "N shown" popup toggles a field.
+    private func wireChips() {
+        displayChips.onChange = { [weak self] in
+            self?.refreshPreview()
+            self?.refreshTitleFieldsPopup()
+            self?.onThemeChange?(ThemeStore.current.id)
+        }
+        let container = displayChips.container
+        chipsHolder.translatesAutoresizingMaskIntoConstraints = false
+        chipsHolder.subviews.forEach { $0.removeFromSuperview() }
+        container.translatesAutoresizingMaskIntoConstraints = false
+        chipsHolder.addSubview(container)
+        NSLayoutConstraint.activate([
+            container.topAnchor.constraint(equalTo: chipsHolder.topAnchor),
+            container.leadingAnchor.constraint(equalTo: chipsHolder.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: chipsHolder.trailingAnchor),
+            container.bottomAnchor.constraint(equalTo: chipsHolder.bottomAnchor),
+        ])
+    }
+
+    /// Rebuilds the chips controller from the persisted `DisplayStore` (the
+    /// source of truth) and swaps its fresh container into the holder. Used
+    /// after the popup toggles a field so the chip checkboxes stay in sync —
+    /// the controller reads `DisplayStore.items` on init.
+    private func reloadChips() {
+        displayChips = HorizontalDisplayController()
+        wireChips()
+    }
+
+    /// Toggles a title field's visibility from the "N shown" popup, persists
+    /// it, and re-syncs the chips so both controls agree.
+    private func toggleTitleField(at index: Int) {
+        var items = DisplayStore.items
+        guard index >= 0, index < items.count else { return }
+        items[index].enabled.toggle()
+        DisplayStore.save(items)
+        reloadChips()
     }
 
     /// ALERTS — context-bar marks, background sessions, provider status, monthly
@@ -393,39 +652,76 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
     private func buildAlertsGroup() {
         let alerts = addGroup(symbol: "bell", title: L10n.text("Alerts", "Uyarılar"))
 
+        // ── Context bar marks → % threshold popup (settings.jsx
+        //    `<Popup value="75%" />`, desc "Tick the bar at your warning
+        //    threshold"). Off / 60 / 70 / 75 / 80 / 90. Keeps DisplayPrefs.
+        //    tickMarks in sync via AlertsStore.
+        let marksPopup = PopupButton(
+            options: AlertsStore.optionLabels,
+            selectedIndex: AlertsStore.selectedIndex
+        ) { [weak self] idx in
+            AlertsStore.threshold = AlertsStore.thresholds[idx]
+            self?.onChange?()
+        }
+        marksPopup.setAccessibilityLabel(L10n.text("Context bar marks", "Bağlam çubuğu işaretleri"))
         alerts.addRow(
-            title: L10n.text("Bar marks", "Çubuk işaretleri"),
+            title: L10n.text("Context bar marks", "Bağlam çubuğu işaretleri"),
             desc: L10n.text(
-                "Thin ticks at 70% and 90% on every context bar. Off by default.",
-                "Her bağlam çubuğunda %70 ve %90'a ince çizgiler. Varsayılan kapalı."),
-            control: makeSwitch(on: DisplayPrefs.tickMarks, action: #selector(ticksChanged(_:)),
-                                a11y: L10n.text("Warning marks on bars", "Çubuklarda uyarı işaretleri")))
+                "Tick the bar at your warning threshold.",
+                "Çubuğu uyarı eşiğinizde işaretleyin."),
+            control: marksPopup)
 
+        // ── Background sessions → pill switch.
         alerts.addRow(
             title: L10n.text("Background sessions", "Arka plan oturumları"),
             desc: L10n.text(
                 "Surface a background session above 80% while the foreground is calm.",
                 "Aktif oturum sakinken %80'i geçen arka plan oturumunu göster."),
-            control: makeSwitch(on: DisplayPrefs.criticalBackground, action: #selector(criticalChanged(_:)),
-                                a11y: L10n.text("Surface critical background sessions", "Kritik arka plan oturumlarını göster")))
+            control: makePillSwitch(on: DisplayPrefs.criticalBackground) { on in
+                DisplayPrefs.criticalBackground = on
+            })
 
+        // ── Provider status → pill switch.
         alerts.addRow(
             title: L10n.text("Provider status", "Sağlayıcı durumu"),
             desc: L10n.text(
-                "Surface Anthropic / OpenAI incidents in the menubar and popover.",
-                "Anthropic / OpenAI olaylarını menubar ve popover'da göster."),
-            control: makeSwitch(on: DisplayPrefs.incidents, action: #selector(incidentsChanged(_:)),
-                                a11y: L10n.text("Show upstream incident overlay", "Üst kaynak olay göstergesi")))
+                "Surface Anthropic / OpenAI incidents.",
+                "Anthropic / OpenAI olaylarını göster."),
+            control: makePillSwitch(on: DisplayPrefs.incidents) { on in
+                DisplayPrefs.incidents = on
+                if on { IncidentPoller.shared.start() } else { IncidentPoller.shared.stop() }
+            })
 
-        // Budget limit — promoted to a wide row so the live pace preview
-        // (current run-rate vs. cap, color tier) sits directly under the
-        // input. Re-renders on every refresh so the user sees their
-        // current pace without leaving the pane.
-        alerts.addWideRow(
-            title: L10n.text("Monthly budget", "Aylık bütçe"),
+        // ── Budget alerts → cap-preset popup (settings.jsx `<Popup
+        //    value="$150/mo" />`, desc "Warn as API-equivalent value passes a
+        //    cap"). Off / $50 / $100 / $150 / $300. Mapped onto
+        //    DisplayPrefs.monthlyBudgetUSD.
+        let budgetPopup = PopupButton(
+            options: BudgetPresets.optionLabels,
+            selectedIndex: BudgetPresets.selectedIndex
+        ) { [weak self] idx in
+            DisplayPrefs.monthlyBudgetUSD = BudgetPresets.caps[idx]
+            self?.syncBudgetField()
+            self?.refreshBudgetPace()
+            self?.onChange?()
+        }
+        budgetPopup.setAccessibilityLabel(L10n.text("Budget alerts", "Bütçe uyarıları"))
+        budgetPopupRef = budgetPopup
+        alerts.addRow(
+            title: L10n.text("Budget alerts", "Bütçe uyarıları"),
             desc: L10n.text(
-                "Tint the title as the run-rate nears this cap, or the 5h limit fills. 0 = off.",
-                "Harcama hızı bu üst sınıra ya da 5sa limitine yaklaşınca başlığı renklendir. 0 = kapalı."),
+                "Warn as API-equivalent value passes a cap.",
+                "API eşdeğeri değer bir sınırı aşınca uyar."),
+            control: budgetPopup)
+
+        // Custom budget + live pace preview — preserved as a wide row so a
+        // user who wants a non-preset cap can still type one, and so the live
+        // run-rate vs. cap (color tier) sits directly under the input.
+        alerts.addWideRow(
+            title: L10n.text("Custom budget", "Özel bütçe"),
+            desc: L10n.text(
+                "Type any monthly cap, or read the live pace below. 0 = off.",
+                "Herhangi bir aylık sınır yazın ya da aşağıdaki canlı hızı okuyun. 0 = kapalı."),
             content: makeBudgetFieldAndPreview())
     }
 
@@ -433,25 +729,33 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
     private func buildBehaviorGroup() {
         let behavior = addGroup(symbol: "slider.horizontal.3", title: L10n.text("Behavior", "Davranış"))
 
-        let resetCtrl = NSSegmentedControl(
-            labels: [L10n.text("Relative", "Göreli"), L10n.text("Absolute", "Mutlak")],
-            trackingMode: .selectOne, target: self, action: #selector(resetStyleChanged(_:)))
-        resetCtrl.selectedSegment = DisplayPrefs.resetStyle == .relative ? 0 : 1
-        resetCtrl.setAccessibilityLabel(L10n.text("Reset time", "Sıfırlama zamanı"))
+        // ── Limit reset style → Countdown / Clock pill segmented control
+        //    (settings.jsx `SegCtrl options={['Countdown','Clock']}`). Maps
+        //    0 → relative (countdown), 1 → absolute (clock).
+        let resetCtrl = PillSegmentedControl(
+            options: [L10n.text("Countdown", "Geri sayım"), L10n.text("Clock", "Saat")],
+            selectedIndex: DisplayPrefs.resetStyle == .relative ? 0 : 1
+        ) { [weak self] idx in
+            DisplayPrefs.resetStyle = idx == 0 ? .relative : .absolute
+            self?.onChange?()
+        }
+        resetCtrl.setAccessibilityLabel(L10n.text("Limit reset style", "Limit sıfırlama biçimi"))
         behavior.addRow(
-            title: L10n.text("Reset time", "Sıfırlama zamanı"),
+            title: L10n.text("Limit reset style", "Limit sıfırlama biçimi"),
             desc: L10n.text(
-                "Show resets as a duration (\"in 1h 47m\") or a clock time (\"14:32\").",
-                "Sıfırlamaları süre (\"1sa 47dk\") veya saat (\"14:32\") olarak göster."),
+                "How rolling-window resets are shown.",
+                "Pencere sıfırlamalarının nasıl gösterileceği."),
             control: resetCtrl)
 
+        // ── Delight → pill switch (settings.jsx `<Switch on />`).
         behavior.addRow(
             title: L10n.text("Delight", "İnce dokunuş"),
             desc: L10n.text(
-                "A particle burst when a quota window resets. Respects reduce-motion.",
-                "Kota penceresi sıfırlanınca kısa animasyon. Hareketi azalt ayarına uyar."),
-            control: makeSwitch(on: DisplayPrefs.confetti, action: #selector(confettiChanged(_:)),
-                                a11y: L10n.text("Celebrate quota window resets", "Pencere sıfırlamada kutlama")))
+                "Celebrate streaks and milestones.",
+                "Serileri ve dönüm noktalarını kutla."),
+            control: makePillSwitch(on: DisplayPrefs.confetti) { on in
+                DisplayPrefs.confetti = on
+            })
     }
 
     private func updateCardSelection() {
@@ -459,8 +763,13 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         for (card, theme) in cardViews { card.isSelected = theme.id == current }
     }
 
-    private func makeSwitch(on: Bool, action: Selector, a11y: String) -> NSSwitch {
-        makeSettingsSwitch(on: on, target: self, action: action, a11y: a11y)
+    /// Builds a redesign `PillSwitch`, runs the persistence action, and forwards
+    /// an `onChange` so the data tabs refresh.
+    private func makePillSwitch(on: Bool, persist: @escaping (Bool) -> Void) -> PillSwitch {
+        PillSwitch(isOn: on) { [weak self] value in
+            persist(value)
+            self?.onChange?()
+        }
     }
 
     /// Field + a live pace preview that re-renders on every refresh. The
@@ -476,6 +785,7 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         field.target = self
         field.action = #selector(budgetChanged(_:))
         field.setAccessibilityLabel(L10n.text("Monthly budget USD", "Aylık bütçe USD"))
+        budgetField = field
 
         let fieldRow = NSStackView(views: [NSTextField(labelWithString: "$"), field])
         fieldRow.orientation = .horizontal
@@ -501,12 +811,37 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
     }
 
     private weak var budgetPaceLabel: NSTextField?
+    private weak var budgetField: NSTextField?
+    private weak var budgetPopupRef: PopupButton?
 
     @objc private func budgetChanged(_ sender: NSTextField) {
         let cleaned = sender.stringValue.filter { $0.isNumber || $0 == "." }
         DisplayPrefs.monthlyBudgetUSD = Double(cleaned) ?? 0
+        syncBudgetPopup()
         onChange?()
         refreshBudgetPace()
+    }
+
+    /// Reflects the current budget back into the custom field (used when the
+    /// preset popup changes the value).
+    private func syncBudgetField() {
+        let v = DisplayPrefs.monthlyBudgetUSD
+        budgetField?.stringValue = v > 0 ? String(format: "%.0f", v) : ""
+    }
+
+    /// Reflects the current budget into the preset popup — selecting the
+    /// matching preset, or "Off"/value-as-shown for a custom amount.
+    private func syncBudgetPopup() {
+        guard let popup = budgetPopupRef else { return }
+        let v = DisplayPrefs.monthlyBudgetUSD
+        if let idx = BudgetPresets.caps.firstIndex(of: v) {
+            popup.setOptions(BudgetPresets.optionLabels, selectedIndex: idx)
+        } else if v > 0 {
+            // Custom amount with no matching preset — show the raw cap.
+            popup.setValue(String(format: "$%.0f/mo", v))
+        } else {
+            popup.setOptions(BudgetPresets.optionLabels, selectedIndex: 0)
+        }
     }
 
     /// Computes run-rate vs cap and writes the preview line. Color
@@ -543,28 +878,6 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
         label.textColor = color
     }
 
-    @objc private func resetStyleChanged(_ sender: NSSegmentedControl) {
-        DisplayPrefs.resetStyle = sender.selectedSegment == 0 ? .relative : .absolute
-        onChange?()
-    }
-    @objc private func ticksChanged(_ sender: NSSwitch) {
-        DisplayPrefs.tickMarks = sender.state == .on
-        onChange?()
-    }
-    @objc private func criticalChanged(_ sender: NSSwitch) {
-        DisplayPrefs.criticalBackground = sender.state == .on
-        onChange?()
-    }
-    @objc private func incidentsChanged(_ sender: NSSwitch) {
-        DisplayPrefs.incidents = sender.state == .on
-        if sender.state == .on { IncidentPoller.shared.start() } else { IncidentPoller.shared.stop() }
-        onChange?()
-    }
-    @objc private func confettiChanged(_ sender: NSSwitch) {
-        DisplayPrefs.confetti = sender.state == .on
-        onChange?()
-    }
-
     private func refreshPreview() {
         preview.update(
             items: displayChips.currentItems,
@@ -572,19 +885,6 @@ final class GeneralSettingsViewController: PreferencePaneViewController {
             project: L10n.text("my-project", "projem"),
             pct: 27
         )
-    }
-
-    @objc private func languageChanged(_ sender: NSSegmentedControl) {
-        let language = AppLanguage.allCases[sender.selectedSegment]
-        LanguageStore.set(language)
-        onThemeChange?(ThemeStore.current.id)
-    }
-
-    @objc private func separatorChanged(_ sender: NSSegmentedControl) {
-        let value = SeparatorStore.options[sender.selectedSegment].value
-        SeparatorStore.set(value)
-        refreshPreview()
-        onThemeChange?(ThemeStore.current.id)
     }
 }
 
@@ -695,7 +995,8 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
                 "Yalnızca sunucu çalıştırmak istemiyorsanız gerekir. Her Mac oraya özet kullanım yazar; Değer sekmesi birleştirir."),
             content: makeSyncFolderField())
 
-        addPrivacyFooter()
+        // Footer is rendered once by the parent SettingsViewController at the
+        // very bottom of the combined scroll.
     }
 
     // ── AI ADVISOR UI

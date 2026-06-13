@@ -13,14 +13,21 @@ import Foundation
 ///   - total_tokens_30d / total_sessions_30d
 final class StatsViewController: PreferencePaneViewController {
     enum Range: Int { case all = 0, last30 = 1, last7 = 2 }
-    enum Provider: Int { case claude = 0, codex = 1 }
+    enum Provider: Int { case both = 0, claude = 1, codex = 2 }
     enum DayMode: Int { case day = 0, range = 1 }
     private var range: Range = .all
-    private var provider: Provider = .claude
+    private var provider: Provider = .both
     private var dayMode: DayMode = .day
 
-    private let rangeControl = NSSegmentedControl()
-    private let providerControl = NSSegmentedControl()
+    // Redesign controls (stats.jsx): provider + range render as the shared
+    // PillSegmentedControl; the model scope as a PopupButton ("All models").
+    private var providerControl: PillSegmentedControl!
+    private var rangeControl: PillSegmentedControl!
+    private var modelFilter: PopupButton!
+    /// Raw model IDs backing `modelFilter` (index 0 = "All models" → nil).
+    private var modelFilterIDs: [String] = []
+    /// Currently selected model ID (nil = all). Filters the model-aware sections.
+    private var selectedModelID: String?
     private let tilesStack = NSStackView()
     private let comparisonLabel = NSTextField(labelWithString: "")
 
@@ -55,6 +62,11 @@ final class StatsViewController: PreferencePaneViewController {
     // Token composition renders as one segmented accent pill (input/output/cache).
     private let compositionView = SegmentedCompositionView()
     private let insightsStack = NSStackView()
+    // stats.jsx bottom-left: a 30-day "Top projects" bars card, separate from the
+    // selection-driven breakdown lower down.
+    private let topProjectsView = ProjectBarsView()
+    /// "48.2M total" caption in the composition card header.
+    private let compositionTotalLabel = NSTextField(labelWithString: "")
     private let aiButton = NSButton()
     private let aiSpinner = NSProgressIndicator()
     private let aiResult = NSTextField(wrappingLabelWithString: "")
@@ -68,56 +80,30 @@ final class StatsViewController: PreferencePaneViewController {
     }
 
     private func buildUI() {
-        let controlsStack = NSStackView()
-        controlsStack.orientation = .horizontal
-        controlsStack.alignment = .centerY
-        controlsStack.spacing = 10
-        controlsStack.translatesAutoresizingMaskIntoConstraints = false
+        // 1) Header + controls row (stats.jsx top strip): title "Activity" with a
+        //    one-line subtitle on the left, and the provider / model / range
+        //    filters on the right. No card chrome — added bare via addHero.
+        buildHeaderControls()
 
-        providerControl.segmentStyle = .texturedRounded
-        providerControl.segmentCount = 2
-        providerControl.setLabel("Claude", forSegment: 0)
-        providerControl.setLabel("Codex", forSegment: 1)
-        providerControl.selectedSegment = 0
-        providerControl.target = self
-        providerControl.action = #selector(providerChanged(_:))
-        providerControl.translatesAutoresizingMaskIntoConstraints = false
-
-        rangeControl.segmentStyle = .texturedRounded
-        rangeControl.segmentCount = 3
-        rangeControl.setLabel(L10n.text("All time", "Tüm zaman"), forSegment: 0)
-        rangeControl.setLabel(L10n.text("Last 30 days", "Son 30 gün"), forSegment: 1)
-        rangeControl.setLabel(L10n.text("Last 7 days", "Son 7 gün"), forSegment: 2)
-        rangeControl.selectedSegment = 0
-        rangeControl.target = self
-        rangeControl.action = #selector(rangeChanged(_:))
-        rangeControl.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Activity", "Aktivite"),
-            subtitle: L10n.text("Provider and time range for the historical view.",
-                                "Geçmiş görünümü için sağlayıcı ve zaman aralığı."),
-            symbol: "chart.line.uptrend.xyaxis",
-            info: L10n.text(
-                "Each provider is scanned from its own local transcripts. Change the range to pivot the overview without losing the yearly heatmap.",
-                "Her sağlayıcı kendi yerel transkriptlerinden taranır. Aralığı değiştirerek yıllık ısı haritasını kaybetmeden özeti çevirebilirsin."),
-            body: controlsStack
-        )
-        controlsStack.addArrangedSubview(providerControl)
-        controlsStack.addArrangedSubview(rangeControl)
-
+        // 2) Overview — six metric tiles in ONE row of 6 equal columns, with the
+        //    "N more …" disclosure beneath (stats.jsx overview grid).
         tilesStack.orientation = .vertical
         tilesStack.alignment = .leading
         tilesStack.spacing = 10
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Overview", "Genel bakış"),
-            subtitle: nil,
-            symbol: "chart.bar.xaxis",
-            body: tilesStack
-        )
+        addHero(tilesStack)
 
-        buildInsightsSection()
+        // 3) Year heatmap card.
         buildHeatmapSection()
+
+        // 4) Two-column bottom grid (1.35fr : 1fr): LEFT = token-composition card
+        //    over a top-projects card; RIGHT = two insight cards.
+        buildBottomGrid()
+
+        // 5) Preserved features, BELOW the spec sections: AI deep-dive, the
+        //    day/range drill-down with the session list, and the War & Peace fun
+        //    fact. Same functionality as before, only relocated.
+        buildAISection()
         buildBreakdownSection()
 
         comparisonLabel.font = NSFont.systemFont(ofSize: 11)
@@ -130,6 +116,78 @@ final class StatsViewController: PreferencePaneViewController {
             symbol: "lightbulb",
             body: comparisonLabel
         )
+    }
+
+    /// stats.jsx top strip — "Activity" headline + subtitle on the left, and the
+    /// provider PillSegmentedControl / model PopupButton / range PillSegmentedControl
+    /// on the right. Built as one bare full-width row (no card).
+    private func buildHeaderControls() {
+        let titleLabel = NSTextField(labelWithString: L10n.text("Activity", "Aktivite"))
+        titleLabel.font = NSFont.systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = Palette.primaryText
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let subtitleLabel = NSTextField(labelWithString:
+            L10n.text("All Claude Code & Codex sessions on this Mac",
+                      "Bu Mac'teki tüm Claude Code & Codex oturumları"))
+        subtitleLabel.font = NSFont.systemFont(ofSize: 11.5)
+        subtitleLabel.textColor = Palette.secondaryText
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        titleLabel.lineBreakMode = .byTruncatingTail
+        subtitleLabel.lineBreakMode = .byTruncatingTail
+        let titleCol = NSStackView(views: [titleLabel, subtitleLabel])
+        titleCol.orientation = .vertical
+        titleCol.alignment = .leading
+        titleCol.spacing = 2
+        titleCol.translatesAutoresizingMaskIntoConstraints = false
+        // Let the controls keep their full intrinsic width; the title text yields.
+        titleCol.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        providerControl = PillSegmentedControl(
+            options: [L10n.text("Both", "İkisi"), "Claude", "Codex"],
+            selectedIndex: 0
+        ) { [weak self] idx in
+            self?.provider = [.both, .claude, .codex][idx]
+            self?.reload()
+        }
+
+        // Populated from the snapshot in reload(); starts as just "All models".
+        modelFilter = PopupButton(
+            options: [L10n.text("All models", "Tüm modeller")],
+            selectedIndex: 0
+        ) { [weak self] idx in
+            self?.modelFilterChanged(idx)
+        }
+        modelFilterIDs = [""]
+
+        rangeControl = PillSegmentedControl(
+            options: [L10n.text("All time", "Tüm zaman"),
+                      L10n.text("30d", "30g"),
+                      L10n.text("7d", "7g")],
+            selectedIndex: 0
+        ) { [weak self] idx in
+            self?.range = Range(rawValue: idx) ?? .all
+            self?.reload()
+        }
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let controls = NSStackView(views: [providerControl, modelFilter, rangeControl])
+        controls.orientation = .horizontal
+        controls.alignment = .centerY
+        controls.spacing = 10
+        controls.translatesAutoresizingMaskIntoConstraints = false
+        controls.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = NSStackView(views: [titleCol, spacer, controls])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addHero(row)
     }
 
     private func buildHeatmapSection() {
@@ -294,13 +352,10 @@ final class StatsViewController: PreferencePaneViewController {
         pop.show(relativeTo: dateButton.bounds, of: dateButton, preferredEdge: .maxY)
     }
 
-    @objc private func rangeChanged(_ sender: NSSegmentedControl) {
-        range = Range(rawValue: sender.selectedSegment) ?? .all
-        reload()
-    }
-
-    @objc private func providerChanged(_ sender: NSSegmentedControl) {
-        provider = Provider(rawValue: sender.selectedSegment) ?? .claude
+    /// Model scope changed in the PopupButton. Index 0 = "All models" (nil).
+    private func modelFilterChanged(_ index: Int) {
+        selectedModelID = (index > 0 && index < modelFilterIDs.count && !modelFilterIDs[index].isEmpty)
+            ? modelFilterIDs[index] : nil
         reload()
     }
 
@@ -363,16 +418,90 @@ final class StatsViewController: PreferencePaneViewController {
         refreshBreakdown()
     }
 
-    // MARK: - Insights
+    // MARK: - Bottom grid (stats.jsx): composition + top-projects | insights
 
-    private func buildInsightsSection() {
+    /// A self-contained `cb-tile` card: `Surface.applyCard` chrome wrapping a
+    /// vertical content stack with the spec's interior padding. (addSection wraps
+    /// in a header+card; here we want a bare standalone card for the grid.)
+    private func makeCard(_ content: NSView, padding: CGFloat = Spacing.m) -> NSView {
+        let card = FlippedView()
+        Surface.applyCard(card)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        content.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.topAnchor.constraint(equalTo: card.topAnchor, constant: padding),
+            content.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: padding),
+            content.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -padding),
+            content.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -padding),
+        ])
+        return card
+    }
+
+    private func buildBottomGrid() {
+        // ---- LEFT column ----
+        // Token composition card: caption + "X total" header, the segmented
+        // input/output/cache pill, and the swatch legend (drawn by the view).
         compositionView.translatesAutoresizingMaskIntoConstraints = false
 
+        let compCap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("Token composition", "Token bileşimi")))
+        compCap.translatesAutoresizingMaskIntoConstraints = false
+        compositionTotalLabel.font = Typography.bodyMono(11, weight: .regular)
+        compositionTotalLabel.textColor = Palette.secondaryText
+        compositionTotalLabel.alignment = .right
+        compositionTotalLabel.translatesAutoresizingMaskIntoConstraints = false
+        compositionTotalLabel.setContentHuggingPriority(.required, for: .horizontal)
+        let compSpacer = NSView()
+        compSpacer.translatesAutoresizingMaskIntoConstraints = false
+        compSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let compHeader = NSStackView(views: [compCap, compSpacer, compositionTotalLabel])
+        compHeader.orientation = .horizontal
+        compHeader.alignment = .firstBaseline
+        compHeader.translatesAutoresizingMaskIntoConstraints = false
+
+        let compStack = NSStackView(views: [compHeader, compositionView])
+        compStack.orientation = .vertical
+        compStack.alignment = .leading
+        compStack.spacing = 12
+        compStack.translatesAutoresizingMaskIntoConstraints = false
+        let compCard = makeCard(compStack)
+        compHeader.widthAnchor.constraint(equalTo: compStack.widthAnchor).isActive = true
+        compositionView.widthAnchor.constraint(equalTo: compStack.widthAnchor).isActive = true
+
+        // Top projects · 30d card.
+        let projCap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("Top projects · 30d", "En çok proje · 30g")))
+        projCap.translatesAutoresizingMaskIntoConstraints = false
+        topProjectsView.translatesAutoresizingMaskIntoConstraints = false
+        let projStack = NSStackView(views: [projCap, topProjectsView])
+        projStack.orientation = .vertical
+        projStack.alignment = .leading
+        projStack.spacing = 11
+        projStack.translatesAutoresizingMaskIntoConstraints = false
+        let projCard = makeCard(projStack)
+        topProjectsView.widthAnchor.constraint(equalTo: projStack.widthAnchor).isActive = true
+
+        let leftCol = NSStackView(views: [compCard, projCard])
+        leftCol.orientation = .vertical
+        leftCol.alignment = .leading
+        leftCol.spacing = 14
+        leftCol.translatesAutoresizingMaskIntoConstraints = false
+        compCard.widthAnchor.constraint(equalTo: leftCol.widthAnchor).isActive = true
+        projCard.widthAnchor.constraint(equalTo: leftCol.widthAnchor).isActive = true
+
+        // ---- RIGHT column: insight cards ----
         insightsStack.orientation = .vertical
         insightsStack.alignment = .leading
-        insightsStack.spacing = 12
+        insightsStack.spacing = 14
         insightsStack.translatesAutoresizingMaskIntoConstraints = false
 
+        addGridRow(left: leftCol, right: insightsStack, leftRatio: 1.35, spacing: Spacing.m)
+    }
+
+    // MARK: - AI deep-dive section (preserved feature)
+
+    private func buildAISection() {
         // AI deep-dive (BYO key) — same advisor the Cost tab uses.
         aiButton.bezelStyle = .rounded
         aiButton.target = self
@@ -390,25 +519,22 @@ final class StatsViewController: PreferencePaneViewController {
         aiRow.spacing = 8
         aiRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = NSStackView(views: [compositionView, insightsStack, aiRow, aiResult])
+        let stack = NSStackView(views: [aiRow, aiResult])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 16
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.setCustomSpacing(18, after: compositionView)
 
         addSection(
-            title: L10n.text("Insights", "İçgörüler"),
-            subtitle: L10n.text("Where your tokens go and what drives them.",
-                                "Tokenlerin nereye gittiği ve neyin sürüklediği."),
+            title: L10n.text("AI deep-dive", "AI derin analiz"),
+            subtitle: L10n.text("Privacy-safe aggregates, analyzed with your own key.",
+                                "Gizliliğe uygun toplamlar, kendi anahtarınla analiz edilir."),
             symbol: "sparkles",
             info: L10n.text(
                 "Computed locally over the last 30 days. The AI deep-dive sends only privacy-safe aggregates (never transcripts) to your own key.",
                 "Son 30 günden yerel hesaplanır. AI derin analizi yalnızca gizliliğe uygun toplamları (asla transkript değil) kendi anahtarına gönderir."),
             body: stack
         )
-        compositionView.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        insightsStack.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         aiResult.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
 
@@ -618,6 +744,11 @@ final class StatsViewController: PreferencePaneViewController {
             .init(label: L10n.text("Output", "Çıktı"), value: snapshot.output30d, color: accent.withAlphaComponent(0.60)),
             .init(label: L10n.text("Cache", "Önbellek"), value: snapshot.cacheRead30d, color: accent.withAlphaComponent(0.26)),
         ]
+        // "X total" caption in the composition card header (input + output + cache).
+        let compTotal = snapshot.input30d + snapshot.output30d + snapshot.cacheRead30d
+        compositionTotalLabel.stringValue = L10n.text(
+            "\(ContextSnapshot.formatTokens(compTotal)) total",
+            "\(ContextSnapshot.formatTokens(compTotal)) toplam")
 
         insightsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let insights = computeInsights(snapshot)
@@ -679,16 +810,31 @@ final class StatsViewController: PreferencePaneViewController {
         var activeSessionSubagentTokens: UInt64 = 0
     }
 
+    /// Read the on-disk snapshot for the active provider. `.both` merges the
+    /// claude + codex agent blocks the same way the Rust CLI does; otherwise we
+    /// parse the single matching key.
     private func loadSnapshot() -> Snapshot {
         let path = ContextSnapshot.resolveSnapshotPath()
-        let key: String = (provider == .codex) ? "codex" : "claude"
         guard
             let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let c = root[key] as? [String: Any]
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
             return Snapshot()
         }
+        func block(_ key: String) -> Snapshot {
+            guard let c = root[key] as? [String: Any] else { return Snapshot() }
+            return loadOne(c)
+        }
+        switch provider {
+        case .both:   return merge(block("claude"), block("codex"))
+        case .claude: return block("claude")
+        case .codex:  return block("codex")
+        }
+    }
+
+    /// Parse one agent block (the dictionary under root["claude"] / root["codex"])
+    /// into a Snapshot. (Extracted from the old single-key loadSnapshot.)
+    private func loadOne(_ c: [String: Any]) -> Snapshot {
         func u64(_ any: Any?) -> UInt64 {
             (any as? UInt64) ?? UInt64(any as? Int ?? 0)
         }
@@ -749,6 +895,102 @@ final class StatsViewController: PreferencePaneViewController {
             )
         }
         return snap
+    }
+
+    /// Combine two agent snapshots into one ("Both" view). Mirrors the Rust CLI
+    /// merge: scalar totals sum; by_day / by_month combine per date key; the
+    /// model / project / day-project / recent lists concatenate then re-aggregate;
+    /// the newest last_context_* wins.
+    private func merge(_ a: Snapshot, _ b: Snapshot) -> Snapshot {
+        var out = Snapshot()
+
+        // Scalar totals — straight sums.
+        out.total30dTokens       = a.total30dTokens + b.total30dTokens
+        out.subagent30dTokens    = a.subagent30dTokens + b.subagent30dTokens
+        out.subagent30dCost      = a.subagent30dCost + b.subagent30dCost
+        out.total30dSessions     = a.total30dSessions + b.total30dSessions
+        out.input30d             = a.input30d + b.input30d
+        out.output30d            = a.output30d + b.output30d
+        out.cacheRead30d         = a.cacheRead30d + b.cacheRead30d
+        out.cacheSavings30d      = a.cacheSavings30d + b.cacheSavings30d
+        out.totalCost30d         = a.totalCost30d + b.totalCost30d
+        out.activeSessionTokens  = a.activeSessionTokens + b.activeSessionTokens
+        out.activeSessionSubagentTokens = a.activeSessionSubagentTokens + b.activeSessionSubagentTokens
+        // Longest session = whichever agent's longest is larger.
+        out.maxSessionMinutes    = max(a.maxSessionMinutes, b.maxSessionMinutes)
+        // Effort is a Codex-only concept; keep whichever side recorded one.
+        out.favoriteEffort = a.favoriteEffort ?? b.favoriteEffort
+
+        // by_day / by_month — sum tokens / sessions / cost per date key, then sort
+        // newest-first (string sort works for "yyyy-MM-dd" and "yyyy-MM").
+        func mergeDays(_ x: [Day], _ y: [Day]) -> [Day] {
+            var bucket: [String: (tokens: UInt64, sessions: Int, cost: Double)] = [:]
+            for d in x + y {
+                var acc = bucket[d.date] ?? (0, 0, 0)
+                acc.tokens += d.tokens; acc.sessions += d.sessions; acc.cost += d.cost
+                bucket[d.date] = acc
+            }
+            return bucket
+                .map { Day(date: $0.key, tokens: $0.value.tokens, sessions: $0.value.sessions, cost: $0.value.cost) }
+                .sorted { $0.date > $1.date }
+        }
+        out.byDay = mergeDays(a.byDay, b.byDay)
+        out.byMonth = mergeDays(a.byMonth, b.byMonth)
+
+        // by_model / by_project — concatenate then sum per name, sorted by tokens.
+        func mergeBuckets(_ x: [ModelBucket], _ y: [ModelBucket]) -> [ModelBucket] {
+            var bucket: [String: (tokens: UInt64, sessions: Int)] = [:]
+            var order: [String] = []
+            for m in x + y {
+                if bucket[m.model] == nil { order.append(m.model) }
+                var acc = bucket[m.model] ?? (0, 0)
+                acc.tokens += m.tokens; acc.sessions += m.sessions
+                bucket[m.model] = acc
+            }
+            return order
+                .map { ModelBucket(model: $0, tokens: bucket[$0]!.tokens, sessions: bucket[$0]!.sessions) }
+                .sorted { $0.tokens > $1.tokens }
+        }
+        out.byModel = mergeBuckets(a.byModel, b.byModel)
+        out.byProject = mergeBuckets(a.byProject, b.byProject)
+
+        // by_day_project — sum per (date, project).
+        var inst: [String: (tokens: UInt64, cost: Double)] = [:]
+        var instKeys: [(date: String, project: String, k: String)] = []
+        for p in a.instances + b.instances {
+            let k = p.date + "\u{1}" + p.project
+            if inst[k] == nil { instKeys.append((p.date, p.project, k)) }
+            var acc = inst[k] ?? (0, 0)
+            acc.tokens += p.tokens; acc.cost += p.cost
+            inst[k] = acc
+        }
+        out.instances = instKeys.map {
+            ProjInst(date: $0.date, project: $0.project, tokens: inst[$0.k]!.tokens, cost: inst[$0.k]!.cost)
+        }
+
+        // recent_sessions — concatenate, newest-first, cap 20.
+        out.recent = (a.recent + b.recent)
+            .sorted { ($0.startedAt) > ($1.startedAt) }
+            .prefix(20)
+            .map { $0 }
+
+        // last_context_* — keep the newer session's values. by_day is newest-first,
+        // so compare the freshest active date; fall back to whichever is non-zero.
+        if a.lastContextWindow == 0 {
+            out.lastContextWindow = b.lastContextWindow; out.lastContextPct = b.lastContextPct
+        } else if b.lastContextWindow == 0 {
+            out.lastContextWindow = a.lastContextWindow; out.lastContextPct = a.lastContextPct
+        } else {
+            // Both present — prefer the one whose newest recent session is later.
+            let aDate = a.recent.first?.startedAt ?? ""
+            let bDate = b.recent.first?.startedAt ?? ""
+            if bDate > aDate {
+                out.lastContextWindow = b.lastContextWindow; out.lastContextPct = b.lastContextPct
+            } else {
+                out.lastContextWindow = a.lastContextWindow; out.lastContextPct = a.lastContextPct
+            }
+        }
+        return out
     }
 
     // MARK: - Aggregates
@@ -883,6 +1125,7 @@ final class StatsViewController: PreferencePaneViewController {
         guard isViewLoaded else { return }
         snapshot = loadSnapshot()
         let snap = snapshot
+        refreshModelFilter(snap)
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         let tokens = tokensInRange(snap)
@@ -950,19 +1193,14 @@ final class StatsViewController: PreferencePaneViewController {
             extras.append((L10n.text("favorite effort", "favori effort"), prettyEffort(eff)))
         }
 
-        let rows = stride(from: 0, to: primary.count, by: 3).map { start -> NSStackView in
-            let end = min(start + 3, primary.count)
-            let row = NSStackView(views: Array(primary[start..<end]))
-            row.orientation = .horizontal
-            row.distribution = .fillEqually
-            row.spacing = 10
-            row.translatesAutoresizingMaskIntoConstraints = false
-            return row
-        }
-        rows.forEach {
-            tilesStack.addArrangedSubview($0)
-            $0.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
-        }
+        // stats.jsx overview: ONE row of 6 equal columns (repeat(6, 1fr)).
+        let tileRow = NSStackView(views: primary)
+        tileRow.orientation = .horizontal
+        tileRow.distribution = .fillEqually
+        tileRow.spacing = 10
+        tileRow.translatesAutoresizingMaskIntoConstraints = false
+        tilesStack.addArrangedSubview(tileRow)
+        tileRow.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
         if !extras.isEmpty {
             let disclosure = StatDisclosureRow(
                 count: extras.count,
@@ -980,9 +1218,47 @@ final class StatsViewController: PreferencePaneViewController {
         // Clamp the selection to recorded history, then redraw the breakdown.
         clampSelectionToHistory()
         refreshBreakdown()
+        refreshTopProjects(snap)
         refreshInsights()
 
         comparisonLabel.stringValue = comparisonString(totalAllTime: snap.byMonth.reduce(0) { $0 + $1.tokens })
+    }
+
+    /// Populate the "All models" PopupButton from the snapshot's model list
+    /// (pretty names), preserving the current selection by raw model ID.
+    private func refreshModelFilter(_ snap: Snapshot) {
+        guard modelFilter != nil else { return }
+        // Raw IDs sorted by tokens (snap.byModel is already sorted desc).
+        let ids = snap.byModel.map(\.model)
+        modelFilterIDs = [""] + ids
+        let options = [L10n.text("All models", "Tüm modeller")] + ids.map { prettyModelName($0) }
+        // Keep the prior selection if that model still exists.
+        let sel = selectedModelID.flatMap { modelFilterIDs.firstIndex(of: $0) } ?? 0
+        if sel == 0 { selectedModelID = nil }
+        modelFilter.setOptions(options, selectedIndex: sel)
+    }
+
+    /// Feed the 30-day "Top projects" bars card (stats.jsx bottom-left). Uses the
+    /// by_day_project instances (last ~30 days), summed per project.
+    private func refreshTopProjects(_ snap: Snapshot) {
+        var projTokens: [String: UInt64] = [:]
+        var projCost: [String: Double] = [:]
+        for inst in snap.instances {
+            projTokens[inst.project, default: 0] += inst.tokens
+            projCost[inst.project, default: 0] += inst.cost
+        }
+        let maxProj = projTokens.values.max() ?? 0
+        topProjectsView.rows = projTokens
+            .sorted { $0.value > $1.value }
+            .prefix(5)
+            .map { name, tok in
+                ProjectBarsView.Row(
+                    name: name,
+                    tokens: tok,
+                    cost: projCost[name] ?? 0,
+                    share: maxProj > 0 ? Double(tok) / Double(maxProj) : 0
+                )
+            }
     }
 
     // MARK: - Breakdown render

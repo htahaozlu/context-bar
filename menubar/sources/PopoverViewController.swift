@@ -32,6 +32,10 @@ final class MenubarPopoverViewController: NSViewController {
     /// Last manual-refresh click; debounces double-clicks so we don't queue
     /// duplicate engine runs when a user hammers the button.
     private var lastRefreshClickAt: Date?
+    /// Transient popover that hosts a tapped session's `/context`-style detail.
+    /// Held so a second click (or a rebuild) can dismiss the previous one before
+    /// showing the next, instead of stacking popovers.
+    private var sessionDetailPopover: NSPopover?
 
     override func loadView() {
         let root = NSView()
@@ -89,6 +93,11 @@ final class MenubarPopoverViewController: NSViewController {
         let snapshot = ContextSnapshot()
         let (active, all, others) = snapshot.load()
         let primary = active ?? all.first
+        // The OTHER first-party agent (Claude vs Codex). Both must be visible at
+        // once (product requirement), but only when it actually has data — an
+        // empty/idle second agent must not add a blank card. `agentHasData`
+        // gates render-worthiness; ordering follows `all` so the result is stable.
+        let secondary = all.first { $0.name != primary?.name && agentHasData($0) }
         let activeOthers = others.filter { isActivelyUsed($0, now: now) }
         // Parallel-session visibility is time-dependent but NOT reflected in the
         // raw session timestamps the key already hashes, so fold the visible
@@ -97,7 +106,7 @@ final class MenubarPopoverViewController: NSViewController {
         // parallel card is never removed and the popover never shrinks.
         let parallelVisible = primary.map { parallelSessions(for: $0, now: now).count } ?? 0
         let key = snapshotKey(
-            active: active, primary: primary, all: all,
+            active: active, primary: primary, secondary: secondary, all: all,
             others: activeOthers, parallelVisible: parallelVisible)
         // Engine returned — stop the manual-refresh spinner whether or not the
         // snapshot key actually changed. If the footer gets rebuilt below the
@@ -119,13 +128,35 @@ final class MenubarPopoverViewController: NSViewController {
 
         if let agent = primary {
             // Card order: hero (active session) → parallel sessions →
-            // usage limits → other tools.
-            addCard(buildHero(agent: agent, isActive: agent.name == active?.name))
+            // usage limits → [other agent hero + its limits] → other tools.
+            addCard(buildHero(agent: agent, isActive: isLive(agent, now: now)))
             if hasParallelSessions(agent: agent, now: now) {
                 addCard(buildParallelSessions(agent: agent, now: now))
             }
             if hasSecondaryData(agent) {
                 addCard(buildUsageLimits(agent))
+            }
+            // Second first-party agent (the OTHER of Claude/Codex). Both are
+            // shown at once: a captioned hero for the agent, then its own
+            // usage-limits card. `secondary` is already nil-gated on having
+            // data, so an idle agent adds nothing. Liveness is evaluated PER
+            // AGENT (`isLive`) — not against the single global `active` — so a
+            // second agent that is itself mid-session shows its live context %
+            // and live dot rather than reading as idle just because the other
+            // agent fired more recently.
+            if let other = secondary {
+                let live = isLive(other, now: now)
+                let caption = live
+                    ? L10n.text("\(other.name) — also active", "\(other.name) — ayrıca aktif")
+                    : L10n.text("\(other.name) — recent", "\(other.name) — yakın zamanda")
+                addCard(buildSectionCaption(caption))
+                addCard(buildHero(agent: other, isActive: live))
+                if hasParallelSessions(agent: other, now: now) {
+                    addCard(buildParallelSessions(agent: other, now: now))
+                }
+                if hasSecondaryData(other) {
+                    addCard(buildUsageLimits(other))
+                }
             }
         } else {
             // Before the engine has produced a context.json (first launch / cache
@@ -142,6 +173,11 @@ final class MenubarPopoverViewController: NSViewController {
         if !activeOthers.isEmpty {
             addCard(buildOthers(tools: activeOthers))
         }
+        // Full-bleed hairline immediately before the footer (popover.jsx:
+        // `<div className="cb-div" style={{ margin: '14px -16px 12px' }} />`).
+        // `addFullBleedDivider` pins it edge-to-edge, ignoring the per-card
+        // horizontal inset so it reads as a true separator strip.
+        addFullBleedDivider()
         addCard(buildFooter())
 
         view.layoutSubtreeIfNeeded()
@@ -192,6 +228,40 @@ final class MenubarPopoverViewController: NSViewController {
             v.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: pad),
             v.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -pad),
         ])
+    }
+
+    /// Adds a hairline that spans the popover's full content width (edge to
+    /// edge), bypassing `addCard`'s per-card horizontal inset. Matches the
+    /// `margin: 0 -16px` full-bleed divider drawn before the footer in
+    /// popover.jsx.
+    private func addFullBleedDivider() {
+        let div = DividerView()
+        contentStack.addArrangedSubview(div)
+        NSLayoutConstraint.activate([
+            div.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor),
+            div.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor),
+        ])
+    }
+
+    /// A first-party agent is "worth showing" when it has any live context, any
+    /// rolling-limit pressure, or a recent turn — i.e. there is something for
+    /// the user to read. Mirrors `hasSecondaryData` but also counts a live
+    /// context % so an agent mid-session (limits not yet populated) still shows.
+    private func agentHasData(_ a: Agent) -> Bool {
+        if a.ctxPct != nil { return true }
+        if a.activeSession > 0 { return true }
+        if a.session5h > 0 || a.session5hPercent != nil { return true }
+        if a.week7d > 0 || a.week7dPercent != nil { return true }
+        if a.lastTurn != nil { return true }
+        return false
+    }
+
+    /// Stand-alone section caption used between the two agent blocks. Unlike the
+    /// in-card `sectionCaption`, this is laid out directly in the popover stack
+    /// as its own row (with the standard card inset) so it titles the agent
+    /// block that follows.
+    private func buildSectionCaption(_ text: String) -> NSView {
+        sectionCaption(Typography.captionAttributed(text))
     }
 
     // MARK: - Sections
@@ -339,19 +409,11 @@ final class MenubarPopoverViewController: NSViewController {
         stack.spacing = Spacing.s
 
         // ── Header row: ● + project (left)  ·  brand glyph well (right) ──
-        // Inline "●" keeps the dot baseline-locked to the project name without
-        // cap-height math; it warms to the accent while the agent is live and
-        // greys to tertiary text when idle.
-        let dotColor: NSColor = isActive ? Palette.accent : Palette.tertiaryText
+        // The status dot is now a real `StatusDotView` (cb-dot): a `.live` dot
+        // shows the soft accent halo ring while the agent is active; `.idle`
+        // greys it out. Replaces the prior inline "●" glyph.
+        let dot = StatusDotView(state: isActive ? .live : .idle, diameter: 8)
         let title = NSMutableAttributedString()
-        title.append(
-            NSAttributedString(
-                string: "●  ",
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: 10, weight: .bold),
-                    .foregroundColor: dotColor,
-                    .baselineOffset: 2,
-                ]))
         title.append(
             NSAttributedString(
                 string: a.project,
@@ -367,35 +429,19 @@ final class MenubarPopoverViewController: NSViewController {
         projectLbl.toolTip = a.project
         projectLbl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        // Brand glyph in a soft accent well (28pt). Keeps the real provider
-        // logo (not a generic glyph) inside the design's tinted chip; the
-        // `accentSofter` token resolves to the same warm clay wash in both
-        // appearances so we don't have to hand-roll srgb per mode.
-        let well = NSView()
-        well.translatesAutoresizingMaskIntoConstraints = false
-        well.wantsLayer = true
-        well.layer?.cornerRadius = Radius.chip
-        well.layer?.cornerCurve = .continuous
-        well.layer?.backgroundColor = Palette.accentSofter.cgColor
-        let brandView = NSImageView()
+        // Brand glyph in a soft accent well (28pt) — the shared `GlyphWell`
+        // (cb-glyph). Prefers the real provider logo; falls back to a neutral
+        // sparkle symbol when the brand asset is unavailable.
+        let well: GlyphWell
         if let url = agentIconURL(name: a.name), let img = NSImage(contentsOf: url) {
-            brandView.image = img
+            well = GlyphWell(image: img, size: 28, iconSize: 16, background: Palette.accentSofter)
+        } else {
+            well = GlyphWell(symbol: "sparkle", size: 28, iconSize: 16, background: Palette.accentSofter)
         }
-        brandView.imageScaling = .scaleProportionallyUpOrDown
-        brandView.translatesAutoresizingMaskIntoConstraints = false
-        brandView.toolTip = AgentVisual.forName(a.name).accessibilityLabel
-        well.addSubview(brandView)
-        NSLayoutConstraint.activate([
-            well.widthAnchor.constraint(equalToConstant: 28),
-            well.heightAnchor.constraint(equalToConstant: 28),
-            brandView.centerXAnchor.constraint(equalTo: well.centerXAnchor),
-            brandView.centerYAnchor.constraint(equalTo: well.centerYAnchor),
-            brandView.widthAnchor.constraint(equalToConstant: 16),
-            brandView.heightAnchor.constraint(equalToConstant: 16),
-        ])
+        well.toolTip = AgentVisual.forName(a.name).accessibilityLabel
         let headSpacer = NSView()
         headSpacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let headerRow = NSStackView(views: [projectLbl, headSpacer, well])
+        let headerRow = NSStackView(views: [dot, projectLbl, headSpacer, well])
         headerRow.orientation = .horizontal
         headerRow.alignment = .centerY
         headerRow.distribution = .fill
@@ -561,7 +607,83 @@ final class MenubarPopoverViewController: NSViewController {
                 Celebration.burst(in: container)
             }
         }
-        return container
+
+        // Make the hero open the detail for this agent's most-relevant active
+        // session. Resolve the real ActiveSession when one exists; otherwise
+        // synthesize a minimal one from the agent's live ctx/model/project so
+        // the click still surfaces what we know. Wrapping the hero card in a
+        // zero-inset ClickableRowView keeps the hero visual identical while
+        // adding the click target + pointing-hand cursor (same affordance as
+        // the parallel rows). If there's nothing to show, return the hero as-is.
+        guard let session = heroSession(for: a) else { return container }
+        let agentName = a.name
+        var wrapper: ClickableRowView!
+        wrapper = ClickableRowView(content: container) { [weak self, weak wrapper] in
+            guard let self, let wrapper else { return }
+            self.showSessionDetail(session: session, agentName: agentName, anchor: wrapper)
+        }
+        wrapper.toolTip = L10n.text("Open context detail", "Bağlam ayrıntısını aç")
+        return wrapper
+    }
+
+    /// Resolves the ActiveSession to show when the hero is clicked: prefer the
+    /// agent's most-recent live `activeSessions` entry, else synthesize a
+    /// minimal one from the agent's rolled-up live fields so the detail can
+    /// still show context %/window, total tokens, sub-agent burn and cost.
+    private func heroSession(for a: Agent) -> ActiveSession? {
+        if let best = a.activeSessions.max(by: {
+            ($0.lastTurn ?? .distantPast) < ($1.lastTurn ?? .distantPast)
+        }) {
+            return best
+        }
+        // Nothing in the per-session list — synthesize from agent rollups. Only
+        // worth doing if there is *something* to show.
+        guard a.ctxPct != nil || a.activeSession > 0 || a.activeSessionCost > 0 else { return nil }
+        return ActiveSession(
+            id: "\(a.name)-hero",
+            tokens: a.activeSession,
+            subagentTokens: a.activeSessionSubagent,
+            cost: a.activeSessionCost,
+            project: a.project,
+            model: a.model,
+            lastTurn: a.lastTurn,
+            started: a.sessionStarted,
+            ctxPct: a.ctxPct,
+            ctxWindow: a.ctxWindow
+        )
+    }
+
+    /// Opens (or replaces) the transient session-detail popover anchored to the
+    /// clicked row / hero card. `.transient` so it dismisses on outside clicks
+    /// without swallowing the next interaction.
+    private func showSessionDetail(session: ActiveSession, agentName: String, anchor: NSView) {
+        sessionDetailPopover?.performClose(nil)
+        let detail = SessionDetailView(session: session, agentName: agentName)
+        let vc = NSViewController()
+        vc.view = detail
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.contentViewController = vc
+        // The "context loaded each turn" section fills in asynchronously after a
+        // background transcript parse — the popover is sized once here, so let the
+        // detail view ask us to re-measure when those rows (or their removal)
+        // change its intrinsic height. Guard against the popover having been
+        // dismissed/replaced in the meantime.
+        detail.onContentResize = { [weak detail, weak pop] in
+            guard let detail, let pop, pop.isShown else { return }
+            detail.layoutSubtreeIfNeeded()
+            pop.contentSize = NSSize(
+                width: SessionDetailView.preferredWidth,
+                height: max(detail.fittingSize.height, 1))
+        }
+        // Size from the detail's fitting height so the popover is exactly as
+        // tall as its content (width is fixed by SessionDetailView).
+        detail.layoutSubtreeIfNeeded()
+        pop.contentSize = NSSize(
+            width: SessionDetailView.preferredWidth,
+            height: max(detail.fittingSize.height, 1))
+        sessionDetailPopover = pop
+        pop.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxX)
     }
 
     @available(*, deprecated)
@@ -631,25 +753,16 @@ final class MenubarPopoverViewController: NSViewController {
         stack.addArrangedSubview(caption)
         caption.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
-        var metaParts: [String] = []
-        metaParts.append(a.name)
-        if let m = a.model { metaParts.append(m) }
-        if let t = a.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
-        let meta = NSTextField(labelWithString: metaParts.joined(separator: " · "))
-        meta.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
-        meta.textColor = Palette.secondaryText
-        meta.lineBreakMode = .byTruncatingTail
-        meta.maximumNumberOfLines = 1
-
-        stack.addArrangedSubview(meta)
-        meta.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-
+        // popover.jsx drops the agent·model·time meta line here — the hero meta
+        // row already carries that. The limits card is just the rolling rows,
+        // each separated by a `cb-div` hairline (matching the spec's stacked
+        // LimitRow / cb-div / LimitRow / cb-div / Session total layout).
         var rows: [NSView] = []
         let showsRemaining = a.name.caseInsensitiveCompare("Codex") == .orderedSame
         if a.session5hPercent != nil || a.session5h > 0 {
             rows.append(
                 makeLimitRow(
-                    label: L10n.text("5h limit", "5sa limit"),
+                    label: L10n.text("5-hour rolling", "5 saatlik"),
                     percent: a.session5hPercent,
                     fallbackValue: ContextSnapshot.formatTokens(a.session5h),
                     resetsAt: a.session5hResetsAt,
@@ -659,7 +772,7 @@ final class MenubarPopoverViewController: NSViewController {
         if a.week7dPercent != nil || a.week7d > 0 {
             rows.append(
                 makeLimitRow(
-                    label: L10n.text("7d limit", "7g limit"),
+                    label: L10n.text("7-day rolling", "7 günlük"),
                     percent: a.week7dPercent,
                     fallbackValue: ContextSnapshot.formatTokens(a.week7d),
                     resetsAt: a.week7dResetsAt,
@@ -671,10 +784,17 @@ final class MenubarPopoverViewController: NSViewController {
                 makeSimpleStatRow(
                     label: L10n.text("Session total", "Oturum toplam"),
                     value: ContextSnapshot.formatTokens(a.activeSession),
-                    valueColor: .secondaryLabelColor
+                    valueColor: Palette.primaryText
                 ))
         }
-        for row in rows {
+        // Interleave a hairline between each row (not after the last) so the
+        // card reads as discrete rolling windows.
+        for (i, row) in rows.enumerated() {
+            if i > 0 {
+                let div = DividerView()
+                stack.addArrangedSubview(div)
+                div.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            }
             stack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
@@ -793,21 +913,39 @@ final class MenubarPopoverViewController: NSViewController {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
 
-        let header = sectionCaption(
-            Typography.captionAttributed(L10n.text("Parallel Sessions", "Paralel oturumlar"))
-        )
-        stack.addArrangedSubview(header)
-        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-
         let allOthers = parallelSessions(for: a, now: now)
         let cap = 5
         let shown = Array(allOthers.prefix(cap))
         let overflow = max(0, allOthers.count - cap)
 
-        for sess in shown {
-            stack.addArrangedSubview(makeParallelSessionRow(sess))
-            stack.arrangedSubviews.last?.widthAnchor.constraint(equalTo: stack.widthAnchor)
-                .isActive = true
+        // Caption with a right-aligned "N active" count (popover.jsx PopCap
+        // `right={SESSIONS.length + ' active'}`).
+        let header = captionRow(
+            L10n.text("Parallel sessions", "Paralel oturumlar"),
+            right: L10n.text("\(allOthers.count) active", "\(allOthers.count) aktif"))
+        stack.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
+        for (i, sess) in shown.enumerated() {
+            if i > 0 {
+                let div = DividerView()
+                stack.addArrangedSubview(div)
+                div.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            }
+            // Wrap the row so clicking it opens that session's context detail,
+            // anchored to the row, with a pointing-hand cursor on hover. The
+            // anchor is resolved lazily through `weak row` so the closure can
+            // reference the wrapper it's installed on without a cycle.
+            let inner = makeParallelSessionRow(sess)
+            let agentName = a.name
+            var row: ClickableRowView!
+            row = ClickableRowView(content: inner) { [weak self, weak row] in
+                guard let self, let row else { return }
+                self.showSessionDetail(session: sess, agentName: agentName, anchor: row)
+            }
+            row.toolTip = L10n.text("Open context detail", "Bağlam ayrıntısını aç")
+            stack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
 
         if overflow > 0 {
@@ -825,6 +963,15 @@ final class MenubarPopoverViewController: NSViewController {
         return now.timeIntervalSince(lastUsed) <= Self.activeToolWindow
     }
 
+    /// An agent is "live" when its own last turn landed inside the active
+    /// window (matches `ContextSnapshot.active`'s gate, but evaluated per agent
+    /// so a second live agent isn't forced to read as idle just because the
+    /// other one fired more recently).
+    private func isLive(_ a: Agent, now: Date = Date()) -> Bool {
+        guard let t = a.lastTurn else { return false }
+        return now.timeIntervalSince(t) <= Self.activeToolWindow
+    }
+
     private func parseISODate(_ raw: String?) -> Date? {
         guard let raw else { return nil }
         let iso = ISO8601DateFormatter()
@@ -835,71 +982,107 @@ final class MenubarPopoverViewController: NSViewController {
         return isoNoFrac.date(from: raw)
     }
 
-    /// Single row inside the parallel-sessions card: project · model on top
-    /// row, capsule progress bar + percent + last-turn time below.
+    /// Single horizontal row inside the parallel-sessions card, matching
+    /// popover.jsx: [idle dot][project + model column ~116pt][flex thin
+    /// bar][pct (right, 34pt)][time (right, 40pt)]. The project/model stay a
+    /// two-line column inside the fixed-width slot; everything else is one line.
     private func makeParallelSessionRow(_ sess: ActiveSession) -> NSView {
+        let dot = StatusDotView(state: .idle, diameter: 6)
+
         let proj = NSTextField(labelWithString: sess.project)
-        proj.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        proj.textColor = .labelColor
-        proj.lineBreakMode = .byTruncatingMiddle
+        proj.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        proj.textColor = Palette.primaryText
+        proj.lineBreakMode = .byTruncatingTail
         proj.cell?.usesSingleLineMode = true
-        proj.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        var metaParts: [String] = []
-        if let m = sess.model { metaParts.append(m) }
-        if let t = sess.lastTurn { metaParts.append(ContextSnapshot.relative(t)) }
-        let meta = NSTextField(labelWithString: metaParts.joined(separator: " · "))
-        meta.font = NSFont.systemFont(ofSize: 10, weight: .regular)
-        meta.textColor = .tertiaryLabelColor
-        meta.lineBreakMode = .byTruncatingTail
-        meta.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let modelLbl = NSTextField(labelWithString: sess.model ?? "")
+        modelLbl.font = NSFont.systemFont(ofSize: 10, weight: .regular)
+        modelLbl.textColor = Palette.tertiaryText
+        modelLbl.lineBreakMode = .byTruncatingTail
+        modelLbl.cell?.usesSingleLineMode = true
 
-        let pctStr = sess.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
-        let pctLbl = NSTextField(labelWithString: pctStr)
-        pctLbl.font = Typography.bodyMono(11, weight: .semibold)
-        pctLbl.textColor = usageColor(sess.ctxPct)
-        pctLbl.setContentHuggingPriority(.required, for: .horizontal)
-
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let topRow = NSStackView(views: [proj, spacer, pctLbl])
-        topRow.orientation = .horizontal
-        topRow.alignment = .firstBaseline
-        topRow.distribution = .fill
-        topRow.spacing = Spacing.xs
+        let idCol = NSStackView(views: [proj, modelLbl])
+        idCol.orientation = .vertical
+        idCol.alignment = .leading
+        idCol.spacing = 1
+        idCol.translatesAutoresizingMaskIntoConstraints = false
+        // Fixed 116pt slot (popover.jsx `flex: '0 0 116px'`).
+        idCol.widthAnchor.constraint(equalToConstant: 116).isActive = true
 
         let bar = ProgressBarView()
-        if let p = sess.ctxPct {
-            bar.value = max(0, min(1, p / 100.0))
-        } else {
-            bar.value = 0
-        }
+        bar.value = sess.ctxPct.map { max(0, min(1, $0 / 100.0)) } ?? 0
         bar.tint = Palette.accent
         bar.gradientEnd = Palette.urgencyAmber
         bar.corner = 2
         if DisplayPrefs.tickMarks { bar.tickMarks = [0.70, 0.90] }
         bar.translatesAutoresizingMaskIntoConstraints = false
-
-        let stack = NSStackView(views: [topRow, bar, meta])
-        stack.orientation = .vertical
-        stack.alignment = .width
-        stack.spacing = 3
-        stack.translatesAutoresizingMaskIntoConstraints = false
         bar.heightAnchor.constraint(equalToConstant: 4).isActive = true
-        return stack
+        bar.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        bar.setAccessibilityLabel(L10n.text("Context usage", "Bağlam kullanımı"))
+
+        let pctStr = sess.ctxPct.map { String(format: "%.0f%%", $0) } ?? "—"
+        let pctLbl = NSTextField(labelWithString: pctStr)
+        pctLbl.font = Typography.bodyMono(11.5, weight: .semibold)
+        pctLbl.textColor = Palette.secondaryText
+        pctLbl.alignment = .right
+        pctLbl.setContentHuggingPriority(.required, for: .horizontal)
+        pctLbl.widthAnchor.constraint(equalToConstant: 34).isActive = true
+
+        let timeStr = sess.lastTurn.map { ContextSnapshot.relative($0) } ?? ""
+        let timeLbl = NSTextField(labelWithString: timeStr)
+        timeLbl.font = Typography.bodyMono(10.5, weight: .regular)
+        timeLbl.textColor = Palette.tertiaryText
+        timeLbl.alignment = .right
+        timeLbl.setContentHuggingPriority(.required, for: .horizontal)
+        timeLbl.widthAnchor.constraint(equalToConstant: 40).isActive = true
+
+        let row = NSStackView(views: [dot, idCol, bar, pctLbl, timeLbl])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.distribution = .fill
+        row.spacing = Spacing.xs
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
     }
 
     /// Fingerprint of the data the popover actually renders. Two consecutive
     /// refreshes producing the same key skip the rebuild entirely so the
     /// popover doesn't tear down + re-add its cards on every 10s tick.
     private func snapshotKey(
-        active: Agent?, primary: Agent?, all: [Agent], others: [ToolSummary], parallelVisible: Int
+        active: Agent?, primary: Agent?, secondary: Agent?, all: [Agent],
+        others: [ToolSummary], parallelVisible: Int
     ) -> String {
         var parts: [String] = []
         parts.append(active?.name ?? "-")
         // Time-derived visible count — folds the 30-min parallel-session cutoff
         // into the key so an aging-out card isn't stranded by the early-bail.
         parts.append("PV:\(parallelVisible)")
+        // Per-agent liveness is `now`-derived (lastTurn vs the active window),
+        // so it can flip while the raw timestamps the key hashes stay identical.
+        // Fold both flags in so an agent aging from live→idle (dot + context %
+        // change) isn't frozen by the early-bail.
+        parts.append("LV:\(primary.map { isLive($0) } ?? false ? 1 : 0)")
+        parts.append("LV2:\(secondary.map { isLive($0) } ?? false ? 1 : 0)")
+        // The second agent now renders a full hero + parallel + limits card, so
+        // ITS render-affecting fields must be in the key too — otherwise its
+        // context %, window, model or session list could change while the key
+        // stayed byte-identical and the early-bail would freeze the stale card.
+        if let s = secondary {
+            let parallel2 = parallelSessions(for: s).count
+            parts.append("PV2:\(parallel2)")
+            parts.append("SEC:\(s.name)|\(s.project)|\(s.model ?? "-")")
+            parts.append(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")
+            parts.append(s.ctxWindow.map(String.init) ?? "-")
+            parts.append(String(s.activeSession))
+            parts.append(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")
+            for ss in s.activeSessions {
+                parts.append(
+                    "S2:\(ss.id)|\(ss.project)|\(ss.model ?? "-")|\(ss.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(ss.tokens)|\(ss.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")"
+                )
+            }
+        } else {
+            parts.append("SEC:-")
+        }
         if let p = primary {
             parts.append(p.name)
             parts.append(p.project)
@@ -949,6 +1132,34 @@ final class MenubarPopoverViewController: NSViewController {
         return lbl
     }
 
+    /// Caption header with a left title and an optional right-aligned caption,
+    /// matching popover.jsx's `PopCap` (space-between, both `.caption`). Used
+    /// for the "Parallel sessions … N active" header.
+    private func captionRow(_ title: String, right: String?) -> NSView {
+        let left = sectionCaption(Typography.captionAttributed(title))
+        let row: NSStackView
+        if let right {
+            let rightLbl = NSTextField(
+                labelWithAttributedString: Typography.captionAttributed(right))
+            rightLbl.alignment = .right
+            rightLbl.lineBreakMode = .byTruncatingTail
+            rightLbl.maximumNumberOfLines = 1
+            rightLbl.cell?.usesSingleLineMode = true
+            rightLbl.setContentHuggingPriority(.required, for: .horizontal)
+            rightLbl.setContentCompressionResistancePriority(.required, for: .horizontal)
+            let spacer = NSView()
+            spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+            row = NSStackView(views: [left, spacer, rightLbl])
+        } else {
+            row = NSStackView(views: [left])
+        }
+        row.orientation = .horizontal
+        row.alignment = .firstBaseline
+        row.distribution = .fill
+        row.spacing = Spacing.xs
+        return row
+    }
+
     private func buildOthers(tools: [ToolSummary]) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = 4
@@ -959,7 +1170,12 @@ final class MenubarPopoverViewController: NSViewController {
         stack.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
-        for tool in tools {
+        for (i, tool) in tools.enumerated() {
+            if i > 0 {
+                let div = DividerView()
+                stack.addArrangedSubview(div)
+                div.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            }
             let r = OtherToolRowView(tool: tool)
             stack.addArrangedSubview(r)
             r.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true

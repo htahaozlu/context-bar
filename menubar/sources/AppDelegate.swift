@@ -34,6 +34,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // system. No effect in normal use (variable unset → follows system).
         if let want = ProcessInfo.processInfo.environment["CONTEXTBAR_FORCE_APPEARANCE"]?.lowercased() {
             NSApp.appearance = NSAppearance(named: want == "light" ? .aqua : .darkAqua)
+        } else {
+            // Honor the user's Settings → Appearance → Theme (System/Light/Dark)
+            // at launch, not only when the Settings window is first opened.
+            AppearanceStore.apply()
         }
         setupMainMenu()
 
@@ -613,7 +617,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             result.append(NSAttributedString(string: L10n.text(" no agent", " ajan yok"),
                                              attributes: [
                                                  .font: font,
-                                                 .foregroundColor: NSColor.secondaryLabelColor,
+                                                 // Full-strength menubar text (white on the usual dark
+                                                 // menubar) — not the dim secondary gray.
+                                                 .foregroundColor: NSColor.labelColor,
                                              ]))
             return result
         }

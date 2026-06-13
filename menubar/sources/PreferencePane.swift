@@ -28,6 +28,11 @@ class PreferencePaneViewController: NSViewController {
     let scrollView = NSScrollView()
     let contentStack = NSStackView()
 
+    /// Override to cap + center the content column at a fixed width (the redesign
+    /// centers Settings at 580pt). `nil` = full-width (Stats/Cost use the whole
+    /// 820pt canvas for their two-column grids).
+    var preferredContentWidth: CGFloat? { nil }
+
     override func loadView() {
         view = FlippedView()
         view.wantsLayer = true
@@ -57,9 +62,40 @@ class PreferencePaneViewController: NSViewController {
             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             documentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             contentStack.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 20),
-            contentStack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 24),
-            contentStack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -24),
             contentStack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor, constant: -24),
+        ])
+        if let maxWidth = preferredContentWidth {
+            NSLayoutConstraint.activate([
+                contentStack.centerXAnchor.constraint(equalTo: documentView.centerXAnchor),
+                contentStack.widthAnchor.constraint(equalToConstant: maxWidth),
+                contentStack.leadingAnchor.constraint(greaterThanOrEqualTo: documentView.leadingAnchor, constant: 24),
+                contentStack.trailingAnchor.constraint(lessThanOrEqualTo: documentView.trailingAnchor, constant: -24),
+            ])
+        } else {
+            NSLayoutConstraint.activate([
+                contentStack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 24),
+                contentStack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -24),
+            ])
+        }
+    }
+
+    /// A bare two-column row (no section header / card wrapper), added full-width
+    /// to the content column. `leftRatio` sets the left:right width ratio (1.5 →
+    /// 1.5fr : 1fr). Pass already-styled cards as `left` / `right`.
+    func addGridRow(left: NSView, right: NSView, leftRatio: CGFloat = 1.0,
+                    spacing: CGFloat = Spacing.m) {
+        left.translatesAutoresizingMaskIntoConstraints = false
+        right.translatesAutoresizingMaskIntoConstraints = false
+        let row = NSStackView(views: [left, right])
+        row.orientation = .horizontal
+        row.alignment = .top
+        row.distribution = .fill
+        row.spacing = spacing
+        row.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(row)
+        NSLayoutConstraint.activate([
+            row.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            left.widthAnchor.constraint(equalTo: right.widthAnchor, multiplier: leftRatio),
         ])
     }
 

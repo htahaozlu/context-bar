@@ -16,12 +16,18 @@ import Foundation
 ///   - pricing_source / pricing_is_estimate (snapshot-level)
 final class CostViewController: PreferencePaneViewController {
     enum Range: Int { case last7 = 0, last30 = 1 }
-    enum Provider: Int { case claude = 0, codex = 1 }
+    /// `.both` is the default (the #1 requirement: Claude + Codex visible at
+    /// once). `.claude` / `.codex` scope to a single provider.
+    enum Provider: Int { case both = 0, claude = 1, codex = 2 }
     private var range: Range = .last30
-    private var provider: Provider = .claude
+    private var provider: Provider = .both
+    /// Selected model filter — index into `modelFilterNames` (0 = "All models").
+    private var modelFilterIndex: Int = 0
+    private var modelFilterNames: [String] = []   // ["All models", pretty names…]
 
-    private let providerControl = NSSegmentedControl()
-    private let rangeControl = NSSegmentedControl()
+    private var providerControl: PillSegmentedControl!
+    private var modelFilter: PopupButton!
+    private var rangeControl: PillSegmentedControl!
     private let heroCard = CostHeroView()
     private let tilesStack = NSStackView()
     private let savingsLabel = NSTextField(labelWithString: "")
@@ -34,7 +40,12 @@ final class CostViewController: PreferencePaneViewController {
     private let aiSpinner = NSProgressIndicator()
     private let aiResult = NSTextField(wrappingLabelWithString: "")
     private let machinesHost = NSStackView()
-    private let modelsHost = NSStackView()
+    /// Hosts the per-model cost card only (the calc note is now a sibling in the
+    /// grid, per cost.jsx:172). Rebuilt every reload.
+    private let modelBreakdownHost = NSStackView()
+    /// Header subtitle — flips between the "API-equivalent estimate" (value) and
+    /// "Real spend on models outside your plan" (billed) copy, per cost.jsx:86.
+    private let headerSubtitle = NSTextField(labelWithString: "")
     /// Host opens Settings → Privacy (where the AI key lives) — a gentle,
     /// one-click discovery path, not a nag.
     var onShowPrivacy: (() -> Void)?
@@ -46,80 +57,67 @@ final class CostViewController: PreferencePaneViewController {
     }
 
     private func buildUI() {
-        // Clarity banner first (Codex/UX review): what you actually pay, the
-        // hypothetical metered-API value, the subscription saving, and budget
-        // pace — so the big number never reads as a bill.
-        addHero(heroCard)
+        // ── Header (cost.jsx:83-92) — "Cost & value" + subtitle on the left,
+        // [provider PillSegmentedControl][ModelFilter PopupButton] on the right.
+        addHeaderRow()
 
-        let controlsStack = NSStackView()
-        controlsStack.orientation = .horizontal
-        controlsStack.alignment = .centerY
-        controlsStack.spacing = 10
-        controlsStack.translatesAutoresizingMaskIntoConstraints = false
-
-        providerControl.segmentStyle = .texturedRounded
-        providerControl.segmentCount = 2
-        providerControl.setLabel("Claude", forSegment: 0)
-        providerControl.setLabel("Codex", forSegment: 1)
-        providerControl.selectedSegment = 0
-        providerControl.target = self
-        providerControl.action = #selector(providerChanged(_:))
-        providerControl.translatesAutoresizingMaskIntoConstraints = false
-
-        rangeControl.segmentStyle = .texturedRounded
-        rangeControl.segmentCount = 2
-        rangeControl.setLabel(L10n.text("Last 7 days", "Son 7 gün"), forSegment: 0)
-        rangeControl.setLabel(L10n.text("Last 30 days", "Son 30 gün"), forSegment: 1)
-        rangeControl.selectedSegment = 1
-        rangeControl.target = self
-        rangeControl.action = #selector(rangeChanged(_:))
-        rangeControl.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Cost & value", "Maliyet ve değer"),
-            subtitle: L10n.text("Provider and rolling window for the estimate.",
-                                "Tahmin için sağlayıcı ve kayan pencere."),
-            symbol: "dollarsign.circle",
-            info: L10n.text(
-                "Each provider is priced from its own transcripts. The hero keeps the 'not a bill' explanation pinned above the rest of the tab.",
-                "Her sağlayıcı kendi transkriptlerinden fiyatlanır. Hero kart 'fatura değil' açıklamasını sekmenin üstünde sabit tutar."),
-            body: controlsStack
-        )
-        controlsStack.addArrangedSubview(providerControl)
-        controlsStack.addArrangedSubview(rangeControl)
-
+        // ── Hero clarity card + 2×2 tiles (cost.jsx:95-158) — a 1.5:1 grid.
+        // LEFT keeps CostHeroView (not-a-bill / billed framing). RIGHT is a 2×2
+        // tile grid built per reload into `tilesStack`.
         tilesStack.orientation = .vertical
         tilesStack.alignment = .leading
-        tilesStack.spacing = 10
+        tilesStack.spacing = 0
         tilesStack.translatesAutoresizingMaskIntoConstraints = false
+        addGridRow(left: heroCard, right: tilesStack, leftRatio: 1.5)
 
+        // Cache-savings line — a quiet "you're winning" footnote under the tiles.
         savingsLabel.font = NSFont.systemFont(ofSize: 11)
         savingsLabel.textColor = .secondaryLabelColor
         savingsLabel.maximumNumberOfLines = 0
         savingsLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(savingsLabel)
+        savingsLabel.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
 
-        let costStack = NSStackView(views: [tilesStack, savingsLabel])
-        costStack.orientation = .vertical
-        costStack.alignment = .leading
-        costStack.spacing = 10
-        costStack.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Estimated cost", "Tahmini maliyet"),
-            subtitle: L10n.text(
-                "Priced as if metered — not your bill.",
-                "Ölçümlüymüş gibi fiyatlandı — fatura değil."
-            ),
-            symbol: "function",
-            info: L10n.text(
-                "What this usage would cost on the pay-per-token API. You're on a subscription, so these are estimates, not charges. today / 7d / 30d windows, plus 30-day input vs output token totals.",
-                "Bu kullanımın token başına ödenen API'de tutacağı tutar. Aboneliktesin, bu yüzden bunlar tahmindir, fatura değil. bugün / 7g / 30g pencereleri ve 30 günlük girdi/çıktı token toplamları."
-            ),
-            body: costStack
-        )
-        tilesStack.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
-        savingsLabel.widthAnchor.constraint(equalTo: costStack.widthAnchor).isActive = true
+        // ── 30-day trend card (cost.jsx:160-169). Kept as a bare card so the
+        // header chip ("Jun 1 · $132") sits inside, matching the spec.
+        sparkHost.translatesAutoresizingMaskIntoConstraints = false
+        let trendCard = NSView()
+        Surface.applyCard(trendCard)
+        trendCard.translatesAutoresizingMaskIntoConstraints = false
+        trendCard.addSubview(sparkHost)
+        NSLayoutConstraint.activate([
+            sparkHost.topAnchor.constraint(equalTo: trendCard.topAnchor, constant: Spacing.m),
+            sparkHost.leadingAnchor.constraint(equalTo: trendCard.leadingAnchor, constant: Spacing.m),
+            sparkHost.trailingAnchor.constraint(equalTo: trendCard.trailingAnchor, constant: -Spacing.m),
+            sparkHost.bottomAnchor.constraint(equalTo: trendCard.bottomAnchor, constant: -Spacing.m),
+            sparkHost.heightAnchor.constraint(equalToConstant: 150),
+        ])
+        contentStack.addArrangedSubview(trendCard)
+        trendCard.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
 
-        // Cross-machine combined cost — a headline summary, so it sits right
-        // under the estimate tiles (only meaningful once a sync folder is set).
+        // ── Model breakdown + calc note (cost.jsx:171-175, models.jsx) — a
+        // 1.55:1 grid. LEFT = per-model cost card (Claude + Codex now), RIGHT =
+        // the "how this is calculated" note.
+        modelBreakdownHost.orientation = .vertical
+        modelBreakdownHost.alignment = .leading
+        modelBreakdownHost.spacing = Spacing.s
+        modelBreakdownHost.translatesAutoresizingMaskIntoConstraints = false
+        let calcNote = CostCalcNoteView()
+        calcNote.translatesAutoresizingMaskIntoConstraints = false
+        addGridRow(left: modelBreakdownHost, right: calcNote, leftRatio: 1.55)
+
+        // ── Daily breakdown table (cost.jsx:177-184). Kept as CostInstancesView
+        // inside a bare card, with its drill-down popover.
+        instancesStack.orientation = .vertical
+        instancesStack.alignment = .leading
+        instancesStack.spacing = 8
+        instancesStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(instancesStack)
+        instancesStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+
+        // ── PRESERVED features below the spec sections ──────────────────────
+
+        // Cross-machine combined cost (only meaningful once a sync folder is set).
         machinesHost.orientation = .vertical
         machinesHost.alignment = .leading
         machinesHost.spacing = 6
@@ -133,50 +131,6 @@ final class CostViewController: PreferencePaneViewController {
                 "Combined 30-day estimated cost from every Mac writing to your sync folder (set it in Privacy settings).",
                 "Senkron klasörüne yazan her Mac'in son 30 günlük tahmini maliyeti birleşik (Gizlilik ayarlarından klasörü gir)."),
             body: machinesHost
-        )
-
-        sparkHost.translatesAutoresizingMaskIntoConstraints = false
-        sparkHost.heightAnchor.constraint(equalToConstant: 150).isActive = true
-        addSection(
-            title: L10n.text("Cost trend (30 days)", "Maliyet trendi (30 gün)"),
-            subtitle: L10n.text("Estimated daily cost — hover for a day.",
-                                "Tahmini günlük maliyet — gün için üzerine gel."),
-            symbol: "chart.xyaxis.line",
-            body: sparkHost
-        )
-
-        // Per-model cost — REAL `by_model` dollars (Claude only), each tagged
-        // with its plan/API availability, over a compact "how this is
-        // calculated" note. Mirrors the redesign's model-filter surface.
-        modelsHost.orientation = .vertical
-        modelsHost.alignment = .leading
-        modelsHost.spacing = Spacing.s
-        modelsHost.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Cost by model", "Modele göre maliyet"),
-            subtitle: L10n.text("Where the estimate comes from, model by model.",
-                                "Tahminin model model nereden geldiği."),
-            symbol: "square.stack.3d.up",
-            info: L10n.text(
-                "Per-model API-equivalent cost from your transcripts. Plan models show value your flat plan covers; models removed from the plan (or API-only) show real spend billed to your key.",
-                "Transkriptlerinden model başına API-eşdeğeri maliyet. Plan modelleri planının karşıladığı değeri gösterir; plandan çıkan (veya yalnızca-API) modeller anahtarına faturalanan gerçek harcamayı gösterir."),
-            body: modelsHost
-        )
-        modelsHost.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
-
-        instancesStack.orientation = .vertical
-        instancesStack.alignment = .leading
-        instancesStack.spacing = 8
-        instancesStack.translatesAutoresizingMaskIntoConstraints = false
-        addSection(
-            title: L10n.text("Daily cost by project", "Projeye göre günlük maliyet"),
-            subtitle: L10n.text("One row per project per day. Click a row for detail.",
-                                "Gün başına proje başına bir satır. Detay için satıra tıkla."),
-            symbol: "tablecells",
-            info: L10n.text(
-                "One row per project per day — like `better-ccusage daily --instances`. Click any row for a token-bucket breakdown and a plain-language cache explainer.",
-                "Gün başına proje başına bir satır — `better-ccusage daily --instances` gibi. Token dağılımı ve sade önbellek açıklaması için bir satıra tıkla."),
-            body: instancesStack
         )
 
         aiButton.bezelStyle = .rounded
@@ -218,6 +172,64 @@ final class CostViewController: PreferencePaneViewController {
         footnote.translatesAutoresizingMaskIntoConstraints = false
         addSection(title: L10n.text("Source", "Kaynak"), subtitle: nil,
                    symbol: "doc.text", body: footnote)
+    }
+
+    /// Header row (cost.jsx:83-92): big title + a subtitle that flips between the
+    /// "value" and "billed" framings, with the provider segmented control and the
+    /// model-filter popup on the right.
+    private func addHeaderRow() {
+        let title = NSTextField(labelWithString: L10n.text("Cost & value", "Maliyet ve değer"))
+        title.font = Typography.display(17, weight: .semibold)
+        title.textColor = Palette.primaryText
+        title.translatesAutoresizingMaskIntoConstraints = false
+
+        headerSubtitle.font = Typography.body(11.5)
+        headerSubtitle.textColor = Palette.secondaryText
+        headerSubtitle.lineBreakMode = .byTruncatingTail
+        headerSubtitle.stringValue = L10n.text(
+            "API-equivalent estimate from local transcripts",
+            "Yerel transkriptlerden API-eşdeğeri tahmin")
+        headerSubtitle.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleStack = NSStackView(views: [title, headerSubtitle])
+        titleStack.orientation = .vertical
+        titleStack.alignment = .leading
+        titleStack.spacing = 2
+        titleStack.translatesAutoresizingMaskIntoConstraints = false
+        titleStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        providerControl = PillSegmentedControl(
+            options: [L10n.text("Both", "İkisi"), "Claude", "Codex"],
+            selectedIndex: provider.rawValue
+        ) { [weak self] idx in
+            self?.provider = Provider(rawValue: idx) ?? .both
+            self?.reload()
+        }
+        providerControl.setContentHuggingPriority(.required, for: .horizontal)
+
+        modelFilter = PopupButton(
+            options: [L10n.text("All models", "Tüm modeller")], selectedIndex: 0
+        ) { [weak self] idx in
+            self?.modelFilterIndex = idx
+            self?.reload()
+        }
+        modelFilter.setContentHuggingPriority(.required, for: .horizontal)
+
+        let controls = NSStackView(views: [providerControl, modelFilter])
+        controls.orientation = .horizontal
+        controls.alignment = .centerY
+        controls.spacing = 10
+        controls.translatesAutoresizingMaskIntoConstraints = false
+        controls.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = NSStackView(views: [titleStack, controls])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.distribution = .fill
+        row.spacing = Spacing.m
+        row.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(row)
+        row.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
     }
 
     private func populateMachines() {
@@ -335,16 +347,6 @@ final class CostViewController: PreferencePaneViewController {
         }
     }
 
-    @objc private func providerChanged(_ sender: NSSegmentedControl) {
-        provider = Provider(rawValue: sender.selectedSegment) ?? .claude
-        reload()
-    }
-
-    @objc private func rangeChanged(_ sender: NSSegmentedControl) {
-        range = Range(rawValue: sender.selectedSegment) ?? .last30
-        reload()
-    }
-
     // MARK: - Data
 
     private struct Instance {
@@ -378,18 +380,16 @@ final class CostViewController: PreferencePaneViewController {
         var isEstimate: Bool = true
         var planType: String?              // "pro", "max", "free"
         var planTier: String?              // raw rate_limit_tier (max_20x …)
+        /// True when this scope is purely billed (Codex / API-only) — drives the
+        /// hero's "real spend" framing rather than "plan value" (cost.jsx:76).
+        var billedOnly: Bool = false
     }
 
-    private func loadData() -> CostData {
-        let path = ContextSnapshot.resolveSnapshotPath()
-        let key: String = (provider == .codex) ? "codex" : "claude"
-        guard
-            let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let c = root[key] as? [String: Any]
-        else {
-            return CostData()
-        }
+    /// Parse a single provider block (`claude` / `codex`). Extracted so `.both`
+    /// can parse each and merge. `root` is the shared snapshot root (accounts,
+    /// pricing_source live here, not per-provider).
+    private func loadOne(key: String, root: [String: Any]) -> CostData {
+        guard let c = root[key] as? [String: Any] else { return CostData() }
         func u64(_ any: Any?) -> UInt64 {
             if let n = any as? UInt64 { return n }
             if let n = any as? Int, n >= 0 { return UInt64(n) }
@@ -411,6 +411,8 @@ final class CostViewController: PreferencePaneViewController {
         out.cacheSavings30d = dbl(c["cache_savings_30d"])
         out.pricingSource = root["pricing_source"] as? String
         out.isEstimate = (root["pricing_is_estimate"] as? Bool) ?? true
+        // Codex is always billed to the API key — there's no per-plan list price.
+        out.billedOnly = (key == "codex")
         out.instances = ((c["by_day_project"] as? [[String: Any]]) ?? []).compactMap { o in
             guard let date = o["date"] as? String, let project = o["project"] as? String else { return nil }
             let models = (o["models"] as? [String]) ?? []
@@ -449,6 +451,93 @@ final class CostViewController: PreferencePaneViewController {
         return out
     }
 
+    /// Merge two provider scopes for `.both`: scalars sum; `by_model` and
+    /// `by_day_project` concatenate then re-aggregate per key; trend points sum
+    /// per date; plan info comes from the value side (Claude). The result is
+    /// "billed-only" only if BOTH sides are billed (i.e. no plan value present).
+    private func merge(_ a: CostData, _ b: CostData) -> CostData {
+        var out = CostData()
+        out.costToday = a.costToday + b.costToday
+        out.cost7d = a.cost7d + b.cost7d
+        out.cost30d = a.cost30d + b.cost30d
+        out.input30d = a.input30d + b.input30d
+        out.output30d = a.output30d + b.output30d
+        out.cacheSavings30d = a.cacheSavings30d + b.cacheSavings30d
+        out.pricingSource = a.pricingSource ?? b.pricingSource
+        out.isEstimate = a.isEstimate || b.isEstimate
+        out.billedOnly = a.billedOnly && b.billedOnly
+        // Plan info: prefer the side that actually has a plan (the value side).
+        out.planType = a.planType ?? b.planType
+        out.planTier = a.planTier ?? b.planTier
+
+        // by_model — concatenate and re-aggregate by exact model id.
+        var modelIdx: [String: Int] = [:]
+        var models: [ModelCost] = []
+        for m in a.byModel + b.byModel {
+            if let i = modelIdx[m.model] {
+                models[i] = ModelCost(model: m.model,
+                                      tokens: models[i].tokens + m.tokens,
+                                      cost: models[i].cost + m.cost)
+            } else {
+                modelIdx[m.model] = models.count
+                models.append(m)
+            }
+        }
+        out.byModel = models.sorted { $0.tokens > $1.tokens }
+
+        // by_day_project — concatenate and re-aggregate by (date, project).
+        var instIdx: [String: Int] = [:]
+        var insts: [Instance] = []
+        for it in a.instances + b.instances {
+            let k = it.date + "\u{1}" + it.project
+            if let i = instIdx[k] {
+                let p = insts[i]
+                insts[i] = Instance(
+                    date: p.date, project: p.project,
+                    models: Array(Set(p.models + it.models)).sorted(),
+                    input: p.input + it.input, output: p.output + it.output,
+                    cacheCreate: p.cacheCreate + it.cacheCreate,
+                    cacheRead: p.cacheRead + it.cacheRead,
+                    tokens: p.tokens + it.tokens, cost: p.cost + it.cost)
+            } else {
+                instIdx[k] = insts.count
+                insts.append(it)
+            }
+        }
+        out.instances = insts
+
+        // trend — sum cost/tokens per date across both providers.
+        var dayIdx: [String: Int] = [:]
+        var days: [DailyPoint] = []
+        for p in a.dailyPoints + b.dailyPoints {
+            if let i = dayIdx[p.date] {
+                days[i] = DailyPoint(date: p.date, cost: days[i].cost + p.cost,
+                                     tokens: days[i].tokens + p.tokens)
+            } else {
+                dayIdx[p.date] = days.count
+                days.append(p)
+            }
+        }
+        out.dailyPoints = days.sorted { $0.date < $1.date }   // oldest → newest
+        return out
+    }
+
+    private func loadData() -> CostData {
+        let path = ContextSnapshot.resolveSnapshotPath()
+        guard
+            let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return CostData()
+        }
+        switch provider {
+        case .claude: return loadOne(key: "claude", root: root)
+        case .codex:  return loadOne(key: "codex", root: root)
+        case .both:   return merge(loadOne(key: "claude", root: root),
+                                   loadOne(key: "codex", root: root))
+        }
+    }
+
     // MARK: - Render
 
     func reload() {
@@ -457,12 +546,52 @@ final class CostViewController: PreferencePaneViewController {
         updateAIButton()
         let data = loadData()
 
-        // Clarity hero — plan price only for Claude (Codex has no per-plan list
-        // price). Estimated monthly drives the big "API value" number + budget.
-        let planPrice = (provider == .claude) ? planMonthlyPrice(data.planType, data.planTier) : nil
+        // Aggregate per-model rows (collapse suffix variants under a pretty
+        // name) — drives both the model filter and the breakdown card.
+        let aggModels = aggregatedModels(data.byModel)
+
+        // ── Model filter popup — ["All models", pretty names…]. Keep the
+        // selection stable across reloads when the model still exists.
+        let prevName: String? = (modelFilterIndex > 0 && modelFilterIndex < modelFilterNames.count)
+            ? modelFilterNames[modelFilterIndex] : nil
+        modelFilterNames = [L10n.text("All models", "Tüm modeller")] + aggModels.map { $0.name }
+        let newIndex = prevName.flatMap { modelFilterNames.firstIndex(of: $0) } ?? 0
+        modelFilterIndex = newIndex
+        modelFilter.setOptions(modelFilterNames, selectedIndex: newIndex)
+        // Show a billed dot in the label when the active filter is a billed model.
+        let filterName: String? = modelFilterIndex > 0 ? modelFilterNames[modelFilterIndex] : nil
+        let filterBilled = filterName.map { isBilledModel(availability(for: $0)) } ?? false
+        modelFilter.setValue(modelFilterNames[modelFilterIndex] + (filterBilled ? "  •" : ""))
+
+        // Scope the visible model set + instances to the filter.
+        let scopedModels = filterName == nil ? aggModels : aggModels.filter { $0.name == filterName }
+        let scopedInstances = filterName == nil
+            ? data.instances
+            : data.instances.filter { $0.models.contains { prettyModel($0) == filterName } }
+
+        // ── "Billed" framing (cost.jsx:76): true for a purely-billed scope
+        // (Codex), or when the filter is pinned to a single billed model. In that
+        // mode the hero/tiles read as REAL spend, not plan value.
+        let billedScope = data.billedOnly || filterBilled
+
+        // Header subtitle flips with the framing.
+        headerSubtitle.stringValue = billedScope
+            ? L10n.text("Real spend on models outside your plan",
+                        "Planının dışındaki modellerde gerçek harcama")
+            : L10n.text("API-equivalent estimate from local transcripts",
+                        "Yerel transkriptlerden API-eşdeğeri tahmin")
+
+        // Scoped 30-day figure: when a single model is selected, use that model's
+        // exact by_model cost; otherwise the provider scope's rolling 30-day.
+        let scoped30d = filterName == nil ? data.cost30d : scopedModels.reduce(0.0) { $0 + $1.cost }
+
+        // ── Hero — plan price only for the value framing (Codex / billed have no
+        // per-plan list price). `billed` switches the copy to "actual API spend".
+        let planPrice = billedScope ? nil : planMonthlyPrice(data.planType, data.planTier)
         let planLabel = planPrice != nil ? planName(data.planType, data.planTier) : nil
         heroCard.update(planName: planLabel, planPrice: planPrice,
-                        estMonthly: data.cost30d, budget: DisplayPrefs.monthlyBudgetUSD)
+                        estMonthly: scoped30d, budget: DisplayPrefs.monthlyBudgetUSD,
+                        billed: billedScope)
 
         tilesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         instancesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -475,41 +604,13 @@ final class CostViewController: PreferencePaneViewController {
         // calendar days. cost_today/cost_30d are always shown for context.
         let rangeDays = (range == .last7) ? 7 : 30
         let cutoff = cutoffDate(daysAgo: rangeDays)
-        let visible = data.instances.filter { dateFromKey($0.date).map { $0 >= cutoff } ?? true }
+        let visible = scopedInstances.filter { dateFromKey($0.date).map { $0 >= cutoff } ?? true }
         let rangeCost = visible.reduce(0.0) { $0 + $1.cost }
 
-        let tiles: [NSView] = [
-            StatTileView(
-                caption: L10n.text("today", "bugün"),
-                value: formatUSD(data.costToday), mono: true
-            ),
-            StatTileView(
-                caption: L10n.text("last 7 days", "son 7 gün"),
-                value: formatUSD(data.cost7d), mono: true
-            ),
-            StatTileView(
-                caption: range == .last7
-                    ? L10n.text("range total", "aralık toplamı")
-                    : L10n.text("last 30 days", "son 30 gün"),
-                value: formatUSD(range == .last7 ? rangeCost : data.cost30d), mono: true
-            ),
-            StatTileView(
-                caption: L10n.text("30d in / out", "30g girdi / çıktı"),
-                value: "\(ContextSnapshot.formatTokens(data.input30d)) / \(ContextSnapshot.formatTokens(data.output30d))",
-                mono: false
-            ),
-        ]
-        let row = NSStackView(views: tiles)
-        row.orientation = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 10
-        row.translatesAutoresizingMaskIntoConstraints = false
-        tilesStack.addArrangedSubview(row)
-        row.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
-
+        renderTiles(data, rangeCost: rangeCost)
         renderSavings(data)
         renderTrend(data.dailyPoints)
-        renderModels(data.byModel)
+        renderModels(scopedModels)
         renderInstances(visible)
 
         let src = data.pricingSource.map { srcLabel($0) } ?? "—"
@@ -517,6 +618,73 @@ final class CostViewController: PreferencePaneViewController {
             "Rates: \(src). Estimated as if metered. Subscription usage isn't billed per token; API-key usage is — the transcripts don't record which mode a session used, so all of it is shown as an estimate.",
             "Oranlar: \(src). Ölçümlüymüş gibi tahmin. Abonelik kullanımı token başına faturalanmaz; API-key kullanımı faturalanır — transkriptler bir oturumun hangi modda olduğunu kaydetmediği için hepsi tahmin olarak gösterilir."
         )
+    }
+
+    /// 2×2 tile grid (cost.jsx:142-157): Today / 7 days / 30 days (each with a
+    /// delta sub-line) + an In·Out tile with the segmented bar. Prefixed by the
+    /// small range pill. Rebuilt into `tilesStack` each reload.
+    private func renderTiles(_ data: CostData, rangeCost: Double) {
+        // Range pill (kept small, above the tiles, per the brief).
+        rangeControl = PillSegmentedControl(
+            options: [L10n.text("7d", "7g"), L10n.text("30d", "30g")],
+            selectedIndex: range.rawValue
+        ) { [weak self] idx in
+            self?.range = Range(rawValue: idx) ?? .last30
+            self?.reload()
+        }
+        let rangeRow = NSStackView(views: [NSView(), rangeControl])
+        rangeRow.orientation = .horizontal
+        rangeRow.distribution = .fill
+        rangeRow.alignment = .centerY
+        rangeRow.translatesAutoresizingMaskIntoConstraints = false
+        tilesStack.addArrangedSubview(rangeRow)
+        rangeRow.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
+        tilesStack.setCustomSpacing(10, after: rangeRow)
+
+        let avg7 = data.cost7d / 7.0
+        let todaySub = avg7 > 0
+            ? String(format: data.costToday >= avg7 ? "↑ %.0f%% " : "↓ %.0f%% ",
+                     abs((data.costToday - avg7) / avg7 * 100))
+                + L10n.text("vs avg", "ort. göre")
+            : L10n.text("today", "bugün")
+        let topRow = NSStackView(views: [
+            DualStatTileView(caption: L10n.text("today", "bugün"),
+                             value: formatUSD(data.costToday), sub: todaySub, mono: true),
+            DualStatTileView(caption: L10n.text("7 days", "7 gün"),
+                             value: formatUSD(data.cost7d),
+                             sub: "≈ " + formatUSD(avg7) + L10n.text("/day", "/gün"), mono: true),
+        ])
+        topRow.orientation = .horizontal
+        topRow.distribution = .fillEqually
+        topRow.spacing = 12
+        topRow.translatesAutoresizingMaskIntoConstraints = false
+
+        // 30-day tile: when scoped to 7d range, show the range total instead.
+        let bottomLeft = DualStatTileView(
+            caption: range == .last7 ? L10n.text("range total", "aralık toplamı")
+                                     : L10n.text("30 days", "30 gün"),
+            value: formatUSD(range == .last7 ? rangeCost : data.cost30d),
+            sub: range == .last7 ? L10n.text("last 7 days", "son 7 gün")
+                                 : L10n.text("full window", "tüm pencere"),
+            mono: true)
+        let inOut = InOutTileView(input: data.input30d, output: data.output30d,
+                                  usd: ContextSnapshot.formatUSD,
+                                  inputCost: nil, outputCost: nil)
+        let bottomRow = NSStackView(views: [bottomLeft, inOut])
+        bottomRow.orientation = .horizontal
+        bottomRow.distribution = .fillEqually
+        bottomRow.spacing = 12
+        bottomRow.translatesAutoresizingMaskIntoConstraints = false
+
+        let grid = NSStackView(views: [topRow, bottomRow])
+        grid.orientation = .vertical
+        grid.alignment = .leading
+        grid.spacing = 12
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        tilesStack.addArrangedSubview(grid)
+        grid.widthAnchor.constraint(equalTo: tilesStack.widthAnchor).isActive = true
+        topRow.widthAnchor.constraint(equalTo: grid.widthAnchor).isActive = true
+        bottomRow.widthAnchor.constraint(equalTo: grid.widthAnchor).isActive = true
     }
 
     /// Cache-savings insight: the net USD prompt caching saved vs paying full
@@ -563,14 +731,27 @@ final class CostViewController: PreferencePaneViewController {
         }
         let total = points.reduce(0.0) { $0 + $1.cost }
         let peak = points.map(\.cost).max() ?? 0
+        // Left caption (cost.jsx:163) — "30-day cost trend", with the running
+        // total / peak kept as a quiet mono trailer.
         let caption = NSTextField(labelWithString: L10n.text(
-            "30d total \(formatUSD(total))  ·  peak \(formatUSD(peak))/day  ·  hover for a day",
-            "30g toplam \(formatUSD(total))  ·  zirve \(formatUSD(peak))/gün  ·  gün için üzerine gel"
+            "30-day cost trend   ·   total \(formatUSD(total))   ·   peak \(formatUSD(peak))/day",
+            "30 günlük maliyet trendi   ·   toplam \(formatUSD(total))   ·   zirve \(formatUSD(peak))/gün"
         ))
         caption.font = Typography.bodyMono(10, weight: .regular)
         caption.textColor = .tertiaryLabelColor
+        caption.lineBreakMode = .byTruncatingTail
         caption.translatesAutoresizingMaskIntoConstraints = false
+        caption.setContentHuggingPriority(.defaultLow, for: .horizontal)
         sparkHost.addSubview(caption)
+
+        // Right chip (cost.jsx:164-166) — the latest day's date + cost in an
+        // accent-tinted pill.
+        let last = points.last
+        let chip = TrendDayChip(
+            text: (last.map { formatDay($0.date) } ?? "") + " · "
+                + (last.map { formatUSD($0.cost) } ?? "$0"))
+        chip.translatesAutoresizingMaskIntoConstraints = false
+        sparkHost.addSubview(chip)
 
         let chart = CostTrendChartView()
         chart.tint = Palette.accent
@@ -583,43 +764,50 @@ final class CostViewController: PreferencePaneViewController {
 
         NSLayoutConstraint.activate([
             caption.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
-            caption.topAnchor.constraint(equalTo: sparkHost.topAnchor),
+            caption.centerYAnchor.constraint(equalTo: chip.centerYAnchor),
+            caption.trailingAnchor.constraint(lessThanOrEqualTo: chip.leadingAnchor, constant: -8),
+            chip.topAnchor.constraint(equalTo: sparkHost.topAnchor),
+            chip.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
             chart.leadingAnchor.constraint(equalTo: sparkHost.leadingAnchor),
             chart.trailingAnchor.constraint(equalTo: sparkHost.trailingAnchor),
-            chart.topAnchor.constraint(equalTo: caption.bottomAnchor, constant: 6),
+            chart.topAnchor.constraint(equalTo: chip.bottomAnchor, constant: 8),
             chart.bottomAnchor.constraint(equalTo: sparkHost.bottomAnchor),
         ])
     }
 
     // MARK: - Per-model cost
 
-    /// Static availability for a prettified Claude model name. Mirrors the
-    /// redesign's `models.jsx`: Sonnet 3.7 sunsets Jun 22 (API-only after),
-    /// Opus 4.8 is API-only, everything else is covered by the plan.
+    /// One aggregated model row (pretty name, summed tokens/cost, availability).
+    private struct AggModel { let name: String; let tokens: UInt64; let cost: Double; let avail: ModelAvail }
+
+    /// True when a model's cost is REAL spend (Codex/GPT/any non-plan model, or a
+    /// plan model that's sunset/API-only) rather than plan-covered value.
+    private func isBilledModel(_ a: ModelAvail) -> Bool {
+        if case .plan = a { return false }
+        return true
+    }
+
+    /// Availability for a prettified model name (models.jsx framing). Claude plan
+    /// models stay `.plan`; Sonnet 3.7 sunsets Jun 22; Opus 4.8 is API-only.
+    /// EVERYTHING non-Claude (Codex / GPT / Gemini / o-series) is `.api` —
+    /// billed — which is exactly the spec's cross-provider "API-only" case.
     private func availability(for pretty: String) -> ModelAvail {
         let p = pretty.lowercased()
+        let isClaude = p.hasPrefix("opus") || p.hasPrefix("sonnet")
+            || p.hasPrefix("haiku") || p.hasPrefix("mythos")
+        if !isClaude { return .api }                 // Codex/GPT/Gemini → billed
         if p.hasPrefix("sonnet 3.7") { return .sunset("Jun 22") }
         if p.hasPrefix("opus 4.8") { return .api }
         return .plan
     }
 
-    /// Per-model cost card — REAL `by_model` dollars, Claude-only (the per-plan
-    /// vs API-only distinction is an Anthropic concept; Codex has no plan), a
-    /// thin accent bar for share of the top model, and an availability badge.
-    /// Always followed by the "how this is calculated" note. When there's no
-    /// Claude per-model data we still show the note — never a fabricated row.
-    private func renderModels(_ models: [ModelCost]) {
-        modelsHost.arrangedSubviews.forEach { $0.removeFromSuperview() }
-
-        // Claude only: collapse repeated-suffix variants under one pretty name,
-        // keep tokens-desc, drop empties. Codex/GPT rows are excluded entirely.
+    /// Collapse raw `by_model` rows under a pretty name (Claude + Codex together,
+    /// per the #1 requirement — codex/gpt/gemini are NO LONGER dropped), tag each
+    /// with availability, drop empties, sort cost-desc.
+    private func aggregatedModels(_ models: [ModelCost]) -> [AggModel] {
         var byName: [(name: String, tokens: UInt64, cost: Double)] = []
         var index: [String: Int] = [:]
         for m in models where m.cost > 0 || m.tokens > 0 {
-            let lower = m.model.lowercased()
-            guard !(lower.contains("gpt") || lower.contains("codex")
-                    || lower.contains("gemini") || lower.contains("o1")
-                    || lower.contains("o3") || lower.contains("o4")) else { continue }
             let pretty = prettyModel(m.model)
             if let i = index[pretty] {
                 byName[i].tokens += m.tokens
@@ -630,6 +818,16 @@ final class CostViewController: PreferencePaneViewController {
             }
         }
         byName.sort { $0.cost > $1.cost }
+        return byName.map { AggModel(name: $0.name, tokens: $0.tokens, cost: $0.cost,
+                                     avail: availability(for: $0.name)) }
+    }
+
+    /// Per-model cost card (models.jsx ModelBreakdown) — REAL `by_model` dollars
+    /// for Claude AND Codex, each with a plan/billed sub-line, a thin accent
+    /// share-bar and an availability badge. The "how this is calculated" note is
+    /// now a separate grid sibling, so this renders only the card.
+    private func renderModels(_ models: [AggModel]) {
+        modelBreakdownHost.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         let card = NSView()
         Surface.applyCard(card)
@@ -666,18 +864,18 @@ final class CostViewController: PreferencePaneViewController {
         head.widthAnchor.constraint(equalTo: inner.widthAnchor).isActive = true
         inner.setCustomSpacing(Spacing.xs, after: head)
 
-        if byName.isEmpty {
+        if models.isEmpty {
             let empty = NSTextField(labelWithString: L10n.text(
-                "No Claude per-model cost yet.", "Henüz Claude model maliyeti yok."))
+                "No per-model cost yet.", "Henüz model maliyeti yok."))
             empty.font = Typography.body(12)
             empty.textColor = Palette.secondaryText
             inner.addArrangedSubview(empty)
         } else {
-            let maxCost = byName.map(\.cost).max() ?? 0
-            for (i, m) in byName.enumerated() {
+            let maxCost = models.map(\.cost).max() ?? 0
+            for (i, m) in models.enumerated() {
                 let row = ModelCostRowView(
                     name: m.name,
-                    avail: availability(for: m.name),
+                    avail: m.avail,
                     tokens: m.tokens,
                     cost: m.cost,
                     share: maxCost > 0 ? CGFloat(m.cost / maxCost) : 0,
@@ -686,7 +884,7 @@ final class CostViewController: PreferencePaneViewController {
                 row.translatesAutoresizingMaskIntoConstraints = false
                 inner.addArrangedSubview(row)
                 row.widthAnchor.constraint(equalTo: inner.widthAnchor).isActive = true
-                if i < byName.count - 1 {
+                if i < models.count - 1 {
                     let hair = NSView()
                     hair.wantsLayer = true
                     hair.layer?.backgroundColor = Palette.hairline.cgColor
@@ -698,14 +896,8 @@ final class CostViewController: PreferencePaneViewController {
             }
         }
 
-        modelsHost.addArrangedSubview(card)
-        card.widthAnchor.constraint(equalTo: modelsHost.widthAnchor).isActive = true
-
-        // "How this is calculated" — always present (legend + Σ formula).
-        let note = CostCalcNoteView()
-        note.translatesAutoresizingMaskIntoConstraints = false
-        modelsHost.addArrangedSubview(note)
-        note.widthAnchor.constraint(equalTo: modelsHost.widthAnchor).isActive = true
+        modelBreakdownHost.addArrangedSubview(card)
+        card.widthAnchor.constraint(equalTo: modelBreakdownHost.widthAnchor).isActive = true
     }
 
     /// Monthly USD price of the active Anthropic plan (for the API comparison).
@@ -1551,7 +1743,8 @@ final class CostHeroView: NSView {
     private let stripe = CALayer()
     /// Last inputs, so a theme switch or light/dark toggle can re-render with
     /// freshly contrast-corrected colors (text colors are baked, not dynamic).
-    private var pending: (name: String?, price: Double?, est: Double, budget: Double)?
+    /// `billed` flips the copy from plan-value to real API spend (cost.jsx:76).
+    private var pending: (name: String?, price: Double?, est: Double, budget: Double, billed: Bool)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -1594,14 +1787,16 @@ final class CostHeroView: NSView {
         render()   // re-bake colors for the new light/dark appearance
     }
 
-    func update(planName: String?, planPrice: Double?, estMonthly: Double, budget: Double) {
-        pending = (planName, planPrice, estMonthly, budget)
+    func update(planName: String?, planPrice: Double?, estMonthly: Double,
+                budget: Double, billed: Bool = false) {
+        pending = (planName, planPrice, estMonthly, budget, billed)
         render()
     }
 
     private func render() {
         guard let p = pending else { isHidden = true; return }
         let planName = p.name, planPrice = p.price, estMonthly = p.est, budget = p.budget
+        let billed = p.billed
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         guard estMonthly > 0 else { isHidden = true; return }
         isHidden = false
@@ -1613,16 +1808,25 @@ final class CostHeroView: NSView {
         let usd = ContextSnapshot.formatUSD
         let perMo = L10n.text(" / mo", " / ay")
 
-        // Row A — caption + plan chip. "ESTIMATED VALUE · NOT A BILL" on the
-        // left; on the right, the plan pill ("Max 5× · $100/mo") when known.
+        // Row A — caption + plan chip. Value: "ESTIMATED VALUE · NOT A BILL" +
+        // the plan pill ("Max 5× · $100/mo"). Billed (cost.jsx:100-103): "ACTUAL
+        // API SPEND · BILLED TO YOUR KEY" + an "API key" chip.
         let caption = NSTextField(labelWithAttributedString:
             Typography.captionAttributed(
-                L10n.text("Estimated value · not a bill", "Tahmini değer · fatura değil"),
+                billed
+                    ? L10n.text("Actual API spend · billed to your key",
+                                "Gerçek API harcaması · anahtarına faturalı")
+                    : L10n.text("Estimated value · not a bill", "Tahmini değer · fatura değil"),
                 color: Palette.secondaryText))
         caption.lineBreakMode = .byTruncatingTail
         caption.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let captionRow: NSStackView
-        if let planName, let planPrice {
+        if billed {
+            let chip = pill(text: L10n.text("API key", "API anahtarı"),
+                            bg: Palette.accentSoft, fg: accent, glyph: "key")
+            chip.setContentHuggingPriority(.required, for: .horizontal)
+            captionRow = NSStackView(views: [caption, chip])
+        } else if let planName, let planPrice {
             let chip = pill(text: planName + " · " + usd(planPrice) + perMo,
                             bg: Palette.track, fg: Palette.secondaryText, accentValue: usd(planPrice) + perMo)
             chip.setContentHuggingPriority(.required, for: .horizontal)
@@ -1638,9 +1842,10 @@ final class CostHeroView: NSView {
         pin(captionRow)
         stack.setCustomSpacing(Spacing.s, after: captionRow)
 
-        // Row B — the big API-equivalent figure in NEUTRAL primaryText (never an
-        // accent that reads as "you owe this"), with a quiet "/mo" tail.
-        let bigStr = NSMutableAttributedString(string: "≈ " + usd(estMonthly), attributes: [
+        // Row B — the big figure. Value framing uses "≈" (an estimate); billed
+        // is an exact amount, so no "≈". NEUTRAL primaryText either way, with a
+        // quiet "/mo" tail.
+        let bigStr = NSMutableAttributedString(string: (billed ? "" : "≈ ") + usd(estMonthly), attributes: [
             .font: Typography.displayMono(40, weight: .semibold),
             .foregroundColor: Palette.primaryText,
             .kern: -0.5,
@@ -1654,19 +1859,41 @@ final class CostHeroView: NSView {
         stack.addArrangedSubview(big)
         pin(big)
 
-        // Row C — the reassurance. The single most important line on the tab.
-        let disclaimer = NSTextField(wrappingLabelWithString: L10n.text(
-            "This is not a bill. You're on a subscription — it's what the same token usage would cost on the pay-per-token API.",
-            "Bu bir fatura değil. Aboneliktesin — aynı token kullanımının token başına ödenen API'de tutacağı tahmini tutar."))
+        // Row C — the reassurance (value) / the real-bill warning (billed).
+        let disclaimer = NSTextField(wrappingLabelWithString: billed
+            ? L10n.text(
+                "These models aren't included in your plan. Their tokens are charged straight to your Anthropic / OpenAI API key at standard rates — a real bill, not an estimate.",
+                "Bu modeller planına dahil değil. Token'ları Anthropic / OpenAI API anahtarına standart oranlarla doğrudan faturalanır — tahmin değil, gerçek fatura.")
+            : L10n.text(
+                "This is not a bill. You're on a subscription — it's what the same token usage would cost on the pay-per-token API.",
+                "Bu bir fatura değil. Aboneliktesin — aynı token kullanımının token başına ödenen API'de tutacağı tahmini tutar."))
         disclaimer.font = .systemFont(ofSize: 12)
         disclaimer.textColor = Palette.secondaryText
         disclaimer.maximumNumberOfLines = 0
         stack.addArrangedSubview(disclaimer)
         pin(disclaimer)
 
-        // Row D — positive framing: an accent-green "N× plan value" pill, then
-        // the plain "$X more than your $Y plan" line beside it.
-        if let planPrice, planPrice > 0, estMonthly > planPrice {
+        // Row D — billed (cost.jsx:115-122): an accent "+ $N on top of plan" chip
+        // (real money charged separately). Value (cost.jsx:124-130): an
+        // accent-green "N× plan value" pill + "$X more than your $Y plan".
+        if billed {
+            let chip = pill(
+                text: "+ " + usd(estMonthly) + " " + L10n.text("on top of plan", "plan üstüne"),
+                bg: Palette.accentSoft, fg: accent, glyph: "dollarsign")
+            chip.setContentHuggingPriority(.required, for: .horizontal)
+            let line = NSTextField(labelWithString: L10n.text(
+                "charged this cycle, separate from your plan",
+                "bu dönem ücretlendirildi, planından ayrı"))
+            line.font = .systemFont(ofSize: 11)
+            line.textColor = Palette.secondaryText
+            line.lineBreakMode = .byTruncatingTail
+            let row = NSStackView(views: [chip, line])
+            row.orientation = .horizontal
+            row.alignment = .centerY
+            row.spacing = 8
+            stack.addArrangedSubview(row)
+            pin(row)
+        } else if let planPrice, planPrice > 0, estMonthly > planPrice {
             let saved = estMonthly - planPrice
             let mult = estMonthly / planPrice
             let multStr = mult >= 10 ? String(format: "%.0f×", mult) : String(format: "%.1f×", mult)
@@ -2034,4 +2261,131 @@ private final class CostCalcNoteView: NSView {
         super.viewDidChangeEffectiveAppearance()
         Surface.refreshCardColors(self)
     }
+}
+
+// MARK: - In·Out tile + trend day chip
+
+/// The In·Out tile (cost.jsx:146-156): an "IN · OUT" caption over a two-segment
+/// bar (input = accent, output = 40% accent) and the two figures below. We have
+/// honest 30-day token totals for the split; when a per-side $ cost is supplied
+/// it's shown instead, otherwise compact token counts (never a fabricated $).
+private final class InOutTileView: NSView {
+    private let barView = TwoSegBar()
+
+    init(input: UInt64, output: UInt64, usd: (Double) -> String,
+         inputCost: Double?, outputCost: Double?) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = Radius.card
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+        Surface.refreshCardColors(self)
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let cap = NSTextField(labelWithAttributedString:
+            Typography.captionAttributed(L10n.text("In · Out", "Girdi · Çıktı")))
+        cap.translatesAutoresizingMaskIntoConstraints = false
+
+        let total = Double(input) + Double(output)
+        barView.inputFraction = total > 0 ? CGFloat(Double(input) / total) : 0.5
+        barView.translatesAutoresizingMaskIntoConstraints = false
+        barView.heightAnchor.constraint(equalToConstant: 7).isActive = true
+
+        let inStr = inputCost.map(usd) ?? ContextSnapshot.formatTokens(input)
+        let outStr = outputCost.map(usd) ?? ContextSnapshot.formatTokens(output)
+        let inLbl = NSTextField(labelWithString: inStr)
+        inLbl.font = Typography.bodyMono(12, weight: .semibold)
+        inLbl.textColor = Palette.primaryText
+        inLbl.translatesAutoresizingMaskIntoConstraints = false
+        inLbl.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let outLbl = NSTextField(labelWithString: outStr)
+        outLbl.font = Typography.bodyMono(12, weight: .semibold)
+        outLbl.textColor = Palette.secondaryText
+        outLbl.alignment = .right
+        outLbl.translatesAutoresizingMaskIntoConstraints = false
+        outLbl.setContentHuggingPriority(.required, for: .horizontal)
+        let figures = NSStackView(views: [inLbl, outLbl])
+        figures.orientation = .horizontal
+        figures.distribution = .fill
+        figures.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = NSStackView(views: [cap, barView, figures])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.s),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.s),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            stack.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: Spacing.s),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -Spacing.s),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 92),
+            barView.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            figures.widthAnchor.constraint(equalTo: stack.widthAnchor),
+        ])
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(L10n.text("Input / output", "Girdi / çıktı"))
+        setAccessibilityValue("\(inStr) / \(outStr)")
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        Surface.refreshCardColors(self)
+    }
+
+    /// Two-segment pill bar: input (accent) + output (40% accent) over the track.
+    private final class TwoSegBar: NSView {
+        var inputFraction: CGFloat = 0.5 { didSet { needsDisplay = true } }
+        override var isFlipped: Bool { true }
+        override func draw(_ dirtyRect: NSRect) {
+            let r = bounds.height / 2
+            let track = NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r)
+            Palette.track.setFill(); track.fill()
+            NSGraphicsContext.current?.saveGraphicsState()
+            track.addClip()
+            let inW = bounds.width * max(0, min(1, inputFraction))
+            Palette.accent.setFill()
+            NSBezierPath(rect: NSRect(x: 0, y: 0, width: inW + 0.5, height: bounds.height)).fill()
+            Palette.accent.withAlphaComponent(0.4).setFill()
+            NSBezierPath(rect: NSRect(x: inW, y: 0, width: bounds.width - inW, height: bounds.height)).fill()
+            NSGraphicsContext.current?.restoreGraphicsState()
+        }
+    }
+}
+
+/// Small accent-tinted pill for the trend card header (cost.jsx:164-166) —
+/// "Jun 1 · $132". Mono figure baked in, accent-softer wash + accent-soft border.
+private final class TrendDayChip: NSView {
+    init(text: String) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = Radius.chip
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+        translatesAutoresizingMaskIntoConstraints = false
+        let lbl = NSTextField(labelWithString: text)
+        lbl.font = Typography.bodyMono(10.5, weight: .medium)
+        lbl.textColor = Palette.primaryText
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(lbl)
+        NSLayoutConstraint.activate([
+            lbl.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            lbl.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            lbl.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            lbl.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+        ])
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+        refreshColors()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    private func refreshColors() {
+        layer?.backgroundColor = Palette.accentSofter.cgColor
+        layer?.borderColor = Palette.accentSoft.cgColor
+    }
+    override func updateLayer() { refreshColors() }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refreshColors() }
 }

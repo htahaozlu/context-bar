@@ -22,6 +22,12 @@ final class SettingsViewController: PreferencePaneViewController {
     private let privacy = PrivacySettingsViewController()
     private let about = AboutSettingsViewController()
 
+    /// Center + cap the Settings column at 580pt (matches
+    /// `docs/macOS UI Theme/settings.jsx` — `width: 580`, `justifyContent:
+    /// center`). The data tabs (Stats/Cost) keep the full 820pt canvas via
+    /// the `nil` default on `PreferencePaneViewController`.
+    override var preferredContentWidth: CGFloat? { 580 }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
@@ -35,14 +41,17 @@ final class SettingsViewController: PreferencePaneViewController {
         privacy.onChange = { [weak self] in self?.onChange?() }
 
         // Build each child pane into its own view and adopt the resulting
-        // view into our content stack. The `addSection` / `addHero` calls
+        // groups into our content stack. The `addGroup` / `addSection` calls
         // inside each child write into the child's own `contentStack`
         // (a private property of PreferencePaneViewController), so we
-        // transplant the populated scroll view into ours.
-        embed(child: general, heading: L10n.text("General", "Genel"),
-               symbol: "gearshape",
-               subtitle: L10n.text("How the menubar looks, alerts, and rolling windows read.",
-                                   "Menubar'ın görünümü, uyarıları ve pencere davranışı."))
+        // transplant the populated rows into ours.
+        //
+        // GENERAL has NO parent super-heading: per settings.jsx its three
+        // groups (Appearance · Alerts · Behavior) sit directly in the
+        // centered 580pt column with their own caption headers. Privacy and
+        // About stay reachable as captioned sections further down the same
+        // continuous scroll.
+        adoptGroups(of: general)
         embed(child: privacy, heading: L10n.text("Privacy", "Gizlilik"),
                symbol: "hand.raised",
                subtitle: L10n.text("AI advisor, sharing, and multi-machine sync.",
@@ -51,6 +60,39 @@ final class SettingsViewController: PreferencePaneViewController {
                symbol: "info.circle",
                subtitle: L10n.text("Version, updates, files & shortcuts.",
                                    "Sürüm, güncellemeler, dosyalar ve kısayollar."))
+
+        // Single centered reassurance line at the very bottom of the scroll
+        // (settings.jsx footer). Rendered once here so the adopted General
+        // groups and the embedded Privacy/About panes don't each repeat it.
+        addSettingsFooter()
+    }
+
+    /// The lone footer line from settings.jsx, centered under every group.
+    private func addSettingsFooter() {
+        let label = NSTextField(labelWithString: L10n.text(
+            "ContextBar 2.0 · all data stays on this Mac · no account, no server",
+            "ContextBar 2.0 · tüm veriler bu Mac'te kalır · hesap yok, sunucu yok"))
+        label.font = NSFont.systemFont(ofSize: 10.5)
+        label.textColor = Palette.tertiaryText
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(label)
+        label.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+    }
+
+    /// Moves a child pane's already-built group cards straight into our
+    /// content stack with no wrapping super-heading — used for GENERAL so the
+    /// Appearance/Alerts/Behavior groups read as the top level of the pane.
+    private func adoptGroups(of child: PreferencePaneViewController) {
+        if !child.isViewLoaded { child.loadView() }
+        if child.view.window == nil { child.viewDidLoad() }
+        child.view.layoutSubtreeIfNeeded()
+        while let arranged = child.contentStack.arrangedSubviews.first {
+            child.contentStack.removeArrangedSubview(arranged)
+            arranged.removeFromSuperview()
+            contentStack.addArrangedSubview(arranged)
+            arranged.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        }
     }
 
     /// Forces a child pane to lay out, then transplants its `view` (a
