@@ -12,10 +12,13 @@ Per assistant turn, priced by that turn's model:
 ```
 cost = input_tokens              * input_cost_per_token
      + output_tokens             * output_cost_per_token
-     + cache_creation_tokens     * cache_creation_input_token_cost
+     + cache_creation_5m_tokens  * cache_creation_input_token_cost   (1.25x input)
+     + cache_creation_1h_tokens  * (input_cost_per_token * 2)        (2x input)
      + cache_read_tokens         * cache_read_input_token_cost
 ```
-- **Anthropic >200K long-context tier**, applied PER token-category: the first 200_000 tokens of a category bill at the base rate, the remainder at the `*_above_200k_tokens` rate — only when that rate exists for the model. Threshold is strictly `> 200_000`. (See `_tiered()` in `usage_signal.py`.)
+- **Cache-creation is split by TTL.** Claude records `usage.cache_creation.{ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}`. 5-minute writes bill at the table `cw` rate (1.25× input); 1-hour writes bill at **2× input** (Anthropic spec — derived from the input rate, not stored in the table). When a turn lacks the breakdown object, the flat `cache_creation_input_tokens` is priced entirely at the 5m rate (fallback). In real Claude Code transcripts the 1h bucket is the **majority** of cache creation, so this split is material — pricing it all at 1.25× materially undercounts.
+- **Anthropic >200K long-context tier**, applied PER token-category: the first 200_000 tokens of a category bill at the base rate, the remainder at the `*_above_200k_tokens` rate — only when that rate exists for the model. Threshold is strictly `> 200_000`. The 1h bucket tiers at `2× input_above_200k`. (See `_tiered()` / `turn_cost()` in `usage_signal.py` and `pricing.rs`.)
+- **De-duplication (avoids ~2× overcount).** Claude Code copies prior turns into resumed-session files and replays sidechain turns, so the *same* billed API response (`message.id` + `requestId`) appears many times across files — ~50% of assistant+usage lines on real data are duplicates. We count each `(message.id, requestId)` pair once (a turn missing either id is never collapsed). Without this the 30-day cost roughly doubles. Matches ccusage's dedup key.
 - **costUSD precedence (ccusage "auto" mode):** if a transcript turn carries a top-level `costUSD`, use it verbatim; else compute from tokens. (Current Claude Code doesn't emit it, so computation is the live path — but honor it if present.)
 - **Codex/OpenAI:** no cache-write charge. `input_tokens` from `last_token_usage` INCLUDES `cached_input_tokens`, so `fresh = input - cached`; `cached` bills at the cache-read rate; `output + reasoning_output` bills at the output rate.
 
@@ -30,6 +33,7 @@ Rates come from **LiteLLM's** canonical dataset (the same source ccusage uses):
 ### Verified Anthropic rates ($/Mtok, confirmed 2026-05-29 against docs.claude.com/.../pricing)
 | Model | Input | Output | 5m cache write | cache read |
 |---|---|---|---|---|
+| Fable 5 | $10 | $50 | $12.50 | $1.00 |
 | Opus 4.5 / 4.6 / 4.7 / 4.8 | $5 | $25 | $6.25 | $0.50 |
 | Opus 4.0 / 4.1 | $15 | $75 | $18.75 | $1.50 |
 | Sonnet 4.0 / 4.5 / 4.6 | $3 | $15 | $3.75 | $0.30 |

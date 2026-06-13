@@ -25,7 +25,8 @@ fn rust_kernel_matches_python_golden() {
     for row in rows {
         let model = row["model"].as_str().unwrap();
         let inp = row["inp"].as_u64().unwrap();
-        let cc = row["cache_create"].as_u64().unwrap();
+        let cc5 = row["cache_create_5m"].as_u64().unwrap();
+        let cc1 = row["cache_create_1h"].as_u64().unwrap();
         let cr = row["cache_read"].as_u64().unwrap();
         let outp = row["outp"].as_u64().unwrap();
         let want_matched = row["matched"].as_bool().unwrap();
@@ -40,16 +41,16 @@ fn rust_kernel_matches_python_golden() {
             rate.is_some()
         );
 
-        let cost = turn_cost(rate.as_ref(), inp, cc, cr, outp);
+        let cost = turn_cost(rate.as_ref(), inp, cc5, cc1, cr, outp);
         assert!(
             (cost - want_cost).abs() <= EPS + EPS * want_cost.abs(),
-            "cost mismatch for {model:?} ({inp},{cc},{cr},{outp}): rust={cost} python={want_cost}"
+            "cost mismatch for {model:?} ({inp},{cc5},{cc1},{cr},{outp}): rust={cost} python={want_cost}"
         );
 
-        let savings = turn_cache_savings(rate.as_ref(), cc, cr);
+        let savings = turn_cache_savings(rate.as_ref(), cc5, cc1, cr);
         assert!(
             (savings - want_savings).abs() <= EPS + EPS * want_savings.abs(),
-            "savings mismatch for {model:?} ({cc},{cr}): rust={savings} python={want_savings}"
+            "savings mismatch for {model:?} ({cc5},{cc1},{cr}): rust={savings} python={want_savings}"
         );
         checked += 1;
     }

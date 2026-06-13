@@ -309,6 +309,10 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
     // (ts, model, cwd, inp, outp, timestamp, path, max_ctx, betas) for the
     // most recent *foreground* (non-subagent) turn.
     let mut fg: Option<ForegroundTurn> = None;
+    // De-dupe ledger keyed by (message.id, requestId). Claude Code copies prior
+    // turns into resumed-session files and replays sidechain turns, so the same
+    // billed API response shows up many times across files; count each once.
+    let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
     let process_cwd = std::env::var("PWD")
         .ok()
         .or_else(|| std::env::current_dir().ok().map(|p| p.display().to_string()));
@@ -344,8 +348,30 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
             let empty = Value::Object(serde_json::Map::new());
             let Some(usage) = obj_or_empty(msg.get("usage"), &empty) else { continue };
 
+            // Skip a turn we have already counted (same message.id + requestId).
+            // Only de-dupe when both ids are present and non-empty; turns missing
+            // either id are kept as-is (never collapsed).
+            let msg_id = msg.get("id").and_then(Value::as_str).unwrap_or("");
+            let req_id = obj.get("requestId").and_then(Value::as_str).unwrap_or("");
+            if !msg_id.is_empty()
+                && !req_id.is_empty()
+                && !seen.insert((msg_id.to_string(), req_id.to_string()))
+            {
+                continue;
+            }
+
             let fresh_in = num_u64(usage, "input_tokens");
             let cache_create = num_u64(usage, "cache_creation_input_tokens");
+            // Split cache creation into 5-minute (1.25x) and 1-hour (2x input)
+            // writes when Claude records the breakdown; otherwise price the flat
+            // total at the 5m rate (the breakdown-absent fallback).
+            let (cc_5m, cc_1h) = match usage.get("cache_creation").filter(|v| v.is_object()) {
+                Some(cc) => (
+                    num_u64(cc, "ephemeral_5m_input_tokens"),
+                    num_u64(cc, "ephemeral_1h_input_tokens"),
+                ),
+                None => (cache_create, 0),
+            };
             let cache_read = num_u64(usage, "cache_read_input_tokens");
             let mut outp = num_u64(usage, "output_tokens");
             // Extended-thinking / reasoning output under varying keys.
@@ -387,9 +413,9 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
             let rate = match_pricing(turn_model.as_deref().unwrap_or(""), table);
             let cost = match obj.get("costUSD") {
                 Some(Value::Number(n)) => n.as_f64().unwrap_or(0.0),
-                _ => turn_cost(rate.as_ref(), fresh_in, cache_create, cache_read, outp),
+                _ => turn_cost(rate.as_ref(), fresh_in, cc_5m, cc_1h, cache_read, outp),
             };
-            let cache_saved = turn_cache_savings(rate.as_ref(), cache_create, cache_read);
+            let cache_saved = turn_cache_savings(rate.as_ref(), cc_5m, cc_1h, cache_read);
             let metrics = TurnMetrics {
                 total,
                 cache_read,
@@ -677,8 +703,10 @@ fn collect_codex_inner(home: &Path, now: f64, table: &Table) -> (AgentUsage, Opt
             let total = fresh_in + billed_out;
 
             let rate = match_pricing(current_model.as_deref().unwrap_or(""), table);
-            let cost = turn_cost(rate.as_ref(), fresh_in, 0, cached, billed_out);
-            let cache_saved = turn_cache_savings(rate.as_ref(), 0, cached);
+            // Codex has no cache-write concept: both creation buckets are 0;
+            // `cached` bills at the cache-read rate.
+            let cost = turn_cost(rate.as_ref(), fresh_in, 0, 0, cached, billed_out);
+            let cache_saved = turn_cache_savings(rate.as_ref(), 0, 0, cached);
             let metrics = TurnMetrics {
                 total,
                 cache_read: cached,

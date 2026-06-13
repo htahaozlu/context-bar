@@ -108,6 +108,9 @@ const fn openai_no_cr(input: f64, output: f64) -> Rate {
 /// from `FALLBACK_PRICING` in `usage_signal.py`. Order is preserved so the
 /// longest-prefix match in [`match_pricing`] is deterministic.
 pub static FALLBACK_PRICING: &[(&str, Rate)] = &[
+    // Fable 5 flagship ($10/$50). 5m cache write 1.25x, read 0.1x; the 1h write
+    // (2x input) is derived in `turn_cost`, not stored.
+    ("claude-fable-5", anthropic(10e-6, 50e-6, 12.5e-6, 1.0e-6)),
     ("claude-opus-4-8", anthropic(5e-6, 25e-6, 6.25e-6, 0.5e-6)),
     ("claude-opus-4-7", anthropic(5e-6, 25e-6, 6.25e-6, 0.5e-6)),
     ("claude-opus-4-6", anthropic(5e-6, 25e-6, 6.25e-6, 0.5e-6)),
@@ -158,6 +161,7 @@ pub static FALLBACK_PRICING: &[(&str, Rate)] = &[
 /// the table key. Mirrors `FAMILY_FALLBACK`; the Python regexes here are plain
 /// literal alternations, so substring matching is faithful.
 static FAMILY_FALLBACK: &[(&[&str], &str)] = &[
+    (&["fable-5", "fable"], "claude-fable-5"),
     (&["opus-4-5", "opus-4-6", "opus-4-7", "opus-4-8"], "claude-opus-4-8"),
     (&["opus-4"], "claude-opus-4"),
     (&["mythos"], "mythos"),
@@ -337,22 +341,39 @@ pub fn tiered(tokens: u64, base: Option<f64>, above: Option<f64>) -> f64 {
     tokens as f64 * base
 }
 
-/// Estimated USD for one turn given its rate + token buckets. Arg order mirrors
-/// the Python `turn_cost(rate, inp, cache_create, cache_read, outp)`.
-pub fn turn_cost(rate: Option<&Rate>, inp: u64, cache_create: u64, cache_read: u64, outp: u64) -> f64 {
+/// Estimated USD for one turn given its rate + token buckets. Cache creation is
+/// split: 5-minute writes bill at the table `cache_write` rate (1.25x input);
+/// 1-hour writes bill at 2x input (Anthropic spec — derived, not stored). Arg
+/// order mirrors `turn_cost(rate, inp, cc_5m, cc_1h, cache_read, outp)`.
+pub fn turn_cost(
+    rate: Option<&Rate>,
+    inp: u64,
+    cache_create_5m: u64,
+    cache_create_1h: u64,
+    cache_read: u64,
+    outp: u64,
+) -> f64 {
     let rate = match rate {
         Some(r) => r,
         None => return 0.0,
     };
+    let oneh = rate.input.map(|i| i * 2.0);
+    let oneh_200k = rate.input_200k.map(|i| i * 2.0);
     tiered(inp, rate.input, rate.input_200k)
         + tiered(outp, rate.output, rate.output_200k)
-        + tiered(cache_create, rate.cache_write, rate.cache_write_200k)
+        + tiered(cache_create_5m, rate.cache_write, rate.cache_write_200k)
+        + tiered(cache_create_1h, oneh, oneh_200k)
         + tiered(cache_read, rate.cache_read, rate.cache_read_200k)
 }
 
 /// NET USD that prompt caching saved this turn (can be slightly negative on a
 /// write-heavy turn). Mirrors `turn_cache_savings`.
-pub fn turn_cache_savings(rate: Option<&Rate>, cache_create: u64, cache_read: u64) -> f64 {
+pub fn turn_cache_savings(
+    rate: Option<&Rate>,
+    cache_create_5m: u64,
+    cache_create_1h: u64,
+    cache_read: u64,
+) -> f64 {
     let rate = match rate {
         Some(r) => r,
         None => return 0.0,
@@ -362,9 +383,13 @@ pub fn turn_cache_savings(rate: Option<&Rate>, cache_create: u64, cache_read: u6
         None => return 0.0,
     };
     let in_200k = rate.input_200k;
-    let no_cache =
-        tiered(cache_create, Some(in_rate), in_200k) + tiered(cache_read, Some(in_rate), in_200k);
-    let actual = tiered(cache_create, rate.cache_write, rate.cache_write_200k)
+    let oneh = Some(in_rate * 2.0);
+    let oneh_200k = in_200k.map(|i| i * 2.0);
+    let no_cache = tiered(cache_create_5m, Some(in_rate), in_200k)
+        + tiered(cache_create_1h, Some(in_rate), in_200k)
+        + tiered(cache_read, Some(in_rate), in_200k);
+    let actual = tiered(cache_create_5m, rate.cache_write, rate.cache_write_200k)
+        + tiered(cache_create_1h, oneh, oneh_200k)
         + tiered(cache_read, rate.cache_read, rate.cache_read_200k);
     no_cache - actual
 }
@@ -584,10 +609,14 @@ mod tests {
     fn turn_cost_matches_hand_computed() {
         // opus-4-8: in 5e-6, out 25e-6, cw 6.25e-6, cr 0.5e-6.
         let rate = match_pricing("claude-opus-4-8", &t());
-        let c = turn_cost(rate.as_ref(), 1000, 2000, 3000, 4000);
-        // 1000*5e-6 + 4000*25e-6 + 2000*6.25e-6 + 3000*0.5e-6
+        // 5m-only: 1000*5e-6 + 4000*25e-6 + 2000*6.25e-6 + 3000*0.5e-6
+        let c = turn_cost(rate.as_ref(), 1000, 2000, 0, 3000, 4000);
         let expect = 1000.0 * 5e-6 + 4000.0 * 25e-6 + 2000.0 * 6.25e-6 + 3000.0 * 0.5e-6;
         assert!((c - expect).abs() < 1e-12, "{c} vs {expect}");
+        // 1-hour writes bill at 2x input (10e-6), not the 5m rate (6.25e-6).
+        let c1h = turn_cost(rate.as_ref(), 1000, 0, 2000, 3000, 4000);
+        let expect1h = 1000.0 * 5e-6 + 4000.0 * 25e-6 + 2000.0 * 10e-6 + 3000.0 * 0.5e-6;
+        assert!((c1h - expect1h).abs() < 1e-12, "{c1h} vs {expect1h}");
     }
 
     #[test]

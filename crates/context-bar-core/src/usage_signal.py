@@ -85,7 +85,10 @@ TIER_THRESHOLD = 200_000
 # Fields: in=input, out=output, cw=cache write (5m), cr=cache read, and the
 # optional *_200k variants for the >200K tier.
 FALLBACK_PRICING = {
-    # Claude — Opus 4.5+ share the lower flagship tier ($5/$25); 4.1/4.0 are
+    # Claude — Fable 5 flagship ($10/$50). cw is the 5m write (1.25x); the 1h
+    # write (2x input) is derived in turn_cost, not stored.
+    "claude-fable-5": {"in": 10e-6, "out": 50e-6, "cw": 12.5e-6, "cr": 1.0e-6},
+    # Opus 4.5+ share the lower flagship tier ($5/$25); 4.1/4.0 are
     # the legacy high tier ($15/$75).
     "claude-opus-4-8": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
     "claude-opus-4-7": {"in": 5e-6, "out": 25e-6, "cw": 6.25e-6, "cr": 0.5e-6},
@@ -144,6 +147,7 @@ FALLBACK_PRICING = {
 # Coarse family fallback for model ids that resolve to no exact / dated key.
 # Checked last. Order matters: more specific patterns first.
 FAMILY_FALLBACK = [
+    (re.compile(r"fable"), "claude-fable-5"),
     (re.compile(r"opus-4-(?:5|6|7|8)"), "claude-opus-4-8"),
     (re.compile(r"opus-4"), "claude-opus-4"),
     (re.compile(r"mythos"), "mythos"),
@@ -353,19 +357,26 @@ def _tiered(tokens, base, above):
     return tokens * base
 
 
-def turn_cost(rate, inp, cache_create, cache_read, outp):
-    """Estimated USD for one turn given its rate dict and token buckets."""
+def turn_cost(rate, inp, cache_create_5m, cache_create_1h, cache_read, outp):
+    """Estimated USD for one turn given its rate dict and token buckets. Cache
+    creation is split: 5-minute writes bill at the table `cw` rate (1.25x
+    input); 1-hour writes bill at 2x input (Anthropic spec — derived here)."""
     if not rate:
         return 0.0
+    in_rate = rate.get("in")
+    in_200k = rate.get("in_200k")
+    oneh = (in_rate * 2.0) if in_rate is not None else None
+    oneh_200k = (in_200k * 2.0) if in_200k is not None else None
     return (
-        _tiered(inp, rate.get("in"), rate.get("in_200k"))
+        _tiered(inp, in_rate, in_200k)
         + _tiered(outp, rate.get("out"), rate.get("out_200k"))
-        + _tiered(cache_create, rate.get("cw"), rate.get("cw_200k"))
+        + _tiered(cache_create_5m, rate.get("cw"), rate.get("cw_200k"))
+        + _tiered(cache_create_1h, oneh, oneh_200k)
         + _tiered(cache_read, rate.get("cr"), rate.get("cr_200k"))
     )
 
 
-def turn_cache_savings(rate, cache_create, cache_read):
+def turn_cache_savings(rate, cache_create_5m, cache_create_1h, cache_read):
     """USD that prompt caching saved on this turn — the NET benefit, not a gross
     figure. Without caching, the cache_creation + cache_read tokens would each
     be billed as fresh input; with caching we instead pay the write premium on
@@ -378,8 +389,13 @@ def turn_cache_savings(rate, cache_create, cache_read):
     if in_rate is None:
         return 0.0
     in_200k = rate.get("in_200k")
-    no_cache = _tiered(cache_create, in_rate, in_200k) + _tiered(cache_read, in_rate, in_200k)
-    actual = (_tiered(cache_create, rate.get("cw"), rate.get("cw_200k"))
+    oneh = in_rate * 2.0
+    oneh_200k = (in_200k * 2.0) if in_200k is not None else None
+    no_cache = (_tiered(cache_create_5m, in_rate, in_200k)
+                + _tiered(cache_create_1h, in_rate, in_200k)
+                + _tiered(cache_read, in_rate, in_200k))
+    actual = (_tiered(cache_create_5m, rate.get("cw"), rate.get("cw_200k"))
+              + _tiered(cache_create_1h, oneh, oneh_200k)
               + _tiered(cache_read, rate.get("cr"), rate.get("cr_200k")))
     return no_cache - actual
 
@@ -1239,6 +1255,10 @@ def collect_claude():
     pricing_table, _ = load_pricing()
     last_ts = 0.0
     per_session = {}  # path -> {first_ts, last_ts, tokens, model, cwd}
+    # De-dupe ledger keyed by (message.id, requestId). Resumed-session files copy
+    # prior turns and sidechains replay them, so the same billed API response
+    # appears many times; count each once.
+    seen = set()
     session_5h_oldest = None  # oldest turn ts within last 5h
     week_7d_oldest = None     # oldest turn ts within last 7d
     # Tracks the most recent assistant turn from a *foreground* transcript
@@ -1274,6 +1294,16 @@ def collect_claude():
                     usage = msg.get("usage") or {}
                     if not isinstance(usage, dict):
                         continue
+                    # Skip a turn already counted (same message.id + requestId).
+                    # Only de-dupe when both ids are present; turns missing either
+                    # are kept as-is.
+                    msg_id = msg.get("id")
+                    req_id = obj.get("requestId")
+                    if msg_id and req_id:
+                        key = (msg_id, req_id)
+                        if key in seen:
+                            continue
+                        seen.add(key)
                     # Fresh-work view (ccusage convention) —
                     # total = input + cache_creation + output (+ thinking).
                     # Excludes cache_read which is billed at 0.1× but
@@ -1285,6 +1315,14 @@ def collect_claude():
                     # buckets — output isn't part of the live window.
                     fresh_in = int(usage.get("input_tokens", 0) or 0)
                     cache_create = int(usage.get("cache_creation_input_tokens", 0) or 0)
+                    # Split cache creation into 5m (1.25x) and 1h (2x input)
+                    # writes when the breakdown is present; else flat total @ 5m.
+                    cc = usage.get("cache_creation")
+                    if isinstance(cc, dict):
+                        cc_5m = int(cc.get("ephemeral_5m_input_tokens", 0) or 0)
+                        cc_1h = int(cc.get("ephemeral_1h_input_tokens", 0) or 0)
+                    else:
+                        cc_5m, cc_1h = cache_create, 0
                     cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
                     outp = int(usage.get("output_tokens", 0) or 0)
                     # Extended-thinking / reasoning output tokens. Anthropic
@@ -1320,8 +1358,8 @@ def collect_claude():
                     if isinstance(precomputed, (int, float)):
                         cost = float(precomputed)
                     else:
-                        cost = turn_cost(rate, fresh_in, cache_create, cache_read, outp)
-                    cache_saved = turn_cache_savings(rate, cache_create, cache_read)
+                        cost = turn_cost(rate, fresh_in, cc_5m, cc_1h, cache_read, outp)
+                    cache_saved = turn_cache_savings(rate, cc_5m, cc_1h, cache_read)
                     metrics = {
                         "total": total, "cache_read": cache_read,
                         "input": fresh_in, "output": outp,
@@ -1571,8 +1609,10 @@ def collect_codex():
                     # OpenAI has no cache-write charge; cached input bills at the
                     # read rate, reasoning at the output rate.
                     rate = match_pricing(current_model, pricing_table)
-                    cost = turn_cost(rate, fresh_in, 0, cached, billed_out)
-                    cache_saved = turn_cache_savings(rate, 0, cached)
+                    # Codex has no cache-write concept: both creation buckets
+                    # are 0; `cached` bills at the cache-read rate.
+                    cost = turn_cost(rate, fresh_in, 0, 0, cached, billed_out)
+                    cache_saved = turn_cache_savings(rate, 0, 0, cached)
                     metrics = {
                         "total": total, "cache_read": cached,
                         "input": fresh_in, "output": billed_out,
