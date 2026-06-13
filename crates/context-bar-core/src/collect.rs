@@ -116,8 +116,10 @@ pub fn claude_context_window(model: Option<&str>, observed_max: u64, betas: &[St
         if m.contains("haiku") {
             return Some(200_000);
         }
-        if m.contains("opus-4-7")
+        if m.contains("opus-4-8")
+            || m.contains("opus-4-7")
             || m.contains("opus-4-6")
+            || m.contains("sonnet-4-8")
             || m.contains("sonnet-4-7")
             || m.contains("sonnet-4-6")
             || m.contains("sonnet-4-5")
@@ -132,6 +134,10 @@ pub fn claude_context_window(model: Option<&str>, observed_max: u64, betas: &[St
             return Some(1_000_000);
         }
     }
+    // Safety net for any model not matched above: if we've actually observed a
+    // context larger than the 200k default, the window cannot be 200k, so it
+    // must be the 1M tier. Context only grows within a session, so this latches
+    // 1M once and never flips back — no oscillation.
     if observed_max > 200_000 {
         return Some(1_000_000);
     }
@@ -368,16 +374,11 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
             }
             let inp = fresh_in + cache_create + cache_read;
             let total = fresh_in + outp;
-            // Foreground-pick signal (pre-existing, unchanged): parentUuid is the
-            // message-threading link, present on ~every turn — kept only for the
-            // existing fallback heuristic below, NOT a sub-agent marker.
-            let is_subagent = obj.get("parentUuid").is_some_and(truthy)
-                || obj.get("parent_tool_use_id").is_some_and(truthy)
-                || msg.get("parentUuid").is_some_and(truthy)
-                || msg.get("parent_tool_use_id").is_some_and(truthy);
             // TRUE sub-agent (Task tool / dynamic-workflow) turn: Claude Code tags
-            // these `isSidechain: true`. parentUuid is NOT it (it's on every
-            // threaded turn). Used for the sub-agent burn split.
+            // these `isSidechain: true`. (parentUuid is NOT it — it's on every
+            // threaded turn, so it can't separate foreground from sub-agent.)
+            // Used for the sub-agent burn split AND to keep the foreground
+            // context % off sub-agent transcripts (see the `fg` pick below).
             let is_sidechain = obj.get("isSidechain").and_then(Value::as_bool) == Some(true)
                 || obj.get("parent_tool_use_id").is_some_and(truthy)
                 || msg.get("parent_tool_use_id").is_some_and(truthy);
@@ -479,7 +480,10 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
                 out.last_cwd = str_field(&obj, "cwd");
                 out.active_session_file = Some(path_s.clone());
             }
-            if !is_subagent && fg.as_ref().is_none_or(|f| ts > f.ts) {
+            // Foreground context %: track the most-recent *non-sidechain* turn,
+            // i.e. the real conversation — never a Task/sub-agent transcript
+            // (those carry huge cache_read and made the % spike/jump).
+            if !is_sidechain && fg.as_ref().is_none_or(|f| ts > f.ts) {
                 fg = Some(ForegroundTurn {
                     ts,
                     model: str_field(msg, "model"),
@@ -500,6 +504,12 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
     if let Some(pcwd) = &process_cwd {
         let mut best_ts = 0.0;
         for s in per_session.values() {
+            // Skip pure sub-agent (Task) transcripts: they inherit the project
+            // cwd but their (cache_read-heavy) context isn't the user's
+            // foreground window — counting them inflated the menubar %.
+            if s.tokens > 0 && s.subagent_tokens == s.tokens {
+                continue;
+            }
             if s.cwd.as_deref() == Some(pcwd.as_str()) && s.last_ts > best_ts {
                 best_ts = s.last_ts;
                 cwd_match = Some(s.clone());
@@ -525,7 +535,35 @@ pub fn collect_claude(home: &Path, now: f64, table: &Table) -> AgentUsage {
         out.last_context_pct = window.map(|w| round_pct(f.inp as f64 / w as f64 * 100.0, 2));
     }
 
-    finish(out, per_session, now, session_5h_oldest, week_7d_oldest)
+    let mut out = finish(out, per_session, now, session_5h_oldest, week_7d_oldest);
+    // Menubar context %: derive from the foreground *active* session — preferring
+    // one whose cwd matches the engine's working dir, else the most-recent.
+    // build_active_sessions already drops pure sub-agent transcripts and computes
+    // each session's pct against the right (now consistent) window, so this is
+    // far more robust than the per-turn pick above (which misses when
+    // `parent_tool_use_id` tags most turns) and never reads >100%.
+    if let Some(fg) = foreground_active(&out.active_sessions, process_cwd.as_deref()) {
+        out.last_context_pct = fg.context_pct;
+        out.last_context_window = fg.context_window;
+        if out.last_model.is_none() {
+            out.last_model = fg.model.clone();
+        }
+        if out.last_cwd.is_none() {
+            out.last_cwd = fg.cwd.clone();
+        }
+    }
+    out
+}
+
+/// The foreground active session: the cwd-matched one if any, else the most
+/// recent (the list is already sorted newest-last-turn first).
+fn foreground_active<'a>(actives: &'a [ActiveSession], pcwd: Option<&str>) -> Option<&'a ActiveSession> {
+    if let Some(p) = pcwd {
+        if let Some(m) = actives.iter().find(|s| s.cwd.as_deref() == Some(p)) {
+            return Some(m);
+        }
+    }
+    actives.first()
 }
 
 struct ForegroundTurn {
