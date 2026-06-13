@@ -65,7 +65,7 @@ fn collect_claude_extracts_buckets_and_cost() {
     let r = &out.recent_sessions[0];
     assert_eq!(r.id, "sess");
     assert_eq!(r.model, "claude-opus-4-8");
-    assert_eq!(r.project, "alpha");
+    assert_eq!(r.project, "work/alpha"); // non-git cwd → parent/leaf
     assert_eq!(r.input, 100);
     assert_eq!(r.output, 50);
     assert_eq!(r.cache_creation, 200);
@@ -119,7 +119,7 @@ fn collect_codex_subtracts_cached_input_and_bills_reasoning() {
 
     let r = &out.recent_sessions[0];
     assert_eq!(r.model, "gpt-5.5");
-    assert_eq!(r.project, "beta");
+    assert_eq!(r.project, "work/beta"); // non-git cwd → parent/leaf
     assert_eq!(r.cache_creation, 0);
     assert_eq!(out.last_context_window, Some(400_000));
 

@@ -78,7 +78,7 @@ pub fn project_name_from_cwd(cwd: Option<&str>) -> String {
     match cwd {
         None => "—".to_string(),
         Some(c) if c.is_empty() => "—".to_string(),
-        Some(c) => repo_name_from_cwd(c).unwrap_or_else(|| basename_of(c)),
+        Some(c) => repo_name_from_cwd(c).unwrap_or_else(|| parent_leaf(c)),
     }
 }
 
@@ -90,6 +90,25 @@ fn basename_of(c: &str) -> String {
     } else {
         base.to_string()
     }
+}
+
+/// For a cwd that is NOT inside a git repo, show `parent/leaf` (e.g.
+/// `hususi/backend`) instead of the bare leaf, so a plain directory reads as a
+/// location rather than masquerading as a project name. Falls back to the leaf
+/// when there is no meaningful parent.
+fn parent_leaf(c: &str) -> String {
+    let leaf = basename_of(c);
+    let trimmed = c.trim_end_matches('/');
+    if let Some(idx) = trimmed.rfind('/') {
+        let parent = &trimmed[..idx];
+        if !parent.is_empty() {
+            let pbase = basename_of(parent);
+            if !pbase.is_empty() && pbase != leaf {
+                return format!("{pbase}/{leaf}");
+            }
+        }
+    }
+    leaf
 }
 
 /// Walk up from `cwd` to the nearest `.git` and return the repository name:
@@ -632,8 +651,9 @@ mod tests {
     fn project_name_basename_rules() {
         assert_eq!(project_name_from_cwd(None), "—");
         assert_eq!(project_name_from_cwd(Some("")), "—");
-        assert_eq!(project_name_from_cwd(Some("/a/b/c")), "c");
-        assert_eq!(project_name_from_cwd(Some("/a/b/c/")), "c");
+        // Not a git repo → parent/leaf (so a plain dir reads as a location).
+        assert_eq!(project_name_from_cwd(Some("/a/b/c")), "b/c");
+        assert_eq!(project_name_from_cwd(Some("/a/b/c/")), "b/c");
         assert_eq!(project_name_from_cwd(Some("/")), "/");
     }
 

@@ -923,7 +923,14 @@ def project_name_from_cwd(cwd):
     repo = _repo_name_from_cwd(cwd)
     if repo:
         return repo
-    return os.path.basename(cwd.rstrip("/")) or cwd
+    # Not in a git repo: show parent/leaf (e.g. "hususi/backend") so a plain
+    # directory reads as a location rather than masquerading as a project.
+    trimmed = cwd.rstrip("/")
+    base = os.path.basename(trimmed) or cwd
+    parent = os.path.basename(os.path.dirname(trimmed))
+    if parent and parent != base:
+        return f"{parent}/{base}"
+    return base
 
 
 def _repo_name_from_cwd(cwd):
