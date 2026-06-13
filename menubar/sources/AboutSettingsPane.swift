@@ -7,6 +7,9 @@ import Foundation
 final class AboutSettingsViewController: PreferencePaneViewController {
     private let changelogURL = URL(string: "https://github.com/htahaozlu/context-bar/blob/main/CHANGELOG.md")!
 
+    /// Center + cap at 580pt to match the Settings and Privacy tabs.
+    override var preferredContentWidth: CGFloat? { 580 }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()

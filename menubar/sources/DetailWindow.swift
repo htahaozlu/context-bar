@@ -1,21 +1,20 @@
 import AppKit
 import Foundation
 
-/// Detail window — three tabs that match the design brief (`docs/macOS UI
-/// Theme`): **Stats · Cost · Settings**. The previous implementation had
-/// six tabs (Usage, Stats, Value, General, Privacy, About); the redesign
-/// collapses them into three by:
-///   * Dropping the standalone "Usage" tab — the same data the popover
-///     hero shows is already on the popover, and the Stats tab covers
-///     the historical view.
-///   * Renaming "Value" → "Cost" (matches the design mockup).
-///   * Folding General + Privacy + About into a single "Settings" tab
-///     that scrolls three group cards (General · Privacy · About).
+/// Detail window — five top-level tabs: **Stats · Cost · Settings · Privacy
+/// · About**. Stats and Cost are the data views; Settings hosts only the
+/// General preferences (Appearance · Alerts · Behavior), while Privacy and
+/// About are now their own top-level tabs (previously they were folded into
+/// the Settings tab as embedded sub-panes). Each settings tab is a standalone
+/// `PreferencePaneViewController` with its own scroll view and centered 580pt
+/// column; the data tabs keep the full 820pt canvas.
 final class DetailWindowController: NSWindowController, NSWindowDelegate {
     private let tabVC = NSTabViewController()
     let statsVC = StatsViewController()
     let costVC = CostViewController()
     private let settingsVC = SettingsViewController()
+    private let privacyVC = PrivacySettingsViewController()
+    private let aboutVC = AboutSettingsViewController()
 
     init(onThemeChange: @escaping (String) -> Void) {
         super.init(window: nil)
@@ -35,15 +34,28 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         costItem.image = NSImage(systemSymbolName: "dollarsign.circle",
                                   accessibilityDescription: costItem.label)
 
-        // Settings — General (Appearance · Alerts · Behavior), Privacy
-        // (AI Advisor · Sharing · Across your Macs), and About live in
-        // one scrollable pane.
+        // Settings — General only (Appearance · Alerts · Behavior).
         let settingsItem = NSTabViewItem(viewController: settingsVC)
         settingsItem.label = L10n.text("Settings", "Ayarlar")
         settingsItem.image = NSImage(systemSymbolName: "gearshape",
                                       accessibilityDescription: settingsItem.label)
 
-        [statsItem, costItem, settingsItem].forEach(tabVC.addTabViewItem)
+        // Privacy — AI Advisor · Sharing · Across your Macs. Now its own
+        // top-level tab (standalone scrollable pane).
+        let privacyItem = NSTabViewItem(viewController: privacyVC)
+        privacyItem.label = L10n.text("Privacy", "Gizlilik")
+        privacyItem.image = NSImage(systemSymbolName: "lock.shield",
+                                     accessibilityDescription: privacyItem.label)
+
+        // About — version, updates, repository context, files & shortcuts.
+        // Now its own top-level tab.
+        let aboutItem = NSTabViewItem(viewController: aboutVC)
+        aboutItem.label = L10n.text("About", "Hakkında")
+        aboutItem.image = NSImage(systemSymbolName: "info.circle",
+                                   accessibilityDescription: aboutItem.label)
+
+        [statsItem, costItem, settingsItem, privacyItem, aboutItem]
+            .forEach(tabVC.addTabViewItem)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
@@ -75,13 +87,13 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         }
 
         // "Connect a key" / "Connect to a server" CTAs on the Stats + Cost
-        // panes jump to the Settings tab (index 2: Stats·Cost·Settings)
-        // where the AI key + sync server URL live.
-        let openSettings: () -> Void = { [weak self] in
-            self?.selectTab(index: 2)
+        // panes jump to the Privacy tab (index 3: Stats·Cost·Settings·
+        // Privacy·About) where the AI key + sync server URL now live.
+        let openPrivacy: () -> Void = { [weak self] in
+            self?.selectTab(index: 3)
         }
-        costVC.onShowPrivacy = openSettings
-        statsVC.onShowPrivacy = openSettings
+        costVC.onShowPrivacy = openPrivacy
+        statsVC.onShowPrivacy = openPrivacy
 
         // A theme / language / setting change must immediately re-render
         // the data tabs too — so the Cost hero picks up the new accent
@@ -94,6 +106,8 @@ final class DetailWindowController: NSWindowController, NSWindowDelegate {
         }
         settingsVC.onThemeChange = apply
         settingsVC.onChange = { apply(ThemeStore.current.id) }
+        // Privacy changes (budget/sync/AI) also refresh the data tabs.
+        privacyVC.onChange = { apply(ThemeStore.current.id) }
     }
     required init?(coder: NSCoder) { fatalError() }
 

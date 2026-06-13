@@ -911,6 +911,10 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
     private var syncObserverToken: UUID?
     private var syncHeartbeat: Timer?
 
+    /// Center + cap at 580pt to match the Settings tab (consistency across the
+    /// standalone settings panes).
+    override var preferredContentWidth: CGFloat? { 580 }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
@@ -995,8 +999,9 @@ final class PrivacySettingsViewController: PreferencePaneViewController {
                 "Yalnızca sunucu çalıştırmak istemiyorsanız gerekir. Her Mac oraya özet kullanım yazar; Değer sekmesi birleştirir."),
             content: makeSyncFolderField())
 
-        // Footer is rendered once by the parent SettingsViewController at the
-        // very bottom of the combined scroll.
+        // Standalone tab now — render the reassurance footer at the bottom of
+        // this pane's own scroll.
+        addPrivacyFooter()
     }
 
     // ── AI ADVISOR UI
