@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.9.0] - 2026-06-13
+
+### Added
+
+- **Claude and Codex usage together.** Stats and Cost gain a "Both" filter (the new default) that merges both agents, and the popover renders a card for each active agent at once instead of only the most-recently-used one.
+- **Session context detail.** Click any session in the popover (or the hero card) to open a detail with the exact context-window fill (used / free / %), token composition, and an estimated per-turn "context loaded" breakdown (CLAUDE.md, MCP instructions, skills) read from the transcript. Claude's full `/context` category split (system prompt + built-in tools) is computed inside Claude Code and never written to disk, so the loader sizes are clearly marked as estimates.
+- **Reliable iCloud cross-machine sync.** Peer Macs' rollup files are now force-downloaded from iCloud Drive (placeholders included), so office/home machines actually appear under Cost → "Across your Macs". Enable iCloud Drive sync in Settings on each Mac (same Apple ID).
+- **App appearance override.** Settings → Appearance → Theme (System / Light / Dark) is now applied at launch, not only when the Settings window opens.
+
+### Changed
+
+- **macOS UI matches the design system end to end.** The popover, Stats, Cost, and Settings were rebuilt to the redesign: pill segmented filter buttons, rounded popups, pill switches, glyph wells, and hairlines; Stats/Cost two-column grids, a model filter, and metric tiles; a centered 580 pt Settings column with grouped cards. Existing features (drill-downs, AI advisor, cross-machine sync, heatmap) are preserved.
+- Menubar idle text ("no agent") now renders full-strength instead of dim gray.
+
+### Fixed
+
+- **Context % no longer reads above 100% or jumps around.** Current Claude models (Opus/Sonnet 4.8) are recognized as 1M-context, the window no longer flips 200k↔1M at the boundary, and the menubar percentage derives from the foreground active session — excluding sub-agent transcripts whose large cache reads previously inflated it. The figure stays stable and ≤100%.
+
 ## [0.8.6] - 2026-06-13
 
 ### Fixed
