@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, adapted for the current release workflow.
 
+## [0.10.0] - 2026-06-13
+
+### Fixed
+
+- **API-equivalent cost was overstated (~2×) — now correct.** Two engine bugs were inflating/distorting the figure: (1) **repeated turns were double-counted** — Claude Code copies prior turns into resumed-session files and replays sidechain turns, so the same billed API response (`message.id` + `requestId`) appeared many times (about half of all logged turns); we now count each once, matching ccusage's dedup. (2) **1-hour prompt-cache writes were underpriced** at the 5-minute rate (1.25× input) instead of Anthropic's **2× input**; we now read the `ephemeral_5m`/`ephemeral_1h` split and price each bucket correctly. Net: the 30-day cost was ~2.3× too high and is now verified against Anthropic's official pricing and cross-checked with ccusage. (Still an estimate — subscription users aren't billed per token.)
+- **Theme setting is findable again.** The accent-palette picker is now labelled "Theme / Tema" and the System/Light/Dark switch is "Mode / Mod" — a recent rename had put "Tema" on the Light/Dark switch and hidden the palette under "Accent / Vurgu".
+- **Cost tab no longer resizes the window.** Switching into Cost used to abruptly grow the detail window; every tab now shares one window size and taller content scrolls within the pane.
+- **Activity breakdown sits directly under the heatmap.** Clicking a day in the contribution graph updates the per-day detail right beneath it (and scrolls it into view) instead of changing a panel buried far below.
+- **Subscription users no longer see Claude usage labelled "billed to API key".** The per-model plan/API framing now follows the detected account: with an active Claude subscription every Claude model reads as plan-covered; only genuinely uncovered providers (Codex/GPT) read as API-billed.
+
+### Added
+
+- **Fable 5 pricing** ($10/$50 per Mtok, 5m cache write $12.50, cache read $1.00). Fable 5 usage was previously priced at $0.
+
 ## [0.9.1] - 2026-06-13
 
 ### Added
