@@ -59,8 +59,12 @@ enum MachineSync {
             .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
     }
 
-    /// True when iCloud Drive is set up on this Mac (the CloudDocs dir exists).
+    /// True when iCloud Drive is set up on this Mac: the user is actually signed
+    /// into iCloud (ubiquity token present) AND the CloudDocs dir exists. Both
+    /// matter — the dir can linger after sign-out, and the token can exist while
+    /// iCloud Drive itself is disabled.
     static var iCloudAvailable: Bool {
+        guard FileManager.default.ubiquityIdentityToken != nil else { return false }
         var isDir: ObjCBool = false
         return FileManager.default.fileExists(atPath: iCloudDriveRoot, isDirectory: &isDir)
             && isDir.boolValue
@@ -134,7 +138,14 @@ enum MachineSync {
         guard let out = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]) else { return }
         let dst = (folder as NSString).appendingPathComponent(fileSafe(machineName) + suffix)
         let tmp = dst + ".tmp"
-        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        } catch {
+            // iCloud may not be ready yet (signing in, Drive disabled, quota).
+            // Bail safely rather than crash; next refresh retries.
+            NSLog("[MachineSync] exportLocal: cannot create sync folder %@ — %@", folder, error.localizedDescription)
+            return
+        }
         if (try? out.write(to: URL(fileURLWithPath: tmp))) != nil {
             try? FileManager.default.removeItem(atPath: dst)
             try? FileManager.default.moveItem(atPath: tmp, toPath: dst)
@@ -142,14 +153,61 @@ enum MachineSync {
     }
 
     /// Read every machine's file from the synced folder (incl. this one).
+    ///
+    /// iCloud keeps a peer Mac's file as a non-materialized placeholder until
+    /// something asks for it — on disk that's `.<name>.icloud` (leading dot +
+    /// `.icloud` suffix), and `contentsOfDirectory(atPath:)` won't see the real
+    /// name at all. So before reading we coerce iCloud to download every
+    /// candidate: real `*.contextbar.json` files AND any `.*.icloud`
+    /// placeholders (whose real URL we reconstruct). Downloads are async, so a
+    /// freshly-added peer may still be missing this pass; it materializes within
+    /// a tick or two and shows up on the next refresh. We parse whatever read
+    /// successfully and skip the rest gracefully.
     static func readAll() -> [MachineUsage] {
         guard enabled else { return [] }
         let folder = DisplayPrefs.syncFolder
         let self_ = machineName
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder) else { return [] }
+        let folderURL = URL(fileURLWithPath: folder, isDirectory: true)
+        let fm = FileManager.default
+
+        // Enumerate by URL so we can trigger downloads. Collect the real
+        // `*.contextbar.json` URLs to parse this pass.
+        var realURLs: [URL] = []
+        if let entries = try? fm.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]) {
+            // Visible (already-materialized) real files.
+            for url in entries where url.lastPathComponent.hasSuffix(suffix) {
+                // Nudge iCloud to keep it current; harmless for local files.
+                try? fm.startDownloadingUbiquitousItem(at: url)
+                realURLs.append(url)
+            }
+        }
+        // Placeholders are hidden (leading dot), so enumerate WITHOUT skipping
+        // hidden files to catch `.<name>.contextbar.json.icloud`. Trigger their
+        // download (materializes for the next pass) and also add the derived
+        // real URL in case the file is already readable this pass.
+        if let allEntries = try? fm.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: nil,
+            options: []) {
+            for url in allEntries {
+                let name = url.lastPathComponent
+                guard name.hasPrefix("."), name.hasSuffix(".icloud") else { continue }
+                // `.MacBook.contextbar.json.icloud` -> `MacBook.contextbar.json`
+                let realName = String(name.dropFirst().dropLast(".icloud".count))
+                guard realName.hasSuffix(suffix) else { continue }
+                let realURL = folderURL.appendingPathComponent(realName)
+                // Kick the download using the real URL (iCloud API expects it).
+                try? fm.startDownloadingUbiquitousItem(at: realURL)
+                if !realURLs.contains(realURL) { realURLs.append(realURL) }
+            }
+        }
+
         var out: [MachineUsage] = []
-        for n in names where n.hasSuffix(suffix) {
-            let p = (folder as NSString).appendingPathComponent(n)
+        for p in realURLs.map({ $0.path }) {
+            let n = (p as NSString).lastPathComponent
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: p)),
                   let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { continue }
