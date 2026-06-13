@@ -22,6 +22,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// until restart.
     private var fsWatchedPaths: Set<String> = []
     private var popoverVisible = false
+    /// Global click monitor live only while a tapped-session detail popover is
+    /// open; a click outside the app tears the whole popover stack down (the
+    /// transient feel the parent loses while suspended — see
+    /// `setHostDismissalSuspended`).
+    private var detailDismissMonitor: Any?
     private var lastAllAgents: [Agent] = []
     private var engineRunning = false
     private var enginePending = false
@@ -348,7 +353,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverWillShow(_ notification: Notification) { popoverVisible = true }
-    func popoverDidClose(_ notification: Notification) { popoverVisible = false }
+    func popoverDidClose(_ notification: Notification) {
+        popoverVisible = false
+        // The menubar popover went away — take any open session-detail child
+        // with it and drop the dismissal suspension so the next open is a
+        // normal transient popover again.
+        popoverVC.dismissSessionDetail()
+        setHostDismissalSuspended(false)
+    }
+
+    /// While a tapped-session detail popover is on screen, flip the menubar
+    /// popover off `.transient`: a transient child steals key and would drag the
+    /// parent (and the detail's own anchor row) closed, so the detail just
+    /// flashed and vanished on click. Restored to `.transient` on close. A
+    /// global click monitor keeps the "click away to dismiss" feel for clicks
+    /// that land outside the app while the popover is suspended.
+    private func setHostDismissalSuspended(_ suspended: Bool) {
+        popover.behavior = suspended ? .applicationDefined : .transient
+        if suspended {
+            guard detailDismissMonitor == nil else { return }
+            detailDismissMonitor = NSEvent.addGlobalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+                self?.popoverVC.dismissSessionDetail()
+                self?.popover.performClose(nil)
+            }
+        } else if let monitor = detailDismissMonitor {
+            NSEvent.removeMonitor(monitor)
+            detailDismissMonitor = nil
+        }
+    }
 
     /// Spawns the bundled engine to rewrite ~/.context-bar/context.json, then reloads
     /// the menu. Engine runs off the main thread so the menubar stays responsive;
@@ -527,6 +560,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         popoverVC.onShare = { [weak self] anchor in
             self?.presentShareCard(from: anchor)
+        }
+        popoverVC.onSessionDetailVisible = { [weak self] visible in
+            self?.setHostDismissalSuspended(visible)
         }
         if let button = statusItem.button {
             button.target = self

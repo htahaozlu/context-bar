@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-final class MenubarPopoverViewController: NSViewController {
+final class MenubarPopoverViewController: NSViewController, NSPopoverDelegate {
     static let contentWidth: CGFloat = 360
     private static let activeToolWindow: TimeInterval = 30 * 60
     private let hPad: CGFloat = Spacing.m
@@ -21,6 +21,12 @@ final class MenubarPopoverViewController: NSViewController {
     /// SHRINKS as well as grows — `preferredContentSize` alone only grows the
     /// popover; it keeps its tallest frame on shrink, leaving a blank band.
     var onSized: ((NSSize) -> Void)?
+    /// Fired when a tapped-session detail popover appears (`true`) or closes
+    /// (`false`). The host suspends the menubar popover's transient auto-dismiss
+    /// while the child is up — a transient child steals key and would otherwise
+    /// pull the parent (and this child's anchor row) closed, so the detail just
+    /// flashed and vanished on click.
+    var onSessionDetailVisible: ((Bool) -> Void)?
 
     private let visualEffect = NSVisualEffectView()
     private let contentStack = NSStackView()
@@ -623,12 +629,20 @@ final class MenubarPopoverViewController: NSViewController {
     /// clicked row / hero card. `.transient` so it dismisses on outside clicks
     /// without swallowing the next interaction.
     private func showSessionDetail(session: ActiveSession, agentName: String, anchor: NSView) {
-        sessionDetailPopover?.performClose(nil)
+        // Drop the previous detail without firing our delegate — an async
+        // performClose would otherwise call popoverDidClose AFTER we've shown
+        // the next one and clear the host-dismissal suspension out from under it.
+        if let existing = sessionDetailPopover {
+            existing.delegate = nil
+            existing.performClose(nil)
+            sessionDetailPopover = nil
+        }
         let detail = SessionDetailView(session: session, agentName: agentName)
         let vc = NSViewController()
         vc.view = detail
         let pop = NSPopover()
         pop.behavior = .transient
+        pop.delegate = self
         pop.contentViewController = vc
         // The "context loaded each turn" section fills in asynchronously after a
         // background transcript parse — the popover is sized once here, so let the
@@ -649,7 +663,22 @@ final class MenubarPopoverViewController: NSViewController {
             width: SessionDetailView.preferredWidth,
             height: max(detail.fittingSize.height, 1))
         sessionDetailPopover = pop
+        // Suspend the host's auto-dismiss BEFORE showing the child, so the child
+        // stealing key can't take the parent (and this anchor) down with it.
+        onSessionDetailVisible?(true)
         pop.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxX)
+    }
+
+    /// Closes the tapped-session detail popover if one is open. The host calls
+    /// this when an outside click (or the menubar popover closing) should tear
+    /// the whole stack down.
+    func dismissSessionDetail() { sessionDetailPopover?.performClose(nil) }
+
+    func popoverDidClose(_ notification: Notification) {
+        // Only our session-detail child is delegated here; ignore stragglers.
+        guard (notification.object as? NSPopover) === sessionDetailPopover else { return }
+        sessionDetailPopover = nil
+        onSessionDetailVisible?(false)
     }
 
     @available(*, deprecated)
