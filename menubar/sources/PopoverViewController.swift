@@ -93,21 +93,26 @@ final class MenubarPopoverViewController: NSViewController {
         let snapshot = ContextSnapshot()
         let (active, all, others) = snapshot.load()
         let primary = active ?? all.first
-        // The OTHER first-party agent (Claude vs Codex). Both must be visible at
-        // once (product requirement), but only when it actually has data — an
-        // empty/idle second agent must not add a blank card. `agentHasData`
-        // gates render-worthiness; ordering follows `all` so the result is stable.
-        let secondary = all.first { $0.name != primary?.name && agentHasData($0) }
+        // The two first-party agents, resolved by name from `all` (which is
+        // `[claude, codex]`). Both usage-limit cards are ALWAYS rendered at the
+        // bottom (product requirement) — `claudeAgent`/`codexAgent` may be nil
+        // when the engine hasn't seen that agent at all, in which case the card
+        // draws its muted idle state. Name match is case-insensitive so a
+        // differently-cased engine label still resolves.
+        let claudeAgent = all.first { $0.name.caseInsensitiveCompare("Claude") == .orderedSame }
+        let codexAgent = all.first { $0.name.caseInsensitiveCompare("Codex") == .orderedSame }
         let activeOthers = others.filter { isActivelyUsed($0, now: now) }
-        // Parallel-session visibility is time-dependent but NOT reflected in the
-        // raw session timestamps the key already hashes, so fold the visible
-        // count in explicitly. Without this, a session aging past the 30-min
-        // cutoff leaves the key byte-identical → the early-bail fires → the
-        // parallel card is never removed and the popover never shrinks.
-        let parallelVisible = primary.map { parallelSessions(for: $0, now: now).count } ?? 0
+        // Parallel sessions now span BOTH agents (every concurrent live session
+        // except the one the hero already shows). Visibility is time-dependent
+        // but NOT reflected in the raw session timestamps the key hashes, so fold
+        // the visible count in explicitly — without it a session aging past the
+        // 30-min cutoff leaves the key byte-identical, the early-bail fires, and
+        // the parallel card is never removed (popover never shrinks).
+        let parallelAll = primary.map { allParallelSessions(hero: $0, all: all, now: now) } ?? []
+        let parallelVisible = parallelAll.count
         let key = snapshotKey(
-            active: active, primary: primary, secondary: secondary, all: all,
-            others: activeOthers, parallelVisible: parallelVisible)
+            active: active, primary: primary, claude: claudeAgent, codex: codexAgent,
+            all: all, others: activeOthers, parallelVisible: parallelVisible)
         // Engine returned — stop the manual-refresh spinner whether or not the
         // snapshot key actually changed. If the footer gets rebuilt below the
         // call is a no-op against the new button.
@@ -127,37 +132,19 @@ final class MenubarPopoverViewController: NSViewController {
         contentStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         if let agent = primary {
-            // Card order: hero (active session) → parallel sessions →
-            // usage limits → [other agent hero + its limits] → other tools.
+            // Clean three-tier layout (top → bottom):
+            //   1. ONE hero — the foreground / most-recently-active session.
+            //   2. Parallel sessions — every OTHER concurrent live session across
+            //      BOTH agents, as a single list.
+            //   3. TWO usage-limit cards — Claude then Codex, ALWAYS both, each
+            //      captioned by agent name. An agent with no data renders a muted
+            //      idle card rather than being omitted.
             addCard(buildHero(agent: agent, isActive: isLive(agent, now: now)))
-            if hasParallelSessions(agent: agent, now: now) {
-                addCard(buildParallelSessions(agent: agent, now: now))
+            if !parallelAll.isEmpty {
+                addCard(buildParallelSessionsAll(sessions: parallelAll))
             }
-            if hasSecondaryData(agent) {
-                addCard(buildUsageLimits(agent))
-            }
-            // Second first-party agent (the OTHER of Claude/Codex). Both are
-            // shown at once: a captioned hero for the agent, then its own
-            // usage-limits card. `secondary` is already nil-gated on having
-            // data, so an idle agent adds nothing. Liveness is evaluated PER
-            // AGENT (`isLive`) — not against the single global `active` — so a
-            // second agent that is itself mid-session shows its live context %
-            // and live dot rather than reading as idle just because the other
-            // agent fired more recently.
-            if let other = secondary {
-                let live = isLive(other, now: now)
-                let caption = live
-                    ? L10n.text("\(other.name) — also active", "\(other.name) — ayrıca aktif")
-                    : L10n.text("\(other.name) — recent", "\(other.name) — yakın zamanda")
-                addCard(buildSectionCaption(caption))
-                addCard(buildHero(agent: other, isActive: live))
-                if hasParallelSessions(agent: other, now: now) {
-                    addCard(buildParallelSessions(agent: other, now: now))
-                }
-                if hasSecondaryData(other) {
-                    addCard(buildUsageLimits(other))
-                }
-            }
+            addCard(buildAgentLimitsCard(agent: claudeAgent, name: "Claude"))
+            addCard(buildAgentLimitsCard(agent: codexAgent, name: "Codex"))
         } else {
             // Before the engine has produced a context.json (first launch / cache
             // miss after purge) show the loading stripe instead of the
@@ -241,27 +228,6 @@ final class MenubarPopoverViewController: NSViewController {
             div.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor),
             div.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor),
         ])
-    }
-
-    /// A first-party agent is "worth showing" when it has any live context, any
-    /// rolling-limit pressure, or a recent turn — i.e. there is something for
-    /// the user to read. Mirrors `hasSecondaryData` but also counts a live
-    /// context % so an agent mid-session (limits not yet populated) still shows.
-    private func agentHasData(_ a: Agent) -> Bool {
-        if a.ctxPct != nil { return true }
-        if a.activeSession > 0 { return true }
-        if a.session5h > 0 || a.session5hPercent != nil { return true }
-        if a.week7d > 0 || a.week7dPercent != nil { return true }
-        if a.lastTurn != nil { return true }
-        return false
-    }
-
-    /// Stand-alone section caption used between the two agent blocks. Unlike the
-    /// in-card `sectionCaption`, this is laid out directly in the popover stack
-    /// as its own row (with the standard card inset) so it titles the agent
-    /// block that follows.
-    private func buildSectionCaption(_ text: String) -> NSView {
-        sectionCaption(Typography.captionAttributed(text))
     }
 
     // MARK: - Sections
@@ -740,16 +706,52 @@ final class MenubarPopoverViewController: NSViewController {
         return false
     }
 
-    /// Single usage-limits card for the hero agent. Background agents surface
-    /// through the parallel / other-tools cards so the popover keeps one clear
-    /// primary hierarchy instead of stacking equally loud limit blocks.
-    private func buildUsageLimits(_ a: Agent) -> NSView {
+    /// One usage-limits card PER first-party agent, always rendered (Claude then
+    /// Codex at the bottom of the popover). When the agent exists and has limit
+    /// or session data it shows the rolling-window rows; otherwise it draws a
+    /// muted idle card ("No <name> activity") so the two-card row stays present
+    /// and scannable even when one agent is dormant. `name` is the canonical
+    /// label ("Claude"/"Codex") used for the caption + idle copy and survives a
+    /// nil agent.
+    private func buildAgentLimitsCard(agent a: Agent?, name: String) -> NSView {
+        if let a, hasSecondaryData(a) {
+            return buildUsageLimits(a, caption: name)
+        }
+        return buildIdleLimitsCard(name: name)
+    }
+
+    /// Muted placeholder limits card for an agent with no data. Keeps the
+    /// agent-name caption (so the two cards read as a matched pair) above a quiet
+    /// one-line "No <name> activity" note. Uses the standard (translucent) card
+    /// surface, tertiary text — deliberately low-contrast so a dormant agent
+    /// doesn't compete with the live hero above it.
+    private func buildIdleLimitsCard(name: String) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
 
-        let caption = sectionCaption(
-            Typography.captionAttributed(L10n.text("Usage limits", "Kullanım limitleri"))
-        )
+        let caption = sectionCaption(Typography.captionAttributed(name))
+        stack.addArrangedSubview(caption)
+        caption.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
+        let idle = NSTextField(
+            labelWithString: L10n.text("No \(name) activity", "\(name) etkinliği yok"))
+        idle.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+        idle.textColor = Palette.tertiaryText
+        idle.lineBreakMode = .byTruncatingTail
+        idle.cell?.usesSingleLineMode = true
+        stack.addArrangedSubview(idle)
+        idle.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        return container
+    }
+
+    /// Rolling usage-limit rows for one agent (5-hour, 7-day, session total),
+    /// captioned by `caption` (the agent name). Caller (`buildAgentLimitsCard`)
+    /// only invokes this when the agent actually has data.
+    private func buildUsageLimits(_ a: Agent, caption captionText: String) -> NSView {
+        let (container, stack) = sectionContainer()
+        stack.spacing = Spacing.xs
+
+        let caption = sectionCaption(Typography.captionAttributed(captionText))
         stack.addArrangedSubview(caption)
         caption.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
@@ -884,12 +886,11 @@ final class MenubarPopoverViewController: NSViewController {
         return row
     }
 
-    /// "Parallel Sessions" card — one row per concurrent Claude/Codex session
-    /// other than the hero (foreground) one. Each row shows the project name +
-    /// model on top, a thin context-percent bar underneath, the percent text +
-    /// last-turn relative time on the right. Capped at 5 rows; a "+N more"
-    /// footer appears if exceeded. Caller is responsible for only invoking
-    /// this when `hasParallelSessions(agent:)` returns true.
+    /// The agent's concurrent live sessions OTHER than the foreground one shown
+    /// in the hero (filtered by the 30-min activity window). Fed into the merged
+    /// cross-agent parallel list (`allParallelSessions`) and the snapshot
+    /// fingerprint. Excludes the foreground session by cwd-derived project (or,
+    /// when no cwd is known, by the first/most-recent session id).
     private func parallelSessions(for a: Agent, now: Date = Date()) -> [ActiveSession] {
         let recentCutoff = now.addingTimeInterval(-Self.activeToolWindow)
         let foregroundCwd = a.cwd
@@ -905,39 +906,71 @@ final class MenubarPopoverViewController: NSViewController {
         }
     }
 
-    private func hasParallelSessions(agent a: Agent, now: Date = Date()) -> Bool {
-        !parallelSessions(for: a, now: now).isEmpty
+    /// One concurrent session plus the name of the agent that owns it — so the
+    /// merged parallel list can still open the right detail popover (which is
+    /// keyed by agent name) when a row is tapped.
+    private struct ParallelEntry {
+        let agentName: String
+        let session: ActiveSession
     }
 
-    private func buildParallelSessions(agent a: Agent, now: Date = Date()) -> NSView {
+    /// Every concurrent live session across BOTH agents, EXCEPT the one already
+    /// shown in the hero. The hero shows `hero`'s most-recent session, so for the
+    /// hero's own agent we reuse the existing per-agent `parallelSessions` filter
+    /// (which already excludes the foreground/most-recent session). For the OTHER
+    /// agent every recent session is "parallel" relative to the hero, so we
+    /// surface all of its recently-active sessions. Sorted most-recent first so
+    /// the list reads top-down by activity.
+    private func allParallelSessions(hero: Agent, all: [Agent], now: Date = Date()) -> [ParallelEntry] {
+        let recentCutoff = now.addingTimeInterval(-Self.activeToolWindow)
+        var entries: [ParallelEntry] = []
+        for agent in all {
+            if agent.name == hero.name {
+                // Same agent as the hero — exclude the session the hero renders.
+                for sess in parallelSessions(for: agent, now: now) {
+                    entries.append(ParallelEntry(agentName: agent.name, session: sess))
+                }
+            } else {
+                // Different agent — every recently-active session is parallel.
+                for sess in agent.activeSessions
+                where (sess.lastTurn ?? .distantPast) >= recentCutoff {
+                    entries.append(ParallelEntry(agentName: agent.name, session: sess))
+                }
+            }
+        }
+        return entries.sorted {
+            ($0.session.lastTurn ?? .distantPast) > ($1.session.lastTurn ?? .distantPast)
+        }
+    }
+
+    /// "Parallel sessions" card built from a pre-merged, cross-agent list. Mirrors
+    /// `buildParallelSessions` (caption + "N active" count, capped rows with a
+    /// "+N more" footer, clickable rows opening the session detail), but each row
+    /// resolves its detail popover against the entry's own agent name rather than
+    /// a single agent's. Caller only invokes this when `sessions` is non-empty.
+    private func buildParallelSessionsAll(sessions: [ParallelEntry]) -> NSView {
         let (container, stack) = sectionContainer()
         stack.spacing = Spacing.xs
 
-        let allOthers = parallelSessions(for: a, now: now)
         let cap = 5
-        let shown = Array(allOthers.prefix(cap))
-        let overflow = max(0, allOthers.count - cap)
+        let shown = Array(sessions.prefix(cap))
+        let overflow = max(0, sessions.count - cap)
 
-        // Caption with a right-aligned "N active" count (popover.jsx PopCap
-        // `right={SESSIONS.length + ' active'}`).
         let header = captionRow(
             L10n.text("Parallel sessions", "Paralel oturumlar"),
-            right: L10n.text("\(allOthers.count) active", "\(allOthers.count) aktif"))
+            right: L10n.text("\(sessions.count) active", "\(sessions.count) aktif"))
         stack.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
-        for (i, sess) in shown.enumerated() {
+        for (i, entry) in shown.enumerated() {
             if i > 0 {
                 let div = DividerView()
                 stack.addArrangedSubview(div)
                 div.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
             }
-            // Wrap the row so clicking it opens that session's context detail,
-            // anchored to the row, with a pointing-hand cursor on hover. The
-            // anchor is resolved lazily through `weak row` so the closure can
-            // reference the wrapper it's installed on without a cycle.
+            let sess = entry.session
             let inner = makeParallelSessionRow(sess)
-            let agentName = a.name
+            let agentName = entry.agentName
             var row: ClickableRowView!
             row = ClickableRowView(content: inner) { [weak self, weak row] in
                 guard let self, let row else { return }
@@ -957,6 +990,7 @@ final class MenubarPopoverViewController: NSViewController {
         }
         return container
     }
+
 
     private func isActivelyUsed(_ tool: ToolSummary, now: Date = Date()) -> Bool {
         guard let lastUsed = parseISODate(tool.lastUsed) else { return false }
@@ -1049,40 +1083,21 @@ final class MenubarPopoverViewController: NSViewController {
     /// refreshes producing the same key skip the rebuild entirely so the
     /// popover doesn't tear down + re-add its cards on every 10s tick.
     private func snapshotKey(
-        active: Agent?, primary: Agent?, secondary: Agent?, all: [Agent],
+        active: Agent?, primary: Agent?, claude: Agent?, codex: Agent?, all: [Agent],
         others: [ToolSummary], parallelVisible: Int
     ) -> String {
         var parts: [String] = []
         parts.append(active?.name ?? "-")
-        // Time-derived visible count — folds the 30-min parallel-session cutoff
-        // into the key so an aging-out card isn't stranded by the early-bail.
+        // Time-derived visible count for the MERGED cross-agent parallel list —
+        // folds the 30-min cutoff into the key so an aging-out session isn't
+        // stranded by the early-bail (its raw timestamps stay byte-identical).
         parts.append("PV:\(parallelVisible)")
-        // Per-agent liveness is `now`-derived (lastTurn vs the active window),
-        // so it can flip while the raw timestamps the key hashes stay identical.
-        // Fold both flags in so an agent aging from live→idle (dot + context %
-        // change) isn't frozen by the early-bail.
+        // Hero liveness is `now`-derived (lastTurn vs the active window), so it can
+        // flip while the hashed timestamps stay identical — fold it in so the
+        // hero aging live→idle (dot + context % change) isn't frozen.
         parts.append("LV:\(primary.map { isLive($0) } ?? false ? 1 : 0)")
-        parts.append("LV2:\(secondary.map { isLive($0) } ?? false ? 1 : 0)")
-        // The second agent now renders a full hero + parallel + limits card, so
-        // ITS render-affecting fields must be in the key too — otherwise its
-        // context %, window, model or session list could change while the key
-        // stayed byte-identical and the early-bail would freeze the stale card.
-        if let s = secondary {
-            let parallel2 = parallelSessions(for: s).count
-            parts.append("PV2:\(parallel2)")
-            parts.append("SEC:\(s.name)|\(s.project)|\(s.model ?? "-")")
-            parts.append(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")
-            parts.append(s.ctxWindow.map(String.init) ?? "-")
-            parts.append(String(s.activeSession))
-            parts.append(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")
-            for ss in s.activeSessions {
-                parts.append(
-                    "S2:\(ss.id)|\(ss.project)|\(ss.model ?? "-")|\(ss.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(ss.tokens)|\(ss.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")"
-                )
-            }
-        } else {
-            parts.append("SEC:-")
-        }
+
+        // ── Hero card + the hero agent's own parallel sessions ──
         if let p = primary {
             parts.append(p.name)
             parts.append(p.project)
@@ -1090,22 +1105,35 @@ final class MenubarPopoverViewController: NSViewController {
             parts.append(p.ctxPct.map { String(format: "%.1f", $0) } ?? "-")
             parts.append(p.ctxWindow.map(String.init) ?? "-")
             parts.append(String(p.activeSession))
-            parts.append(String(p.session5h))
-            parts.append(p.session5hPercent.map { String(format: "%.1f", $0) } ?? "-")
-            parts.append(String(p.week7d))
-            parts.append(p.week7dPercent.map { String(format: "%.1f", $0) } ?? "-")
             parts.append(p.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")
             parts.append(p.sessionStarted.map { String(Int($0.timeIntervalSince1970)) } ?? "-")
-            for s in p.activeSessions {
+        }
+
+        // ── Both limit cards (always rendered) + every agent's sessions ──
+        // The two bottom cards plus the merged parallel list both depend on each
+        // agent's full state, so hash every agent's limit fields, idle-vs-data
+        // flag, AND individual sessions. Iterating `all` (stable [claude,codex]
+        // order) captures the non-hero agent's sessions that now feed the
+        // parallel list — without this they could change while the key stayed
+        // byte-identical and the early-bail would freeze stale rows.
+        let limited: (Agent?, String) -> Void = { agent, label in
+            guard let a = agent else { parts.append("LIM:\(label):-"); return }
+            parts.append(
+                "LIM:\(label)|\(self.hasSecondaryData(a) ? 1 : 0)|\(a.session5h)|\(a.session5hPercent.map { String(format: "%.1f", $0) } ?? "-")|\(a.week7d)|\(a.week7dPercent.map { String(format: "%.1f", $0) } ?? "-")|\(a.activeSession)|\(a.session5hResetsAt.map { String(Int($0.timeIntervalSince1970)) } ?? "-")|\(a.week7dResetsAt.map { String(Int($0.timeIntervalSince1970)) } ?? "-")"
+            )
+        }
+        // Canonical Claude-then-Codex order so the key is stable regardless of
+        // `all`'s ordering.
+        limited(claude, "Claude")
+        limited(codex, "Codex")
+
+        for ag in all {
+            parts.append("AG:\(ag.name)|\(ag.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")|\(ag.model ?? "-")")
+            for s in ag.activeSessions {
                 parts.append(
-                    "S:\(s.id)|\(s.project)|\(s.model ?? "-")|\(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(s.tokens)|\(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")"
+                    "S:\(ag.name)|\(s.id)|\(s.project)|\(s.model ?? "-")|\(s.ctxPct.map { String(format: "%.1f", $0) } ?? "-")|\(s.tokens)|\(s.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")"
                 )
             }
-        }
-        for ag in all where ag.name != primary?.name {
-            parts.append(
-                "A:\(ag.name)|\(ag.session5h)|\(ag.session5hPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.week7d)|\(ag.week7dPercent.map { String(format: "%.1f", $0) } ?? "-")|\(ag.activeSession)|\(ag.lastTurn.map { String(Int($0.timeIntervalSince1970)) } ?? "-")|\(ag.model ?? "-")"
-            )
         }
         for t in others {
             parts.append("O:\(t.name)|\(t.tokens7d)|\(t.sessions7d)|\(t.lastModel ?? "-")")
