@@ -13,6 +13,10 @@ The format is based on Keep a Changelog, adapted for the current release workflo
 - **Typography ships inside the app bundle.** JetBrains Mono is now bundled and registered via the macOS app packaging path so numeric surfaces stay consistent in local builds and release artifacts.
 - **Clay theme polish across popover, settings, and stats.** The refreshed macOS UI pass tightens spacing, component styling, and hierarchy across the menubar surfaces while keeping the single-theme direction introduced in v0.8.4.
 
+### Fixed
+
+- **Context meter no longer mixes sources.** The menubar parser previously fell back to an active session for the context percentage while keeping the top-level context-window size, which could pair fresh usage with a stale `1M` window and show impossible combinations. Percentage and window now resolve from the same source, so the popover's `%` and `used / window` line stay consistent.
+
 ## [0.8.4] - 2026-06-11
 
 ### Changed
